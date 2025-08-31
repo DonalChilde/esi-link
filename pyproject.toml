@@ -1,14 +1,38 @@
 [project]
 name = "esi-link"
-version = "0.1.0"
-description = "A command line first interface to the Eve Online API"
+# version = "0.1.0"
+# description = "A command line first interface to the Eve Online API"
 readme = "README.md"
-authors = [
-    { name = "Chad Lowe", email = "pfmsoft.dev@gmail.com" }
-]
+authors = [{ name = "Chad Lowe", email = "pfmsoft.dev@gmail.com" }]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "aiohttp>=3.12.15",
+    "pydantic>=2.11.7",
+    "typer>=0.17.3",
+    "whenever>=0.8.8",
+]
+# https://packaging.python.org/en/latest/specifications/license-expression/#specification
+license = "MIT"
+# https://packaging.python.org/en/latest/specifications/pyproject-toml/#license-files
+license-files = ["LICENSE"]
+# https://packaging.python.org/en/latest/specifications/pyproject-toml/#dynamic
+dynamic = ["version", "description"]
+
+
+[project.scripts]
+# script entry-points
+# COMMAND_NAME = "PATH.TO.ENTRY.MODULE:ENTRY_FUNCTION"
+esi-link = "esi_link.cli.main:app"
+
+[project.urls]
+Documentation = "https://github.com/DonalChilde/esi-link#readme"
+# Documentation_rtd = "https://esi-link.readthedocs.io"
+Issues = "https://github.com/DonalChilde/esi-link/issues"
+Source = "https://github.com/DonalChilde/esi-link"
 
 [build-system]
 requires = ["uv_build>=0.8.3,<0.9.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = ["pytest>=8.4.1", "pytest-cov>=6.2.1", "ruff>=0.12.11", "scriv>=1.7.0"]
