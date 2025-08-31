@@ -23,8 +23,8 @@ from uuid import UUID
 
 from ..esi_schema.eve_openapi_protocol import EveOpenApiProtocol
 from ..helpers.cache_id_from_url import cache_id_from_url
+from ..helpers.header_funcs import last_modified, page_count
 from .esi_link import EsiLink, EsiQuery, QueryResponse
-from .header_funcs import last_modified, page_count
 from .link_cache_protocol import CacheStatus, LinkCacheProtocol
 
 logger = logging.getLogger(__name__)

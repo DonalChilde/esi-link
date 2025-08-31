@@ -22,8 +22,8 @@ from uuid import UUID
 import aiohttp
 
 from ..esi_schema.eve_openapi_protocol import EveOpenApiProtocol
+from ..helpers.header_funcs import limit_remain, limit_reset
 from ..helpers.now_utc import now_utc
-from .header_funcs import limit_remain, limit_reset
 from .models import EsiQuery, QueryResponse
 
 logger = logging.getLogger(__name__)
