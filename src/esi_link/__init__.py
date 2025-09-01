@@ -13,6 +13,8 @@ _app_name = "Esi Link"
 __description__ = "A command line first interface to the Eve Online API"
 
 # The short X.Y.Z version.
+# Update in pyproject.toml, as uv build backend does not yet support dynamic metadata
+# https://github.com/astral-sh/uv/issues/11718
 __version__ = "0.1.0"
 # The full version, including alpha/beta/rc tags.
 __release__ = __version__

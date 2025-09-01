@@ -16,7 +16,10 @@ license = "MIT"
 # https://packaging.python.org/en/latest/specifications/pyproject-toml/#license-files
 license-files = ["LICENSE"]
 # https://packaging.python.org/en/latest/specifications/pyproject-toml/#dynamic
-dynamic = ["version", "description"]
+# https://github.com/astral-sh/uv/issues/11718
+# dynamic = ["version", "description"]
+version = "0.1.0"
+description = "A command line first interface to the Eve Online API"
 
 
 [project.scripts]
