@@ -1,7 +1,7 @@
 from esi_link.esi_schema.eve_openapi import EveOpenApi
 
 
-def get_operations_by_tag_string(api: EveOpenApi) -> str:
+def format_operations_by_tag_string(api: EveOpenApi) -> str:
     """
     Return available operations grouped by tag, sorted alphabetically inside each tag,
     and indicate if authorization is required (flag after operation id).
