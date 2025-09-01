@@ -1,20 +1,54 @@
 """Resolve internal json references."""
 
-from typing import Any
+# pyright: basic
+from typing import Any, Dict
 
 
-# TODO make tests for this and use inplace of current implementation.
-# TODO does the spec allow only returning dict?
-def resolve_json_ref(spec: dict[str, Any], reference: str) -> dict[str, Any]:
-    """Resolve a JSON reference (RFC 6901) to its definition in the spec."""
-    if reference.startswith("#/"):
-        # Resolve internal reference
-        parts = reference[2:].split("/")
-        obj = spec
-        for part in parts:
-            if isinstance(obj, dict):
-                obj = obj.get(part)
+def resolve_internal_refs(parent: Dict[str, Any], child: Any) -> Any:
+    """
+    Recursively resolve internal JSON references ($ref) in a child object,
+    using the provided parent object as the reference root.
+
+    Args:
+        parent (Dict[str, Any]): The full parent JSON object.
+        child (Any): The child subsection to resolve.
+
+    Returns:
+        Any: The child object with all internal references resolved.
+
+    Example:
+        >>> parent = {
+        ...     "components": {
+        ...         "schemas": {
+        ...             "A": {"type": "object"},
+        ...             "B": {"$ref": "#/components/schemas/A"}
+        ...         }
+        ...     }
+        ... }
+        >>> child = parent["components"]["schemas"]["B"]
+        >>> resolve_internal_refs(parent, child)
+        {'type': 'object'}
+    """
+
+    def _resolve(obj):
+        if isinstance(obj, dict):
+            if "$ref" in obj:
+                ref_path = obj["$ref"]
+                if not ref_path.startswith("#/"):
+                    raise ValueError(f"Only internal refs supported, got: {ref_path}")
+                # Split and traverse the parent object
+                parts = ref_path.lstrip("#/").split("/")
+                ref_obj = parent
+                for part in parts:
+                    ref_obj = ref_obj[part]
+                # Recursively resolve the referenced object
+                return _resolve(ref_obj)
             else:
-                return {}
-        return obj if isinstance(obj, dict) else {}
-    return {}
+                # Recursively resolve all dict values
+                return {k: _resolve(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [_resolve(item) for item in obj]
+        else:
+            return obj
+
+    return _resolve(child)
