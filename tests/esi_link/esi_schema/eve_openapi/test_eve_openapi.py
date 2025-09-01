@@ -84,7 +84,7 @@ def test_get_url_sorts_query_params():
 def test_index_by_op_id(esi_schema):
     client = EveOpenApi(spec=esi_schema, compatibility_date="2023-01-01")
     # Should index all operations with operationId
-    operation_ids = list(client.by_op_id.keys())
+    operation_ids = list(client.by_operation_id.keys())
     assert operation_ids
     # Pick a known operation from the schema
     assert "GetMarketsRegionIdHistory" in operation_ids

@@ -38,7 +38,7 @@ class EveOpenApi(EveOpenApiProtocol):
         self.compatibility_date = compatibility_date
         self.base_url = base_url
         self.resolved_schema = self._resolve_schema()
-        self.by_op_id: dict[str, OperationSchema] = self._index_by_op_id()
+        self.by_operation_id: dict[str, OperationSchema] = self._index_by_operation_id()
 
     @classmethod
     def from_schema_store_path(cls, file_path: Path | None) -> "EveOpenApi":
@@ -128,20 +128,20 @@ class EveOpenApi(EveOpenApiProtocol):
     #             request_parameters[value["name"]] = value
     #     return request_parameters
 
-    def _index_by_op_id(self) -> dict[str, OperationSchema]:
+    def _index_by_operation_id(self) -> dict[str, OperationSchema]:
         """Index the operations by their ID."""
-        by_op_id: dict[str, OperationSchema] = {}
+        by_operation_id: dict[str, OperationSchema] = {}
         for path, methods in self.resolved_schema.get("paths", {}).items():
             for method, operation in methods.items():
-                op_id = operation.get("operationId")
-                if op_id:
-                    by_op_id[op_id] = OperationSchema(
-                        operation_id=op_id,
+                operation_id = operation.get("operationId")
+                if operation_id:
+                    by_operation_id[operation_id] = OperationSchema(
+                        operation_id=operation_id,
                         method=method,
                         path=path,
                         schema=operation,
                     )
-        return by_op_id
+        return by_operation_id
 
     def _load_spec(self) -> dict[str, Any]:
         """Load the OpenAPI specification from the specified file."""
@@ -322,7 +322,7 @@ class EveOpenApi(EveOpenApiProtocol):
         query_params: Mapping[str, str | int | float],
     ) -> bool:
         """Validate the operation parameters."""
-        if operation_id not in self.by_op_id:
+        if operation_id not in self.by_operation_id:
             raise ValueError(f"Operation ID not found: {operation_id}")
         valid = all(
             (
@@ -422,21 +422,21 @@ class EveOpenApi(EveOpenApiProtocol):
     #     return response_headers
 
     def operation_schema(self, operation_id: str) -> OperationSchema:
-        op_schema = self.by_op_id.get(operation_id)
+        op_schema = self.by_operation_id.get(operation_id)
         if not op_schema:
             raise ValueError(f"Operation ID not found: {operation_id}")
         return op_schema
 
     def operation_method(self, operation_id: str) -> str:
-        if operation_id not in self.by_op_id:
+        if operation_id not in self.by_operation_id:
             raise ValueError(f"Operation ID not found: {operation_id}")
-        operation = self.by_op_id[operation_id]
+        operation = self.by_operation_id[operation_id]
         return operation.method
 
     def operation_path(self, operation_id: str) -> str:
-        if operation_id not in self.by_op_id:
+        if operation_id not in self.by_operation_id:
             raise ValueError(f"Operation ID not found: {operation_id}")
-        operation = self.by_op_id[operation_id]
+        operation = self.by_operation_id[operation_id]
         return operation.path
 
     def request_parameters(self, operation_id: str) -> Sequence[dict[str, Any]]:
