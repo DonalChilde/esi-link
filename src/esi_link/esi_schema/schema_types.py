@@ -1,6 +1,23 @@
-from typing import Any, TypedDict
+from typing import Any, Literal, NotRequired, TypedDict
 
+# openapi 3.1 specification
 # https://swagger.io/specification/
+
+
+class TypeSchema(TypedDict):
+    type: Literal["string", "number", "integer", "boolean", "array", "object"]
+    format: str
+    description: NotRequired[str]
+
+
+class Parameter(TypedDict):
+    name: str
+    in_: Literal["query", "path", "header", "cookie"]
+    description: str
+    required: bool
+    schema: TypeSchema
+    deprecated: NotRequired[bool]
+    allowEmptyValue: NotRequired[bool]
 
 
 class Operation(TypedDict):
