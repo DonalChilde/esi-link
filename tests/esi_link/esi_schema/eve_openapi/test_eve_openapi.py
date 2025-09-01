@@ -2,14 +2,16 @@ from typing import Any
 
 from esi_link.esi_schema.eve_openapi import EveOpenApi
 
+# pyright: basic
+
 
 def test_get_url(esi_schema: dict[str, Any]):
     client = EveOpenApi(spec=esi_schema, compatibility_date="2023-01-01")
     op_id = "GetMarketsRegionIdHistory"
     path_params = {"region_id": 10000002}
     query_params = {"type_id": 34}
-    url_with_query = client.get_url(
-        op_id=op_id,
+    url_with_query = client.build_url(
+        operation_id=op_id,
         path_params=path_params,
         query_params=query_params,
         include_query=True,
@@ -18,8 +20,8 @@ def test_get_url(esi_schema: dict[str, Any]):
         url_with_query
         == "https://esi.evetech.net/latest/markets/10000002/history?type_id=34"
     )
-    url_without_query = client.get_url(
-        op_id=op_id,
+    url_without_query = client.build_url(
+        operation_id=op_id,
         path_params=path_params,
         query_params=query_params,
         include_query=False,
@@ -67,8 +69,8 @@ def test_get_url_sorts_query_params():
 
     # Provide query params in reverse order to ensure sorting takes effect
     qp = {"b": 2, "a": 1}
-    url_with_query = client.get_url(
-        op_id=op_id,
+    url_with_query = client.build_url(
+        operation_id=op_id,
         path_params=path_params,
         query_params=qp,
         include_query=True,

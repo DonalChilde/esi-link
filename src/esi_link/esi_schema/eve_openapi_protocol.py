@@ -5,7 +5,10 @@ https://esi.evetech.net/meta/openapi.json
 """
 
 from collections.abc import Mapping
-from typing import Protocol, TypedDict
+from dataclasses import dataclass, field
+from typing import Any, Protocol, TypedDict
+
+from . import schema_types as ST
 
 
 class SplitParameters(TypedDict):
@@ -14,14 +17,22 @@ class SplitParameters(TypedDict):
     header: Mapping[str, str | int | float]
 
 
+@dataclass(slots=True)
+class OperationSchema:
+    operation_id: str
+    method: str
+    path: str
+    schema: dict[str, Any] = field(default_factory=dict[str, Any])
+
+
 class EveOpenApiProtocol(Protocol):
     base_url: str = "https://esi.evetech.net/latest"
     compatibility_date: str
     """The compatibility date for the API in YYYY-MM-DD format."""
 
-    def get_url(
+    def build_url(
         self,
-        op_id: str,
+        operation_id: str,
         path_params: Mapping[str, str | int | float],
         query_params: Mapping[str, str | int | float],
         include_query: bool = False,
@@ -29,13 +40,21 @@ class EveOpenApiProtocol(Protocol):
         """Build the URL for the given operation ID."""
         ...
 
-    def get_method(self, op_id: str) -> str:
+    def operation_method(self, operation_id: str) -> str:
         """Get the HTTP method for the given operation ID."""
+        ...
+
+    def operation_path(self, operation_id: str) -> str:
+        """Get the path for the given operation ID."""
+        ...
+
+    def operation_schema(self, operation_id: str) -> OperationSchema:
+        """Get the schema for the given operation ID."""
         ...
 
     def validate_operation(
         self,
-        op_id: str,
+        operation_id: str,
         path_params: Mapping[str, str | int | float],
         query_params: Mapping[str, str | int | float],
     ) -> bool:
@@ -47,16 +66,22 @@ class EveOpenApiProtocol(Protocol):
 
     def split_parameters(
         self,
-        op_id: str,
+        operation_id: str,
         parameters: Mapping[str, str | int | float],
     ) -> SplitParameters:
         """Split the parameters into their respective categories."""
         ...
 
-    def is_paged(self, op_id: str) -> bool:
+    def is_paged(self, operation_id: str) -> bool:
         """Check if the operation is paged."""
         ...
 
-    def is_cached(self, op_id: str) -> bool:
+    def is_cached(self, operation_id: str) -> bool:
         """Check if the operation is cached."""
         ...
+
+    # def operation_parameter_schema(
+    #     self, op_id: str, location: Literal["query", "path", "header", "cookie"]
+    # ) -> list[ST.Parameter]:
+    #     """Get the parameter schema for the given operation ID."""
+    #     ...
