@@ -188,8 +188,8 @@ class EsiLink:
         query: EsiQuery,
         session: aiohttp.ClientSession,
     ) -> QueryResponse:
-        url = self._schema.get_url(
-            op_id=query["operation"],
+        url = self._schema.build_url(
+            operation_id=query["operation"],
             path_params=query["path_parameters"],
             query_params={},
             include_query=False,
@@ -197,7 +197,7 @@ class EsiLink:
         headers = query["headers"]
         headers["X-Esi-Compatibility-Date"] = self._schema.compatibility_date
         async with session.request(
-            method=self._schema.get_method(query["operation"]),
+            method=self._schema.operation_method(query["operation"]),
             url=url,
             headers=headers,
             params=query["query_parameters"],

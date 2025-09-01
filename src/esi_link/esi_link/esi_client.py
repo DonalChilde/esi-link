@@ -41,8 +41,8 @@ def _make_cache_key(query: EsiQuery, schema: EveOpenApiProtocol) -> UUID:
     Returns:
         UUID: The cache key for the query.
     """
-    url = schema.get_url(
-        op_id=query["operation"],
+    url = schema.build_url(
+        operation_id=query["operation"],
         path_params=query["path_parameters"],
         query_params=query["query_parameters"],
         include_query=True,
