@@ -1,9 +1,15 @@
-from typing import Any
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import Any, TypedDict
 
 from esi_link.esi_schema.eve_openapi_protocol import OperationSchema
-
+from esi_link.helpers.indent_lines import indent_lines, prefixed_list_to_lines
 
 # TODO rewrite this to use triple quote f strings
+# TODO this need a lot of work to handle all the different schemas.
+# A possible temp fix, is to have A cli option that outputs the raw schema for an operation.
+
+
 def format_operation_details(op_schema: OperationSchema) -> str:
     """
     Return a formatted string for one operation, its description, and tables of request parameters, response body parameters, and headers.
@@ -11,55 +17,119 @@ def format_operation_details(op_schema: OperationSchema) -> str:
     Args:
         op_schema (OperationSchema): The operation schema object.
 
+    Example:
+        >>> format_operation_details("GetMarketsRegionIdOrders")
+        ```text
+        Operation: GetMarketsRegionIdOrders
+        Tags: Market
+        Description: Return a list of orders in a region
+        Cache Age: 300
+        Compatibility Date: 2020-01-01
+        Authorization Required:
+        - public
+
+        Request Parameters:
+        Name                 Group      Type       Required Description
+        --------------------------------------------------------------------------------
+        order_type           query      string     True     Filter buy/sell orders, return all orders by default. If you query without type_id, we always return both buy and sell orders (Possible values: buy, sell, all)
+        page                 query      integer    False    Which page of results to return.
+        region_id            path       integer    True     Return orders in this region
+        type_id              query      integer    False    Return orders only for this type
+
+        Response Body Parameters (container: array -> data: object):
+        Name                 Group      Type       Required Description
+        --------------------------------------------------------------------------------
+        duration             body       integer    True     (no description)
+        is_buy_order         body       boolean    True     (no description)
+        issued               body       string     True     (no description)
+        location_id          body       integer    True     (no description)
+        min_volume           body       integer    True     (no description)
+        order_id             body       integer    True     (no description)
+        price                body       number     True     (no description)
+        range                body       string     True     (no description)
+        system_id            body       integer    True     The solar system this order was placed
+        type_id              body       integer    True     (no description)
+        volume_remain        body       integer    True     (no description)
+        volume_total         body       integer    True     (no description)
+
+        Headers:
+        Name                 Type       Required Direction  Description
+        --------------------------------------------------------------------------------
+        Accept-Language      string     False    request    The language to use for the response.
+        If-None-Match        string     False    request    The ETag of the previous request. A 304 will be returned if this matches the current ETag.
+        X-Compatibility-Date string     True     request    The compatibility date for the request.
+        X-Tenant             string     False    request    The tenant ID for the request.
+        Cache-Control        string     False    response   Directives for caching mechanisms. It controls how the response can be cached, by whom, and for how long.
+        ETag                 string     False    response   The ETag value of the response body. Use this with If-None-Match to check whether the resource has changed.
+        Last-Modified        string     False    response   The last modified date of the response. Use this with If-Modified-Since to check whether the resource has changed.
+        X-Pages              integer    False    response   The total number of pages in the result set.
+        ```
     Returns:
         str: Formatted string with operation details and parameter tables.
     """
     lines: list[str] = []
-    lines.append(f"Operation: {op_schema.operation_id}")
+    # lines.append(f"Operation: {op_schema.operation_id}")
     tag_group = op_schema.schema.get("tags", [])
-    lines.append(f"Tags: {', '.join(tag_group)}")
+    # lines.append(f"Tags: {', '.join(tag_group)}")
     desc = op_schema.schema.get("description", "").strip() or "(no description)"
-    lines.append(f"Description: {desc}")
+    # lines.append(f"Description: {desc}")
     cache_age = op_schema.schema.get("x-cache-age", "Not Defined")
-    lines.append(f"Cache Age: {cache_age}")
+    # lines.append(f"Ca/che Age: {cache_age}")
     compatibility_date = op_schema.schema.get("x-compatibility-date", "Not Defined")
-    lines.append(f"Compatibility Date: {compatibility_date}")
-    # Authorization Required field
+    # lines.append(f"Compatibility Date: {compatibility_date}")
+    scopes: list[str] = []
     security: Any = op_schema.schema.get("security")
-    lines.append("Authorization Required:")
     if security and isinstance(security, list):
-        found = False
         for entry in security:  # type: ignore
             if "OAuth2" in entry:
                 scopes = entry["OAuth2"]  # type: ignore
-                if scopes:
-                    for scope in scopes:  # type: ignore
-                        lines.append(f"  - {scope}")
-                    found = True
-        if not found:
-            lines.append("  - public")
-    else:
-        lines.append("  - public")
-    lines.append("")
+            else:
+                scopes.append("public")
+
+    top_section = f"""
+    Operation: {op_schema.operation_id}
+    Tags: {", ".join(tag_group)}
+    Description: {desc}
+    Cache Age: {cache_age}
+    Compatibility Date: {compatibility_date}
+    Authorization Required: 
+    {prefixed_list_to_lines(scopes, prefix="- ", indent=2)}
+    """
+    # Authorization Required field
+    # security: Any = op_schema.schema.get("security")
+    # lines.append("Authorization Required:")
+    # if security and isinstance(security, list):
+    #     found = False
+    #     for entry in security:  # type: ignore
+    #         if "OAuth2" in entry:
+    #             scopes = entry["OAuth2"]  # type: ignore
+    #             if scopes:
+    #                 for scope in scopes:  # type: ignore
+    #                     lines.append(f"  - {scope}")
+    #                 found = True
+    #     if not found:
+    #         lines.append("  - public")
+    # else:
+    #     lines.append("  - public")
+    # lines.append("")
     # Request Parameters Table (excluding headers)
-    lines.append("Request Parameters:")
-    lines.append(f"{'Name':<20} {'Group':<10} {'Type':<10} {'Required':<8} Description")
-    lines.append("-" * 80)
-    for param in op_schema.schema.get("parameters", []):
-        if param.get("in") != "header":
-            name = param.get("name", "")
-            group = param.get("in", "")
-            typ = param.get("schema", {}).get("type", "")
-            required = str(param.get("required", False))
-            pdesc = (
-                param.get("schema", {}).get("description", "").strip()
-                or "(no description)"
-            )
-            if "enum" in param.get("schema", {}):
-                enum_vals = param["schema"]["enum"]
-                pdesc += f" (Possible values: {', '.join(map(str, enum_vals))})"
-            lines.append(f"{name:<20} {group:<10} {typ:<10} {required:<8} {pdesc}")
-    lines.append("")
+    # lines.append("Request Parameters:")
+    # lines.append(f"{'Name':<20} {'Group':<10} {'Type':<10} {'Required':<8} Description")
+    # lines.append("-" * 80)
+
+    # Request Parameters
+    req_params = request_parameters(op_schema.schema.get("parameters", []))
+    params_as_lines = "\n".join(
+        f"{param.name:<20} {param.group:<10} {param.type_:<10} {param.required:<8} {param.description}"
+        for param in req_params
+    )
+
+    request_section = f"""
+    Request Parameters:
+    {f"{'Name':<20} {'Group':<10} {'Type':<10} {'Required':<8} Description"}
+    {"-" * 80}
+    {params_as_lines}
+    """
     # Response Body Parameters Table
     content_schema = (
         op_schema.schema.get("responses", {})
@@ -70,6 +140,7 @@ def format_operation_details(op_schema: OperationSchema) -> str:
     )
     container_type = content_schema.get("type", "Unknown")
     content_type = content_schema.get("items", {}).get("type", "Unknown")
+    resp_params = response_body_parameters(content_schema.get("properties", {}))
     lines.append(
         f"Response Body Parameters (container: {container_type} -> data: {content_type}):"
     )
@@ -127,33 +198,97 @@ def format_operation_details(op_schema: OperationSchema) -> str:
     return "\n".join(lines)
 
 
-# Example output for GetMarketsRegionIdHistory (with array container):
-EXAMPLE = """
-Operation: GetMarketsRegionIdHistory
-Description: Return statistics about a market type in a region
-Authorization Required: True
+# Instructions:
+# Write a new function called `format_operation_details_2` that refactors format_operation_details
+# to have similar output, but collects the data from the schema in a more modular way
 
-Request Parameters:
-Name                 Group      Type       Required  Description
---------------------------------------------------------------------------------
-region_id            path       integer    True      Return statistics in this region
-type_id              query      integer    True      Return statistics for this type
 
-Response Body Parameters (container: array):
-Name                 Group      Type       Required  Description
---------------------------------------------------------------------------------
-(date_founded)       body[item] string     True      (no description)
+@dataclass
+class _Param:
+    name: str
+    group: str
+    type_: str
+    required: str
+    description: str
 
-Headers:
-Name                 Type       Required  Direction  Description
---------------------------------------------------------------------------------
-Accept-Language      string     False     request    The language to use for the response.
-X-Compatibility-Date string     True      request    The compatibility date for the request.
-If-Modified-Since    string     False     request    The date the resource was last modified. A 304 will be returned if the resource has not been modified since this date.
-If-None-Match        string     False     request    The ETag of the previous request. A 304 will be returned if this matches the current ETag.
-X-Tenant             string     False     request    The tenant ID for the request.
-CacheControl         string     False     response   Directives for caching mechanisms. It controls how the response can be cached, by whom, and for how long.
-ContentLanguage      string     False     response   The language used in the response.
-ETag                 string     False     response   The ETag value of the response body. Use this with If-None-Match to check whether the resource has changed.
-LastModified         string     False     response   The last modified date of the response. Use this with If-Modified-Since to check whether the resource has changed.
-"""
+
+@dataclass
+class _Header:
+    name: str
+    type_: str
+    required: str
+    direction: str
+    description: str
+
+
+def request_parameters(params: Sequence[dict[str, Any]]) -> Sequence[_Param]:
+    param_list: list[_Param] = []
+    for param in params:
+        if param.get("in") != "header":
+            _param = _Param(
+                name=param.get("name", ""),
+                group=param.get("in", ""),
+                type_=param.get("schema", {}).get("type", ""),
+                required=str(param.get("required", False)),
+                description=(
+                    (param.get("schema", {}).get("description", "").strip())
+                    or "(no description)"
+                )
+                + (
+                    f" (Possible values: {', '.join(map(str, param['schema']['enum']))})"
+                    if "enum" in param.get("schema", {})
+                    else ""
+                ),
+            )
+
+            param_list.append(_param)
+    return param_list
+
+
+def request_headers(params: Sequence[dict[str, Any]]) -> Sequence[_Header]:
+    header_list: list[_Header] = []
+    for param in params:
+        if param.get("in") == "header":
+            _header = _Header(
+                name=param.get("name", ""),
+                type_=param.get("schema", {}).get("type", ""),
+                required=str(param.get("required", False)),
+                direction="request",
+                description=(
+                    (param.get("schema", {}).get("description", "").strip())
+                    or "(no description)"
+                ),
+            )
+            header_list.append(_header)
+    return header_list
+
+
+def response_headers(headers: dict[str, Any]) -> Sequence[_Header]:
+    header_list: list[_Header] = []
+    for name, param in headers.items():
+        _header = _Header(
+            name=name,
+            type_=param.get("schema", {}).get("type", ""),
+            required=str(param.get("required", False)),
+            direction="response",
+            description=(
+                (param.get("schema", {}).get("description", "").strip())
+                or "(no description)"
+            ),
+        )
+        header_list.append(_header)
+    return header_list
+
+
+def response_body_parameters(content_schema: dict[str, Any]) -> Sequence[_Param]:
+    param_list: list[_Param] = []
+    for name, param in content_schema.get("properties", {}).items():
+        _param = _Param(
+            name=name,
+            group="response",
+            type_=param.get("type", ""),
+            required=str(param.get("required", False)),
+            description=((param.get("description", "").strip()) or "(no description)"),
+        )
+        param_list.append(_param)
+    return param_list

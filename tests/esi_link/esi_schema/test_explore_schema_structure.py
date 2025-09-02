@@ -1,15 +1,10 @@
 from dataclasses import dataclass, field
-from pathlib import Path
 from pprint import pprint
 from typing import Any
 
-from pydantic import BaseModel
+import pytest
 
 from esi_link.esi_schema.schema_store import SchemaStore
-
-
-class Example(BaseModel):
-    file_path: Path
 
 
 @dataclass
@@ -20,6 +15,7 @@ class OperationData:
         return f"OperationData(operation_keys={self.operation_keys})"
 
 
+@pytest.mark.skip(reason="Prototyping")
 def test_response_content_schema_types(schema_store: SchemaStore):
     methods: dict[str, Any] = {}
     for path, operations in schema_store.esi_schema.get("paths", {}).items():

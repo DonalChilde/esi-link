@@ -29,4 +29,4 @@ def test_enum_in_type(schema_store: SchemaStore):
     output = format_operation_details(operation)
     print(output)
     assert "Possible values" in output
-    # assert False
+    assert False
