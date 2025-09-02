@@ -1,6 +1,9 @@
+from typing import Any
+
 from esi_link.esi_schema.eve_openapi_protocol import OperationSchema
 
 
+# TODO rewrite this to use triple quote f strings
 def format_operation_details(op_schema: OperationSchema) -> str:
     """
     Return a formatted string for one operation, its description, and tables of request parameters, response body parameters, and headers.
@@ -22,15 +25,15 @@ def format_operation_details(op_schema: OperationSchema) -> str:
     compatibility_date = op_schema.schema.get("x-compatibility-date", "Not Defined")
     lines.append(f"Compatibility Date: {compatibility_date}")
     # Authorization Required field
-    security = op_schema.schema.get("security")
+    security: Any = op_schema.schema.get("security")
     lines.append("Authorization Required:")
     if security and isinstance(security, list):
         found = False
-        for entry in security:
+        for entry in security:  # type: ignore
             if "OAuth2" in entry:
-                scopes = entry["OAuth2"]
+                scopes = entry["OAuth2"]  # type: ignore
                 if scopes:
-                    for scope in scopes:
+                    for scope in scopes:  # type: ignore
                         lines.append(f"  - {scope}")
                     found = True
         if not found:
