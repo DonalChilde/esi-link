@@ -23,6 +23,8 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel
 
+from esi_link.helpers.resolve_json_ref import resolve_internal_refs
+
 from ..helpers.download_file import download_text
 from ..helpers.now_utc import now_utc
 
@@ -139,13 +141,14 @@ class SchemaStore:
         """
         schema_text = schema_path.read_text()
         schema_json = json.loads(schema_text)
+        resolved_schema = resolve_internal_refs(parent=schema_json, child=schema_json)
         download_date_resolved = datetime.fromisoformat(download_date).astimezone(UTC)
         if "openapi" not in schema_json:
             raise ValueError("Invalid ESI schema: 'openapi' key not found.")
         store_data = SchemaStoreData(
             id_=uuid4(),
             download_date=download_date_resolved.isoformat(),
-            esi_schema=schema_json,
+            esi_schema=resolved_schema,
         )
         instance = cls(None, indent_on_save=indent_on_save)
         instance._store_data = store_data
@@ -177,10 +180,11 @@ class SchemaStore:
             raise ValueError("Invalid ESI schema: 'openapi' key not found.")
         download_date_resolved = datetime.fromisoformat(download_date).astimezone(UTC)
         instance = cls(None, indent_on_save=indent_on_save)
+        resolved_schema = resolve_internal_refs(parent=obj, child=obj)
         instance._store_data = SchemaStoreData(
             id_=uuid4(),
             download_date=download_date_resolved.isoformat(),
-            esi_schema=obj,
+            esi_schema=resolved_schema,
         )
         instance._store_path = store_path
         if store_path:
@@ -252,9 +256,10 @@ class SchemaStore:
         """
         text = download_text(url)
         schema = json.loads(text)
-        if "openapi" not in schema:
+        resolved_schema = resolve_internal_refs(parent=schema, child=schema)
+        if "openapi" not in resolved_schema:
             raise ValueError("Invalid ESI schema: 'openapi' key not found.")
-        return schema
+        return resolved_schema
 
     def _update_store(self) -> None:
         """Download the ESI OpenAPI schema and update the store.

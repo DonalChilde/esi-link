@@ -26,18 +26,19 @@ class EveOpenApi(EveOpenApiProtocol):
     def __init__(
         self,
         compatibility_date: str,
-        spec_path: Path | None = None,
+        schema_path: Path | None = None,
         spec: dict[str, Any] | None = None,
         base_url: str = "https://esi.evetech.net/latest",
     ) -> None:
         """Initialize the EveOpenApi client."""
-        if spec_path is None and spec is None:
-            raise ValueError("Either spec_path or spec must be provided.")
-        self.spec_path = spec_path
-        self.spec: dict[str, Any] = spec or self._load_spec()
+        if schema_path is None and spec is None:
+            raise ValueError("Either schema_path or schema must be provided.")
+        self.schema_path = schema_path
+        schema_ = spec or self._load_spec()
+        validated_schema = self._validate_schema(schema_)
+        self.schema: dict[str, Any] = validated_schema
         self.compatibility_date = compatibility_date
         self.base_url = base_url
-        self.resolved_schema = self._resolve_schema()
         self.by_operation_id: dict[str, OperationSchema] = self._index_by_operation_id()
 
     @classmethod
@@ -60,9 +61,11 @@ class EveOpenApi(EveOpenApiProtocol):
         spec = schema_store.esi_schema
         return cls(compatibility_date=compatibility_date, spec=spec)
 
-    def _resolve_schema(self) -> dict[str, Any]:
-        """Resolve the schema by resolving all internal references."""
-        return resolve_internal_refs(self.spec, self.spec)
+    def _validate_schema(self, schema: dict[str, Any]) -> dict[str, Any]:
+        if "openapi" not in schema:
+            raise ValueError("Invalid schema: missing 'openapi' field")
+        resolved_schema = resolve_internal_refs(parent=schema, child=schema)
+        return resolved_schema
 
     # def _resolve_ref(self, reference: str) -> dict[str, Any]:
     #     """Resolve a JSON reference (RFC 6901) to its definition in the spec."""
@@ -131,7 +134,7 @@ class EveOpenApi(EveOpenApiProtocol):
     def _index_by_operation_id(self) -> dict[str, OperationSchema]:
         """Index the operations by their ID."""
         by_operation_id: dict[str, OperationSchema] = {}
-        for path, methods in self.resolved_schema.get("paths", {}).items():
+        for path, methods in self.schema.get("paths", {}).items():
             for method, operation in methods.items():
                 operation_id = operation.get("operationId")
                 if operation_id:
@@ -145,9 +148,9 @@ class EveOpenApi(EveOpenApiProtocol):
 
     def _load_spec(self) -> dict[str, Any]:
         """Load the OpenAPI specification from the specified file."""
-        if self.spec_path is None or not self.spec_path.exists():
-            raise ValueError(f"Spec path is invalid: {self.spec_path}")
-        with open(self.spec_path, encoding="utf-8") as file:
+        if self.schema_path is None or not self.schema_path.exists():
+            raise ValueError(f"Spec path is invalid: {self.schema_path}")
+        with open(self.schema_path, encoding="utf-8") as file:
             return json.load(file)
 
     # def _collect_path_params(self, op_id: str) -> dict[str, dict[str, Any]]:
