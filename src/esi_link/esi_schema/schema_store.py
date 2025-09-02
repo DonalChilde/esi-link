@@ -29,6 +29,8 @@ from ..helpers.now_utc import now_utc
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
+# TODO move schema de-reference to schema store.
+
 
 class SchemaStoreData(BaseModel):
     """Pydantic model for storing ESI schema metadata and content.
