@@ -18,7 +18,7 @@ def update(
     ] = None,
 ):
     """Update an existing ESI schema, or download a new one."""
-    msg = filter_if_silent(False)
+    msg = filter_if_silent(is_silent=False)
     try:
         if file_path is None:
             # work with app schema store
@@ -59,7 +59,7 @@ def update(
 @app.command()
 def status(ctx: typer.Context):
     """Show the current status of the ESI schema."""
-    msg = filter_if_silent(False)
+    msg = filter_if_silent(is_silent=False)
     msg("Current status of the ESI schema:")
     if ctx.obj.schema_store:
         store = ctx.obj.schema_store
