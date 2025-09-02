@@ -2,39 +2,29 @@
 
 import logging
 import logging.config
-from pathlib import Path
 from typing import Any
 
-from typer import get_app_dir
+from esi_link.config import AppConfig
 
 __author__ = "Chad Lowe"
 __email__ = "pfmsoft.dev@gmail.com"
-_app_name = "Esi Link"
-__description__ = "A command line first interface to the Eve Online API"
+__app_name__ = "Esi Link"
 
+#######################################################################################
+# Update in pyproject.toml, as uv build backend does not yet support dynamic metadata #
+# https://github.com/astral-sh/uv/issues/11718                                        #
+#######################################################################################
+__description__ = "A command line first interface to the Eve Online API"
 # The short X.Y.Z version.
-# Update in pyproject.toml, as uv build backend does not yet support dynamic metadata
-# https://github.com/astral-sh/uv/issues/11718
 __version__ = "0.1.0"
 # The full version, including alpha/beta/rc tags.
 __release__ = __version__
+#######################################################################################
 
 
-_config_dir = Path(get_app_dir(app_name=_app_name, force_posix=True))
-CONFIG: dict[str, Any] = {
-    "app_name": "Esi Link",
-    "version": __version__,
-    "description": "A tool for importing and exporting EVE Online data.",
-    "config_dir": _config_dir,
-    "default_app_path": _config_dir,
-    "default_app_data_path": _config_dir / "app_data",
-    "default_esi_data_path": _config_dir / "esi_data",
-    "default_sde_path": Path.home() / "projects" / "eve-sde",
-    "log_path": _config_dir / "logs",
-    "debug_path": _config_dir / "debug",
-}
+CONFIG = AppConfig(name=__app_name__)
+CONFIG.log_dir.mkdir(parents=True, exist_ok=True)
 
-CONFIG["log_path"].mkdir(parents=True, exist_ok=True)
 LOG_CONFIG: dict[str, Any] = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -78,7 +68,7 @@ LOG_CONFIG: dict[str, Any] = {
     },
     "handlers": {
         "file": {
-            "filename": f"{CONFIG['log_path'] / 'debug.log'}",
+            "filename": CONFIG.log_dir / "debug.log",
             "level": "DEBUG",
             "class": "logging.FileHandler",
             "formatter": "mine",
@@ -92,7 +82,7 @@ LOG_CONFIG: dict[str, Any] = {
             "class": "logging.handlers.RotatingFileHandler",
             "formatter": "mine",
             "level": "INFO",
-            "filename": f"{CONFIG['log_path'] / 'rot_info.log'}",
+            "filename": CONFIG.log_dir / "rotating_info.log",
             "mode": "a",
             "encoding": "utf-8",
             "maxBytes": 10000000,
@@ -102,7 +92,7 @@ LOG_CONFIG: dict[str, Any] = {
             "class": "logging.handlers.RotatingFileHandler",
             "formatter": "mine",
             "level": "WARNING",
-            "filename": f"{CONFIG['log_path'] / 'rot_warn.log'}",
+            "filename": CONFIG.log_dir / "rotating_warn.log",
             "mode": "a",
             "encoding": "utf-8",
             "maxBytes": 500000,
