@@ -22,7 +22,7 @@ class OperationSchema:
     operation_id: str
     method: str
     path: str
-    schema: dict[str, Any] = field(default_factory=dict[str, Any])
+    operation: dict[str, Any] = field(default_factory=dict[str, Any])
 
 
 class EveOpenApiProtocol(Protocol):

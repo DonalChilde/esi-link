@@ -9,11 +9,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from esi_link.esi_schema.schema_pydantic import Operation, OperationSchema, Parameter
 from esi_link.helpers.resolve_json_ref import resolve_internal_refs
 
 from .eve_openapi_protocol import (
     EveOpenApiProtocol,
-    OperationSchema,
     SplitParameters,
 )
 from .schema_store import SchemaStore
@@ -142,7 +142,7 @@ class EveOpenApi(EveOpenApiProtocol):
                         operation_id=operation_id,
                         method=method,
                         path=path,
-                        schema=operation,
+                        operation=operation,
                     )
         return by_operation_id
 
@@ -442,7 +442,7 @@ class EveOpenApi(EveOpenApiProtocol):
         operation = self.by_operation_id[operation_id]
         return operation.path
 
-    def request_parameters(self, operation_id: str) -> Sequence[dict[str, Any]]:
+    def request_parameters(self, operation_id: str) -> Sequence[Parameter]:
         """Collect the request parameters for the given operation ID from the schema.
 
         Args:
@@ -451,8 +451,8 @@ class EveOpenApi(EveOpenApiProtocol):
         Returns:
             dict[str, dict[str, Any]]: A dictionary of request parameters.
         """
-        operation = self.operation_schema(operation_id)
-        request_parameters = operation.schema.get("parameters", [])
+        operation_schema = self.operation_schema(operation_id)
+        request_parameters = operation_schema.operation.parameters
         return request_parameters
 
     def response_content(self, operation_id: str) -> dict[str, dict[str, Any]]:
@@ -464,9 +464,9 @@ class EveOpenApi(EveOpenApiProtocol):
         Returns:
             dict[str, dict[str, Any]]: A dictionary of response parameters.
         """
-        operation = self.operation_schema(operation_id)
-        response_content = (
-            operation.schema.get("responses", {}).get("200", {}).get("content", {})
+        operation_schema = self.operation_schema(operation_id)
+        response_content = operation_schema.operation.responses.get("200", {}).get(
+            "content", {}
         )
         return response_content
 
@@ -479,8 +479,8 @@ class EveOpenApi(EveOpenApiProtocol):
         Returns:
             dict[str, dict[str, Any]]: A dictionary of response headers.
         """
-        operation = self.operation_schema(operation_id)
-        response_headers = (
-            operation.schema.get("responses", {}).get("200", {}).get("headers", {})
+        operation_schema = self.operation_schema(operation_id)
+        response_headers = operation_schema.operation.responses.get("200", {}).get(
+            "headers", {}
         )
         return response_headers

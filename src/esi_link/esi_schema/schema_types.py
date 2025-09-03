@@ -1,5 +1,7 @@
 from typing import Any, Literal, NotRequired, TypedDict
 
+from pydantic import BaseModel
+
 # openapi 3.1 specification
 # https://swagger.io/specification/
 
@@ -20,7 +22,7 @@ class Parameter(TypedDict):
     allowEmptyValue: NotRequired[bool]
 
 
-class Operation(TypedDict):
+class Operation(BaseModel):
     tags: list[str]
     summary: str
     description: str

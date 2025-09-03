@@ -14,11 +14,11 @@ def format_operations_by_tag_string(api: EveOpenApi) -> str:
     """
     tag_map: dict[str, list[tuple[str, str, str]]] = {}
     for op_schema in api.by_operation_id.values():
-        tags = op_schema.schema.get("tags", [])
+        tags = op_schema.operation.get("tags", [])
         description = (
-            op_schema.schema.get("description", "").strip() or "(no description)"
+            op_schema.operation.get("description", "").strip() or "(no description)"
         )
-        requires_auth = bool(op_schema.schema.get("security"))
+        requires_auth = bool(op_schema.operation.get("security"))
         auth_flag = "[auth]" if requires_auth else ""
         for tag in tags:
             tag_map.setdefault(tag, []).append(

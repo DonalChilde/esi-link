@@ -69,16 +69,16 @@ def format_operation_details(op_schema: OperationSchema) -> str:
     """
     lines: list[str] = []
     # lines.append(f"Operation: {op_schema.operation_id}")
-    tag_group = op_schema.schema.get("tags", [])
+    tag_group = op_schema.operation.get("tags", [])
     # lines.append(f"Tags: {', '.join(tag_group)}")
-    desc = op_schema.schema.get("description", "").strip() or "(no description)"
+    desc = op_schema.operation.get("description", "").strip() or "(no description)"
     # lines.append(f"Description: {desc}")
-    cache_age = op_schema.schema.get("x-cache-age", "Not Defined")
+    cache_age = op_schema.operation.get("x-cache-age", "Not Defined")
     # lines.append(f"Ca/che Age: {cache_age}")
-    compatibility_date = op_schema.schema.get("x-compatibility-date", "Not Defined")
+    compatibility_date = op_schema.operation.get("x-compatibility-date", "Not Defined")
     # lines.append(f"Compatibility Date: {compatibility_date}")
     scopes: list[str] = []
-    security: Any = op_schema.schema.get("security")
+    security: Any = op_schema.operation.get("security")
     if security and isinstance(security, list):
         for entry in security:  # type: ignore
             if "OAuth2" in entry:
@@ -118,7 +118,7 @@ def format_operation_details(op_schema: OperationSchema) -> str:
     # lines.append("-" * 80)
 
     # Request Parameters
-    req_params = request_parameters(op_schema.schema.get("parameters", []))
+    req_params = request_parameters(op_schema.operation.get("parameters", []))
     params_as_lines = "\n".join(
         f"{param.name:<20} {param.group:<10} {param.type_:<10} {param.required:<8} {param.description}"
         for param in req_params
@@ -132,7 +132,7 @@ def format_operation_details(op_schema: OperationSchema) -> str:
     """
     # Response Body Parameters Table
     content_schema = (
-        op_schema.schema.get("responses", {})
+        op_schema.operation.get("responses", {})
         .get("200", {})
         .get("content", {})
         .get("application/json", {})
@@ -177,7 +177,7 @@ def format_operation_details(op_schema: OperationSchema) -> str:
     )
     lines.append("-" * 80)
     # Request headers
-    for param in op_schema.schema.get("parameters", []):
+    for param in op_schema.operation.get("parameters", []):
         if param.get("in") == "header":
             name = param.get("name", "")
             typ = param.get("schema", {}).get("type", "")
@@ -187,7 +187,7 @@ def format_operation_details(op_schema: OperationSchema) -> str:
             lines.append(f"{name:<20} {typ:<10} {required:<8} {direction:<10} {pdesc}")
     # Response headers
     response_headers = (
-        op_schema.schema.get("responses", {}).get("200", {}).get("headers", {})
+        op_schema.operation.get("responses", {}).get("200", {}).get("headers", {})
     )
     for name, param in response_headers.items():
         typ = param.get("schema", {}).get("type", "")
