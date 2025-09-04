@@ -68,6 +68,23 @@ esi_link (name to be refactored, as two esi_links is confusing) has the api for 
 
 ### Validating queries
 
+Validate queries to catch missing/extra parameters before sending query.
+
+#### TODO
+
+- [] clean up request validation code. Split function outside the class to make refactors and testinf easier.
+
+### Query docs from cli
+
+- Show lists of operations and descriptions from the cli
+- Show detailed information on query request parameters, and return values.
+
+#### TODO
+
+- [] implement limited docs for operations, Query Request is easy, response doc is more complicated. just do request for now.
+
+## Schema Doc/Def
+
 - The schema for `arrays` of parameters in `["requestBody","response",["200","201]]` look like this:
 
 ```json
