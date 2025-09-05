@@ -44,6 +44,25 @@ class EsiClient:
         self.cache = cache
         self.link = EsiHttp(schema_api, max_concurrent_requests)
 
+    def query(self, esi_query: EsiQuery) -> QueryResponse:
+        batch = {esi_query.query_id: esi_query}
+        results = esi_batch_query(
+            queries=batch,
+            cache=self.cache,
+            schema_api=self.schema,
+            esi_http=self.link,
+        )
+        return results[esi_query.query_id]
+
+    def batch_query(self, queries: dict[UUID, EsiQuery]) -> dict[UUID, QueryResponse]:
+        results = esi_batch_query(
+            queries=queries,
+            cache=self.cache,
+            schema_api=self.schema,
+            esi_http=self.link,
+        )
+        return results
+
 
 # def make_cache_key(query: EsiQuery, schema_api: EveOpenApiProtocol) -> UUID:
 #     """Generate a unique cache key for the given query and schema.

@@ -9,6 +9,7 @@ class EsiQuery(BaseModel):
     operation_id: str
     path_parameters: dict[str, str | int | float] = {}
     query_parameters: dict[str, str | int | float] = {}
+    request_body: dict[str, str | int | float] = {}  # TODO this might need new types.
     headers: dict[str, str] = {}
 
 
