@@ -10,10 +10,12 @@ from esi_link import CONFIG
 from esi_link.esi_schema.schema_store import SchemaStore
 from esi_link.helpers.indent_lines import indent_lines
 
+from .esi_query import app as query_app
 from .esi_schema import app as schema_app
 
 app = typer.Typer(no_args_is_help=True)
 app.add_typer(schema_app, name="schema", help="Manage ESI schema.")
+app.add_typer(query_app, name="query", help="Query ESI data.")
 
 
 @dataclass

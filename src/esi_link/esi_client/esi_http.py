@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
-class EsiLink:
+class EsiHttp:
     """Handles concurrent requests and error management for Eve Online ESI API.
 
     Attributes:
@@ -47,12 +47,12 @@ class EsiLink:
     """
 
     def __init__(
-        self, schema: EveOpenApiProtocol, max_concurrent_requests: int = 50
+        self, schema_api: EveOpenApiProtocol, max_concurrent_requests: int = 50
     ) -> None:
         self._error_timeout_ends = now_utc()
         """The time at which queries can resume."""
         self._default_timeout = 30
-        self._schema = schema
+        self._schema_api = schema_api
         self._max_concurrent_requests = max_concurrent_requests
         self._queue_remaining: int = 0
         self._stop_operations = False
@@ -100,7 +100,7 @@ class EsiLink:
             if self._stop_operations:
                 self._skipped += 1
                 logger.info(
-                    f"{name} skipping query {query['query_id']} due to previous errors."
+                    f"{name} skipping query {query.query_id} due to previous errors."
                 )
                 queue.task_done()
                 continue
@@ -109,7 +109,7 @@ class EsiLink:
                     query=query,
                     session=session,
                 )
-                result[query["query_id"]] = response
+                result[response.query_id] = response
                 if response.status_code >= 400:
                     self._errors += 1
                     self._errors_remaining = limit_remain(response.headers)
@@ -120,7 +120,7 @@ class EsiLink:
                         )
 
             except Exception as e:
-                logger.error(f"{name} error processing query {query['query_id']}: {e}")
+                logger.error(f"{name} error processing query {query.query_id}: {e}")
                 if not self._stop_operations:
                     self._stop_operations = True
                     # self._error_timeout_ends = now_utc() + timedelta(seconds=30)
@@ -139,7 +139,7 @@ class EsiLink:
         Raises:
             Exception: If the query fails or the API returns an error.
         """
-        return self.do_queries({query["query_id"]: query})[query["query_id"]]
+        return self.do_queries({query.query_id: query})[query.query_id]
 
     def do_queries(self, queries: dict[UUID, EsiQuery]) -> dict[UUID, QueryResponse]:
         """Executes multiple ESI API queries concurrently.
@@ -177,7 +177,12 @@ class EsiLink:
                 asyncio.create_task(self._worker(f"Worker-{i}", queue, session, result))
                 for i in range(1, workers + 1)
             ]
-            await asyncio.gather(*tasks)
+            # Wait for all items in the queue to be processed
+            await queue.join()
+            # Cancel all worker tasks since they run infinite loops
+            for task in tasks:
+                task.cancel()
+
         return result
 
     def _inject_compatability_date(self, headers):
@@ -188,23 +193,33 @@ class EsiLink:
         query: EsiQuery,
         session: aiohttp.ClientSession,
     ) -> QueryResponse:
-        url = self._schema.build_url(
-            operation_id=query["operation"],
-            path_params=query["path_parameters"],
+        url = self._schema_api.build_url(
+            operation_id=query.operation_id,
+            path_params=query.path_parameters,
             query_params={},
             include_query=False,
         )
-        headers = query["headers"]
-        headers["X-Esi-Compatibility-Date"] = self._schema.compatibility_date
+        headers = query.headers
+        headers["X-Esi-Compatibility-Date"] = self._schema_api.compatibility_date
         async with session.request(
-            method=self._schema.operation_method(query["operation"]),
+            method=self._schema_api.operation_method(query.operation_id),
             url=url,
             headers=headers,
-            params=query["query_parameters"],
+            params=query.query_parameters,
         ) as response:
             async with response:
                 match response.status:
                     case 200:
+                        logger.debug(
+                            f"{response.method} {response.real_url} returned "
+                            f"{response.status} {response.reason}"
+                        )
+                    case 201:
+                        logger.debug(
+                            f"{response.method} {response.real_url} returned "
+                            f"{response.status} {response.reason}"
+                        )
+                    case 204:
                         logger.debug(
                             f"{response.method} {response.real_url} returned "
                             f"{response.status} {response.reason}"
@@ -231,7 +246,7 @@ class EsiLink:
                         )
                 text = await response.text()
                 return QueryResponse(
-                    query_id=query["query_id"],
+                    query_id=query.query_id,
                     status_code=response.status,
                     status_reason=response.reason or "",
                     headers=tuple(response.headers.items()),

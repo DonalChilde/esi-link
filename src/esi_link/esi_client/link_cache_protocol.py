@@ -4,11 +4,9 @@ from enum import StrEnum
 from typing import Protocol
 from uuid import UUID
 
-from .models import (
-    LinkCachedResponse,
-    LinkCacheMetadata,
-    QueryResponse,
-)
+from esi_link.esi_schema.eve_openapi_protocol import EveOpenApiProtocol
+
+from .models import EsiQuery, LinkCachedResponse, LinkCacheMetadata, QueryResponse
 
 
 class CacheStatus(StrEnum):
@@ -29,11 +27,11 @@ class LinkCacheProtocol(Protocol):
         """Get an ESI Link cached response from the cache."""
         ...
 
-    def get_response(self, key: UUID) -> QueryResponse:
+    def get_response(self, key: UUID) -> QueryResponse | None:
         """Get an ESI query response from the cache by key."""
         ...
 
-    def get_cache_metadata(self, key: UUID) -> LinkCacheMetadata:
+    def get_cache_metadata(self, key: UUID) -> LinkCacheMetadata | None:
         """Get the cache metadata for an ESI query response from the cache."""
         ...
 
@@ -42,7 +40,10 @@ class LinkCacheProtocol(Protocol):
         ...
 
     def set(
-        self, cache_key: UUID, cache_metadata: LinkCacheMetadata, value: QueryResponse
+        self,
+        cache_key: UUID,
+        cache_metadata: LinkCacheMetadata,
+        response: QueryResponse,
     ) -> None:
         """Set a QueryResponse in the cache."""
         ...
@@ -59,6 +60,8 @@ class LinkCacheProtocol(Protocol):
         """Get the cache status of a query."""
         ...
 
-    def build_metadata(self, response: QueryResponse) -> LinkCacheMetadata:
+    def build_metadata(
+        self, query: EsiQuery, response: QueryResponse, schema_api: EveOpenApiProtocol
+    ) -> LinkCacheMetadata:
         """Build cache metadata for a QueryResponse."""
         ...

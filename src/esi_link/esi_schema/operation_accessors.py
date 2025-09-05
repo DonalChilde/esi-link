@@ -16,6 +16,32 @@ class TagOperationDetails(TypedDict):
     requires_auth: bool
 
 
+def is_cached(operation_schema: IndexedOperation) -> bool:
+    """Check if an operation is cached."""
+    # This might be correct, needs some testing.
+    # previously used get method to test for cache.
+    return "x-cache-age" in operation_schema.operation
+
+
+def is_paged(operation_schema: IndexedOperation) -> bool:
+    """Check if an operation is paged."""
+    return any(
+        param.get("name") == "page"
+        for param in operation_schema.operation.get("parameters", [])
+        if param.get("in") == "query"
+    )
+
+
+def x_cache_age(operation_schema: IndexedOperation) -> int | None:
+    """Get the x-cache-age for an operation, if any."""
+    return operation_schema.operation.get("x-cache-age")
+
+
+def x_compatibility_date(operation_schema: IndexedOperation) -> str | None:
+    """Get the x-compatibility-date for an operation, if any."""
+    return operation_schema.operation.get("x-compatibility-date")
+
+
 def request_parameters(operation_schema: IndexedOperation) -> Sequence[dict[str, Any]]:
     """Get the request parameters for an operation."""
     return operation_schema.operation.get("parameters", [])

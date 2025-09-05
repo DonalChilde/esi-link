@@ -4,12 +4,12 @@ from uuid import UUID
 from pydantic import BaseModel
 
 
-class EsiQuery(TypedDict):
+class EsiQuery(BaseModel):
     query_id: UUID
-    operation: str
-    path_parameters: dict[str, str | int | float]
-    query_parameters: dict[str, str | int | float]
-    headers: dict[str, str]
+    operation_id: str
+    path_parameters: dict[str, str | int | float] = {}
+    query_parameters: dict[str, str | int | float] = {}
+    headers: dict[str, str] = {}
 
 
 class QueryResponse(BaseModel):

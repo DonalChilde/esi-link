@@ -5,9 +5,14 @@ from copy import deepcopy
 from datetime import UTC, datetime
 from uuid import UUID
 
+from esi_link.esi_client.cache_helpers import build_metadata as build_cache_metadata
+from esi_link.esi_schema.eve_openapi_protocol import EveOpenApiProtocol
+from esi_link.helpers import header_funcs as HF
+
 from ..helpers.now_utc import now_utc
 from .link_cache_protocol import CacheStatus, LinkCacheProtocol
 from .models import (
+    EsiQuery,
     LinkCache,
     LinkCachedResponse,
     LinkCacheMetadata,
@@ -51,12 +56,15 @@ class EsiMemoryCache(LinkCacheProtocol):
         return deepcopy(metadata.metadata)
 
     def set(
-        self, cache_key: UUID, cache_metadata: LinkCacheMetadata, value: QueryResponse
+        self,
+        cache_key: UUID,
+        cache_metadata: LinkCacheMetadata,
+        response: QueryResponse,
     ) -> None:
         """Store a response in the cache with its key."""
         self._cached_responses.data[cache_key] = LinkCachedResponse(
             cache_key=cache_key,
-            response=deepcopy(value),
+            response=deepcopy(response),
             metadata=deepcopy(cache_metadata),
         )
 
@@ -76,3 +84,23 @@ class EsiMemoryCache(LinkCacheProtocol):
                 return CacheStatus.HIT
             return CacheStatus.STALE
         return CacheStatus.MISS
+
+    def build_metadata(
+        self, query: EsiQuery, response: QueryResponse, schema_api: EveOpenApiProtocol
+    ) -> LinkCacheMetadata:
+        return build_cache_metadata(query, response, schema_api)
+
+    def update_304(self, cache_key: UUID, response: QueryResponse) -> None:
+        """Update the cache metadata for a 304 response."""
+
+        cached_metadata = self.get_cache_metadata(cache_key)
+        if cached_metadata is None:
+            raise ValueError(f"Cache key {cache_key} not found in cache.")
+        new_metadata = LinkCacheMetadata(
+            cache_key=cache_key,
+            expires=HF.expires(response.headers),
+            etag=HF.etag(response.headers),
+            last_modified=HF.last_modified(response.headers),
+            last_checked=response.completed_on,
+        )
+        self._cached_responses.data[cache_key].metadata = new_metadata

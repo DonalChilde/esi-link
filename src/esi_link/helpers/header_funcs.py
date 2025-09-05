@@ -11,12 +11,12 @@ def page_count(headers: HeadersType) -> int:
     return 1
 
 
-def last_modified(headers: HeadersType) -> str | None:
+def last_modified(headers: HeadersType) -> str:
     """Get the last modified timestamp from the response headers."""
     for header in headers:
         if header[0].lower() == "last-modified":
-            return header[1]
-    return None
+            return header[1] if header[1] else ""
+    return ""
 
 
 def limit_reset(headers: HeadersType) -> int:
@@ -35,6 +35,22 @@ def limit_remain(headers: HeadersType) -> int:
         if header[0].lower() == "x-esi-error-limit-remain":
             return int(header[1] or default)
     return default
+
+
+def expires(headers: HeadersType) -> str:
+    """Get the expires timestamp from the response headers."""
+    for header in headers:
+        if header[0].lower() == "expires":
+            return header[1] if header[1] else ""
+    return ""
+
+
+def etag(headers: HeadersType) -> str:
+    """Get the ETag from the response headers."""
+    for header in headers:
+        if header[0].lower() == "etag":
+            return header[1] if header[1] else ""
+    return ""
 
 
 def inject_compatibility_date(headers: dict[str, str], compatibility_date: str) -> None:
