@@ -1,3 +1,8 @@
+"""TypedDict models for ESI schema components.
+
+NOTE Not currently in use.
+"""
+
 from typing import Any, Literal, NotRequired, TypedDict
 
 from pydantic import BaseModel

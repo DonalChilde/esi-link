@@ -1,8 +1,14 @@
+"""Format operation details for documentation.
+
+Needs to be refactored to be more modular.
+Needs extensive rework to handle all the different schema types.
+"""
+
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, TypedDict
 
-from esi_link.esi_schema.eve_openapi_protocol import OperationSchema
+from esi_link.esi_schema.eve_openapi_protocol import IndexedOperation
 from esi_link.helpers.indent_lines import indent_lines, prefixed_list_to_lines
 
 # TODO rewrite this to use triple quote f strings
@@ -10,7 +16,7 @@ from esi_link.helpers.indent_lines import indent_lines, prefixed_list_to_lines
 # A possible temp fix, is to have A cli option that outputs the raw schema for an operation.
 
 
-def format_operation_details(op_schema: OperationSchema) -> str:
+def format_operation_details(op_schema: IndexedOperation) -> str:
     """
     Return a formatted string for one operation, its description, and tables of request parameters, response body parameters, and headers.
 

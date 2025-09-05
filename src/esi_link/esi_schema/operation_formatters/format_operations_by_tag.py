@@ -1,5 +1,7 @@
 from esi_link.esi_schema.eve_openapi import EveOpenApi
 
+# TODO use operation accessors where possible
+
 
 def format_operations_by_tag_string(api: EveOpenApi) -> str:
     """
@@ -13,11 +15,12 @@ def format_operations_by_tag_string(api: EveOpenApi) -> str:
         str: Formatted string of operations grouped by tag.
     """
     tag_map: dict[str, list[tuple[str, str, str]]] = {}
-    for op_schema in api.by_operation_id.values():
+    for op_schema in api.indexed_operations.values():
         tags = op_schema.operation.get("tags", [])
         description = (
             op_schema.operation.get("description", "").strip() or "(no description)"
         )
+        description = description.replace("\n", " ")
         requires_auth = bool(op_schema.operation.get("security"))
         auth_flag = "[auth]" if requires_auth else ""
         for tag in tags:

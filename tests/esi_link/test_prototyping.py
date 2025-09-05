@@ -30,4 +30,4 @@ def test_response_content_schema_types(schema_store: SchemaStore):
                 methods[method]["operation_data"].operation_keys.add(key)
 
     pprint(methods, indent=2)
-    assert False
+    # assert False

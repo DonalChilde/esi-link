@@ -1,6 +1,12 @@
+"""Pydantic models for ESI schema components.
+
+NOTE Not sure if this is a valid pursuit, as the OpenAPI schema is complex and may not map cleanly to Pydantic models.
+Not currently in use.
+"""
+
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Parameter(BaseModel):

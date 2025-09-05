@@ -6,9 +6,7 @@ https://esi.evetech.net/meta/openapi.json
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Protocol, TypedDict
-
-from . import schema_types as ST
+from typing import Any, Literal, Protocol, TypedDict
 
 
 class SplitParameters(TypedDict):
@@ -18,11 +16,15 @@ class SplitParameters(TypedDict):
 
 
 @dataclass(slots=True)
-class OperationSchema:
+class IndexedOperation:
     operation_id: str
     method: str
     path: str
     operation: dict[str, Any] = field(default_factory=dict[str, Any])
+    success_code: Literal["200", "201", "204", ""] = "200"
+
+
+IndexedOperations = Mapping[str, IndexedOperation]
 
 
 class EveOpenApiProtocol(Protocol):
@@ -48,8 +50,8 @@ class EveOpenApiProtocol(Protocol):
         """Get the path for the given operation ID."""
         ...
 
-    def operation_schema(self, operation_id: str) -> OperationSchema:
-        """Get the schema for the given operation ID."""
+    def indexed_operation(self, operation_id: str) -> IndexedOperation:
+        """Get the indexed operation for the given operation ID."""
         ...
 
     def validate_operation(
