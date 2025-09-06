@@ -13,6 +13,7 @@ class SplitParameters(TypedDict):
     path: Mapping[str, str | int | float]
     query: Mapping[str, str | int | float]
     header: Mapping[str, str | int | float]
+    unknown: Mapping[str, str | int | float]
 
 
 @dataclass(slots=True)
@@ -66,7 +67,7 @@ class EveOpenApiProtocol(Protocol):
         """
         ...
 
-    def split_parameters(
+    def split_request_parameters(
         self,
         operation_id: str,
         parameters: Mapping[str, str | int | float],

@@ -7,10 +7,8 @@ import typer
 
 from esi_link.esi_client.esi_client import EsiClient
 from esi_link.esi_client.esi_memory_cache import EsiMemoryCache
-from esi_link.esi_client.link_cache_protocol import LinkCacheProtocol
 from esi_link.esi_client.models import EsiQuery
 from esi_link.esi_schema.eve_openapi import EveOpenApi
-from esi_link.esi_schema.schema_store import SchemaStore
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -21,28 +19,10 @@ def get(
     operation_id: Annotated[
         str, typer.Argument(help="The operation ID to execute.")
     ] = "GetStatus",
-    path_parameters: Annotated[
-        str,
-        typer.Option(
-            "-p, --path", help="Path parameters for the operation.", show_default=False
-        ),
-    ] = "{}",
-    query_parameters: Annotated[
-        str,
-        typer.Option(
-            "-q, --query",
-            help="Query parameters for the operation.",
-            show_default=False,
-        ),
-    ] = "{}",
-    header_parameters: Annotated[
-        str,
-        typer.Option(
-            "-h, --header",
-            help="Header parameters for the operation.",
-            show_default=False,
-        ),
-    ] = "{}",
+    parameters: Annotated[
+        list[str],
+        typer.Option("-p --parameter", help="Parameters as key=value strings."),
+    ] = [],
 ):
     """Get ESI data."""
     start = perf_counter()
@@ -50,9 +30,9 @@ def get(
 
     # TODO use pydantic models for parameters
     # parse parameters
-    path_dict = json.loads(path_parameters)
-    query_dict = json.loads(query_parameters)
-    header_dict = json.loads(header_parameters)
+    path_dict = {}
+    query_dict = {}
+    header_dict = {}
     if path_dict:
         typer.echo(f"Path parameters: {json.dumps(path_dict, indent=2)}")
     if query_dict:
@@ -60,9 +40,7 @@ def get(
     if header_dict:
         typer.echo(f"Header parameters: {json.dumps(header_dict, indent=2)}")
 
-    schema_store = ctx.obj.schema_store
-    cache = EsiMemoryCache()
-    client = get_client(schema_store, cache)
+    client = init_client(ctx)
     esi_query = EsiQuery(
         query_id=uuid4(),
         operation_id=operation_id,
@@ -77,7 +55,10 @@ def get(
     typer.echo(f"Completed in {perf_counter() - start:.2f} seconds.")
 
 
-def get_client(schema_store: SchemaStore, cache: LinkCacheProtocol):
+def init_client(ctx: typer.Context) -> EsiClient:
+    schema_store = ctx.obj.schema_store
+    # TODO use real cache.
+    cache = EsiMemoryCache()
     schema_api = EveOpenApi.from_schema_store(schema_store)
     client = EsiClient(
         schema_api=schema_api,

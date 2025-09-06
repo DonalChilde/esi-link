@@ -174,7 +174,7 @@ class EveOpenApi(EveOpenApiProtocol):
                     )
         return True
 
-    def split_parameters(
+    def split_request_parameters(
         self, operation_id: str, parameters: Mapping[str, str | int | float]
     ) -> SplitParameters:
         raise NotImplementedError("Subclasses must implement split_parameters")

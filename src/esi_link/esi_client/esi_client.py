@@ -23,7 +23,7 @@ from uuid import UUID
 
 from esi_link.esi_client.cache_helpers import make_cache_key
 
-from ..esi_schema.eve_openapi_protocol import EveOpenApiProtocol
+from ..esi_schema.eve_openapi_protocol import EveOpenApiProtocol, SplitParameters
 from ..helpers.cache_id_from_url import cache_id_from_url
 from ..helpers.header_funcs import last_modified, page_count
 from .esi_http import EsiHttp, EsiQuery, QueryResponse
@@ -40,7 +40,7 @@ class EsiClient:
         cache: LinkCacheProtocol,
         max_concurrent_requests: int = 50,
     ) -> None:
-        self.schema = schema_api
+        self.schema_api = schema_api
         self.cache = cache
         self.link = EsiHttp(schema_api, max_concurrent_requests)
 
@@ -49,7 +49,7 @@ class EsiClient:
         results = esi_batch_query(
             queries=batch,
             cache=self.cache,
-            schema_api=self.schema,
+            schema_api=self.schema_api,
             esi_http=self.link,
         )
         return results[esi_query.query_id]
@@ -58,10 +58,20 @@ class EsiClient:
         results = esi_batch_query(
             queries=queries,
             cache=self.cache,
-            schema_api=self.schema,
+            schema_api=self.schema_api,
             esi_http=self.link,
         )
         return results
+
+    def split_request_parameters(
+        self, operation_id: str, parameters: dict[str, str]
+    ) -> SplitParameters:
+        """Split a list of request parameter {key:value} into their respective path, query, and header categories."""
+        return self.schema_api.split_request_parameters(operation_id, parameters)
+
+    def validate_query(self, esi_query: EsiQuery) -> bool:
+        """Validate the query against the ESI schema."""
+        return _validate_query(esi_query, self.schema_api)
 
 
 # def make_cache_key(query: EsiQuery, schema_api: EveOpenApiProtocol) -> UUID:
