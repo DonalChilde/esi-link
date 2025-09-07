@@ -21,33 +21,50 @@ def get(
     ] = "GetStatus",
     parameters: Annotated[
         list[str],
-        typer.Option("-p --parameter", help="Parameters as key=value strings."),
+        typer.Option("-p", "--parameter", help="Parameters as key=value strings."),
     ] = [],
 ):
     """Get ESI data."""
     start = perf_counter()
     typer.echo(f"Getting ESI data for operation ID: {operation_id}")
-
-    # TODO use pydantic models for parameters
-    # parse parameters
-    path_dict = {}
-    query_dict = {}
-    header_dict = {}
-    if path_dict:
-        typer.echo(f"Path parameters: {json.dumps(path_dict, indent=2)}")
-    if query_dict:
-        typer.echo(f"Query parameters: {json.dumps(query_dict, indent=2)}")
-    if header_dict:
-        typer.echo(f"Header parameters: {json.dumps(header_dict, indent=2)}")
-
     client = init_client(ctx)
+
+    # TODO use pydantic models for parameters?
+
+    # split input parameters into key, value pairs
+    # will ignore any that don't have an '=', or have more than one '='
+    params_dict = {
+        x[0]: x[1] for x in (y.split("=", 1) for y in parameters) if len(x) == 2
+    }
+    split_params = client.split_request_parameters(operation_id, params_dict)
+
+    # This will be debug print only -> when implemented
+    if len(parameters) != (
+        len(split_params.path)
+        + len(split_params.query)
+        + len(split_params.header)
+        + len(split_params.unknown)
+    ):
+        typer.echo(
+            f"Warning: Some parameters were not recognized and will be ignored. {parameters!r}"
+        )
+    if split_params.path:
+        typer.echo(f"Path parameters: {json.dumps(split_params.path, indent=2)}")
+    if split_params.query:
+        typer.echo(f"Query parameters: {json.dumps(split_params.query, indent=2)}")
+    if split_params.header:
+        typer.echo(f"Header parameters: {json.dumps(split_params.header, indent=2)}")
+    if split_params.unknown:
+        typer.echo(f"Unknown parameters: {json.dumps(split_params.unknown, indent=2)}")
+
     esi_query = EsiQuery(
         query_id=uuid4(),
         operation_id=operation_id,
-        path_parameters=path_dict,
-        query_parameters=query_dict,
-        headers=header_dict,
+        path_parameters=split_params.path,
+        query_parameters=split_params.query,
+        headers=split_params.header,
     )
+    client.validate_query(esi_query)
 
     result = client.query(esi_query)
     typer.echo(json.dumps(json.loads(result.text), indent=2))

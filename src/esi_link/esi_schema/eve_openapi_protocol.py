@@ -6,14 +6,21 @@ https://esi.evetech.net/meta/openapi.json
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Literal, Protocol, TypedDict
+from typing import Any, Literal, Protocol
 
 
-class SplitParameters(TypedDict):
-    path: Mapping[str, str | int | float]
-    query: Mapping[str, str | int | float]
-    header: Mapping[str, str | int | float]
-    unknown: Mapping[str, str | int | float]
+@dataclass(slots=True)
+class SplitParameters:
+    path: dict[str, str | int | float] = field(
+        default_factory=dict[str, str | int | float]
+    )
+    query: dict[str, str | int | float] = field(
+        default_factory=dict[str, str | int | float]
+    )
+    header: dict[str, str] = field(default_factory=dict[str, str])
+    unknown: dict[str, str | int | float] = field(
+        default_factory=dict[str, str | int | float]
+    )
 
 
 @dataclass(slots=True)

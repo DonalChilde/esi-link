@@ -177,7 +177,20 @@ class EveOpenApi(EveOpenApiProtocol):
     def split_request_parameters(
         self, operation_id: str, parameters: Mapping[str, str | int | float]
     ) -> SplitParameters:
-        raise NotImplementedError("Subclasses must implement split_parameters")
+        """Split the parameters into their respective categories."""
+        split_params = SplitParameters()
+        operation = self.indexed_operation(operation_id)
+
+        for key, value in parameters.items():
+            if key in OA.request_path_parameters(operation):
+                split_params.path[key] = value
+            elif key in OA.request_query_parameters(operation):
+                split_params.query[key] = value
+            elif key in OA.request_header_parameters(operation):
+                split_params.header[key] = value
+            else:
+                split_params.unknown[key] = value
+        return split_params
 
     def validate_operation(
         self,

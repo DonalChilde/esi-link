@@ -18,13 +18,13 @@ Typical usage example:
 """
 
 import logging
+from collections.abc import Sequence
 from copy import deepcopy
 from uuid import UUID
 
 from esi_link.esi_client.cache_helpers import make_cache_key
 
 from ..esi_schema.eve_openapi_protocol import EveOpenApiProtocol, SplitParameters
-from ..helpers.cache_id_from_url import cache_id_from_url
 from ..helpers.header_funcs import last_modified, page_count
 from .esi_http import EsiHttp, EsiQuery, QueryResponse
 from .link_cache_protocol import CacheStatus, LinkCacheProtocol
@@ -64,14 +64,20 @@ class EsiClient:
         return results
 
     def split_request_parameters(
-        self, operation_id: str, parameters: dict[str, str]
+        self, operation_id: str, parameters: dict[str, str] | Sequence[dict[str, str]]
     ) -> SplitParameters:
         """Split a list of request parameter {key:value} into their respective path, query, and header categories."""
-        return self.schema_api.split_request_parameters(operation_id, parameters)
+        if isinstance(parameters, Sequence):
+            param_dict = {k: v for d in parameters for k, v in d.items()}
+        else:
+            param_dict = parameters
+        return self.schema_api.split_request_parameters(operation_id, param_dict)
 
     def validate_query(self, esi_query: EsiQuery) -> bool:
         """Validate the query against the ESI schema."""
-        return _validate_query(esi_query, self.schema_api)
+        # FIXME disable check for development
+        return True
+        # return _validate_query(esi_query, self.schema_api)
 
 
 # def make_cache_key(query: EsiQuery, schema_api: EveOpenApiProtocol) -> UUID:

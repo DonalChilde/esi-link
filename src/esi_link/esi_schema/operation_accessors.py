@@ -42,40 +42,45 @@ def x_compatibility_date(operation_schema: IndexedOperation) -> str | None:
     return operation_schema.operation.get("x-compatibility-date")
 
 
-def request_parameters(operation_schema: IndexedOperation) -> Sequence[dict[str, Any]]:
+def request_parameters(operation_schema: IndexedOperation) -> dict[str, dict[str, Any]]:
     """Get the request parameters for an operation."""
-    return operation_schema.operation.get("parameters", [])
+    return {
+        param["name"]: param
+        for param in operation_schema.operation.get("parameters", [])
+    }
 
 
-def request_headers(operation_schema: IndexedOperation) -> Sequence[dict[str, Any]]:
+def request_header_parameters(
+    operation_schema: IndexedOperation,
+) -> dict[str, dict[str, Any]]:
     """Get the request headers for an operation."""
-    return [
-        param
+    return {
+        param["name"]: param
         for param in operation_schema.operation.get("parameters", [])
         if param.get("in") == "header"
-    ]
+    }
 
 
 def request_query_parameters(
     operation_schema: IndexedOperation,
-) -> Sequence[dict[str, Any]]:
+) -> dict[str, dict[str, Any]]:
     """Get the request query parameters for an operation."""
-    return [
-        param
+    return {
+        param["name"]: param
         for param in operation_schema.operation.get("parameters", [])
         if param.get("in") == "query"
-    ]
+    }
 
 
 def request_path_parameters(
     operation_schema: IndexedOperation,
-) -> Sequence[dict[str, Any]]:
+) -> dict[str, dict[str, Any]]:
     """Get the request path parameters for an operation."""
-    return [
-        param
+    return {
+        param["name"]: param
         for param in operation_schema.operation.get("parameters", [])
         if param.get("in") == "path"
-    ]
+    }
 
 
 def request_body(operation_schema: IndexedOperation) -> dict[str, Any] | None:
