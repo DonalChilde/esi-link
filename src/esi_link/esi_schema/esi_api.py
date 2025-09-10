@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 # TODO output a table of operation_ids,paths, descriptions, and valid inputs.
 # TODO store operation lookup as dict. operation_id={path:str,method:str}?
+# TODO Refactor to split functions from class, eg def is_paged(api: EsiApiProtocol, operation_id: str) -> bool:
 
 
 class EsiApi(EsiApiProtocol):
@@ -108,70 +109,70 @@ class EsiApi(EsiApiProtocol):
         with open(self.schema_path, encoding="utf-8") as file:
             return json.load(file)
 
-    def _check_path_params(
-        self,
-        operation_id: str,
-        path_params: Mapping[str, str | int | float],
-    ) -> bool:
-        """Check if the required path parameters are present for the given operation ID.
+    # def _check_path_params(
+    #     self,
+    #     operation_id: str,
+    #     path_params: Mapping[str, str | int | float],
+    # ) -> bool:
+    #     """Check if the required path parameters are present for the given operation ID.
 
-        Args:
-            op_id (str): The operation ID.
-            operation (Literal["get", "put", "post", "delete"]): The HTTP operation type.
-            path_params (dict[str, str]): A dictionary of path parameters.
+    #     Args:
+    #         op_id (str): The operation ID.
+    #         operation (Literal["get", "put", "post", "delete"]): The HTTP operation type.
+    #         path_params (dict[str, str]): A dictionary of path parameters.
 
-        Returns:
-            bool: True if all required path parameters are present, False otherwise.
-        """
-        # Get a dict of required path parameters from the spec
-        operation = self.indexed_operation(operation_id)
-        required_params = OA.request_path_parameters(operation)
+    #     Returns:
+    #         bool: True if all required path parameters are present, False otherwise.
+    #     """
+    #     # Get a dict of required path parameters from the spec
+    #     operation = self.indexed_operation(operation_id)
+    #     required_params = OA.request_path_parameters(operation)
 
-        # Check no extra path parameters are provided in path_params
-        if not all(path_param in required_params for path_param in path_params):
-            raise ValueError(
-                f"Unrecognized path parameters given.:{path_params=}, {required_params=}"
-            )
+    #     # Check no extra path parameters are provided in path_params
+    #     if not all(path_param in required_params for path_param in path_params):
+    #         raise ValueError(
+    #             f"Unrecognized path parameters given.:{path_params=}, {required_params=}"
+    #         )
 
-        # Check if all required parameters are present in the provided path_params
-        if not all(required_param in path_params for required_param in required_params):
-            raise ValueError(
-                f"Missing required path parameters: {path_params=}, {required_params=}"
-            )
-        return True
+    #     # Check if all required parameters are present in the provided path_params
+    #     if not all(required_param in path_params for required_param in required_params):
+    #         raise ValueError(
+    #             f"Missing required path parameters: {path_params=}, {required_params=}"
+    #         )
+    #     return True
 
-    def _check_query(
-        self,
-        operation_id: str,
-        query_params: Mapping[str, str | int | float],
-    ) -> bool:
-        """Check if the required query parameters are present for the given operation ID.
+    # def _check_query(
+    #     self,
+    #     operation_id: str,
+    #     query_params: Mapping[str, str | int | float],
+    # ) -> bool:
+    #     """Check if the required query parameters are present for the given operation ID.
 
-        Args:
-            op_id (str): The operation ID.
-            query_params (dict[str, str]): A dictionary of query parameters.
+    #     Args:
+    #         op_id (str): The operation ID.
+    #         query_params (dict[str, str]): A dictionary of query parameters.
 
-        Returns:
-            bool: True if all required query parameters are present, False otherwise.
-        """
-        # Get the list of required query parameters from the spec
-        operation = self.indexed_operation(operation_id)
-        possible_params = OA.request_query_parameters(operation)
+    #     Returns:
+    #         bool: True if all required query parameters are present, False otherwise.
+    #     """
+    #     # Get the list of required query parameters from the spec
+    #     operation = self.indexed_operation(operation_id)
+    #     possible_params = OA.request_query_parameters(operation)
 
-        # Check no extra query parameters are provided in query_params
-        if not all(query_param in possible_params for query_param in query_params):
-            raise ValueError(
-                f"Unrecognized query parameters given: {query_params=}, {possible_params=}"
-            )
+    #     # Check no extra query parameters are provided in query_params
+    #     if not all(query_param in possible_params for query_param in query_params):
+    #         raise ValueError(
+    #             f"Unrecognized query parameters given: {query_params=}, {possible_params=}"
+    #         )
 
-        # Check if all required parameters are present in the provided query_params
-        for key, value in possible_params.items():
-            if value.get("required", False):
-                if key not in query_params:
-                    raise ValueError(
-                        f"Missing required query parameters: {query_params=}, {possible_params=}"
-                    )
-        return True
+    #     # Check if all required parameters are present in the provided query_params
+    #     for key, value in possible_params.items():
+    #         if value.get("required", False):
+    #             if key not in query_params:
+    #                 raise ValueError(
+    #                     f"Missing required query parameters: {query_params=}, {possible_params=}"
+    #                 )
+    #     return True
 
     def split_request_parameters(
         self, operation_id: str, parameters: dict[str, str]
@@ -191,24 +192,24 @@ class EsiApi(EsiApiProtocol):
                 split_params.unknown[key] = value
         return split_params
 
-    def validate_operation(
-        self,
-        operation_id: str,
-        path_params: Mapping[str, str | int | float],
-        query_params: Mapping[str, str | int | float],
-    ) -> bool:
-        """Validate the operation parameters."""
-        if operation_id not in self.indexed_operations:
-            raise ValueError(f"Operation ID not found: {operation_id}")
-        valid = all(
-            (
-                self._check_path_params(
-                    operation_id=operation_id, path_params=path_params
-                ),
-                self._check_query(operation_id=operation_id, query_params=query_params),
-            ),
-        )
-        return valid
+    # def validate_operation(
+    #     self,
+    #     operation_id: str,
+    #     path_params: Mapping[str, str | int | float],
+    #     query_params: Mapping[str, str | int | float],
+    # ) -> bool:
+    #     """Validate the operation parameters."""
+    #     if operation_id not in self.indexed_operations:
+    #         raise ValueError(f"Operation ID not found: {operation_id}")
+    #     valid = all(
+    #         (
+    #             self._check_path_params(
+    #                 operation_id=operation_id, path_params=path_params
+    #             ),
+    #             self._check_query(operation_id=operation_id, query_params=query_params),
+    #         ),
+    #     )
+    #     return valid
 
     def build_url(
         self,
@@ -228,11 +229,11 @@ class EsiApi(EsiApiProtocol):
         Returns:
             str: The constructed URL.
         """
-        self.validate_operation(
-            operation_id=operation_id,
-            path_params=path_params,
-            query_params=query_params,
-        )
+        # self.validate_operation(
+        #     operation_id=operation_id,
+        #     path_params=path_params,
+        #     query_params=query_params,
+        # )
         # Build the path by replacing placeholders with actual values
         operation = self.indexed_operation(operation_id)
         path_template = operation.path

@@ -23,7 +23,10 @@ from copy import deepcopy
 from uuid import UUID
 
 from esi_link.esi_client.cache_helpers import make_cache_key
-from esi_link.esi_client.query_validator import EsiQueryValidatorProtocol
+from esi_link.esi_client.query_validator import (
+    EsiQueryValidatorProtocol,
+    ValidationError,
+)
 
 from ..esi_schema.esi_api_protocol import EsiApiProtocol, SplitParameters
 from ..helpers.header_funcs import last_modified, page_count
@@ -58,6 +61,12 @@ class EsiClient:
         return results[esi_query.query_id]
 
     def batch_query(self, queries: dict[UUID, EsiQuery]) -> dict[UUID, QueryResponse]:
+        if self.validator:
+            for query in queries.values():
+                try:
+                    self.validator.validate(query)
+                except ValidationError as e:
+                    logger.warning(f"Query validation failed: {e} for query {query!r}")
         results = esi_batch_query(
             queries=queries,
             cache=self.cache,

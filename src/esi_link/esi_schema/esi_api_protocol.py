@@ -62,17 +62,17 @@ class EsiApiProtocol(Protocol):
         """Get the indexed operation for the given operation ID."""
         ...
 
-    def validate_operation(
-        self,
-        operation_id: str,
-        path_params: dict[str, str | int | float],
-        query_params: dict[str, str | int | float],
-    ) -> bool:
-        """Validate the operation parameters.
+    # def validate_operation(
+    #     self,
+    #     operation_id: str,
+    #     path_params: dict[str, str | int | float],
+    #     query_params: dict[str, str | int | float],
+    # ) -> bool:
+    #     """Validate the operation parameters.
 
-        raise an exception if validation fails.
-        """
-        ...
+    #     raise an exception if validation fails.
+    #     """
+    #     ...
 
     def split_request_parameters(
         self,

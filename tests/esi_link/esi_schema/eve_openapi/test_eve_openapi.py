@@ -95,14 +95,6 @@ def test_index_by_op_id(esi_schema):
     assert op_schema.path == "/markets/{region_id}/history"
 
 
-def test_validate_operation_happy_path(esi_schema):
-    client = EsiApi(spec=esi_schema, compatibility_date="2023-01-01")
-    operation_id = "GetMarketsRegionIdHistory"
-    path_params = {"region_id": 10000002}
-    query_params = {"type_id": 34}
-    assert client.validate_operation(operation_id, path_params, query_params)
-
-
 def test_operation_method_and_path(esi_schema):
     client = EsiApi(spec=esi_schema, compatibility_date="2023-01-01")
     operation_id = "GetMarketsRegionIdHistory"
@@ -119,35 +111,6 @@ def test_invalid_operation_id_raises(esi_schema):
         client.operation_method(invalid_id)
     with pytest.raises(ValueError, match="Operation ID not found"):
         client.operation_path(invalid_id)
-    with pytest.raises(ValueError, match="Operation ID not found"):
-        client.validate_operation(invalid_id, {}, {})
+
     with pytest.raises(ValueError, match="Operation ID not found"):
         client.is_cached(invalid_id)
-
-
-def test_missing_required_path_param_raises(esi_schema):
-    client = EsiApi(spec=esi_schema, compatibility_date="2023-01-01")
-    operation_id = "GetMarketsRegionIdHistory"
-    # Missing region_id
-    with pytest.raises(ValueError, match="Missing required path parameters"):
-        client.validate_operation(operation_id, {}, {"type_id": 34})
-
-
-def test_extra_path_param_raises(esi_schema):
-    client = EsiApi(spec=esi_schema, compatibility_date="2023-01-01")
-    operation_id = "GetMarketsRegionIdHistory"
-    # Extra param not in spec
-    with pytest.raises(ValueError, match="Unrecognized path parameters"):
-        client.validate_operation(
-            operation_id, {"region_id": 10000002, "extra": 1}, {"type_id": 34}
-        )
-
-
-def test_extra_query_param_raises(esi_schema):
-    client = EsiApi(spec=esi_schema, compatibility_date="2023-01-01")
-    operation_id = "GetMarketsRegionIdHistory"
-    # Extra query param not in spec
-    with pytest.raises(ValueError, match="Unrecognized query parameters"):
-        client.validate_operation(
-            operation_id, {"region_id": 10000002}, {"type_id": 34, "extra": 1}
-        )
