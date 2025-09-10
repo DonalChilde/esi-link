@@ -23,6 +23,7 @@ from copy import deepcopy
 from uuid import UUID
 
 from esi_link.esi_client.cache_helpers import make_cache_key
+from esi_link.esi_client.query_validator import EsiQueryValidatorProtocol
 
 from ..esi_schema.eve_openapi_protocol import EveOpenApiProtocol, SplitParameters
 from ..helpers.header_funcs import last_modified, page_count
@@ -38,11 +39,13 @@ class EsiClient:
         self,
         schema_api: EveOpenApiProtocol,
         cache: LinkCacheProtocol,
+        validator: EsiQueryValidatorProtocol | None = None,
         max_concurrent_requests: int = 50,
     ) -> None:
         self.schema_api = schema_api
         self.cache = cache
         self.link = EsiHttp(schema_api, max_concurrent_requests)
+        self.validator = validator
 
     def query(self, esi_query: EsiQuery) -> QueryResponse:
         batch = {esi_query.query_id: esi_query}
@@ -73,11 +76,10 @@ class EsiClient:
             param_dict = parameters
         return self.schema_api.split_request_parameters(operation_id, param_dict)
 
-    def validate_query(self, esi_query: EsiQuery) -> bool:
+    def validate_query(self, esi_query: EsiQuery) -> None:
         """Validate the query against the ESI schema."""
-        # FIXME disable check for development
-        return True
-        # return _validate_query(esi_query, self.schema_api)
+        if self.validator:
+            self.validator.validate(esi_query)
 
 
 # def make_cache_key(query: EsiQuery, schema_api: EveOpenApiProtocol) -> UUID:
@@ -100,22 +102,22 @@ class EsiClient:
 #     return cache_key
 
 
-def _validate_query(query: EsiQuery, schema_api: EveOpenApiProtocol) -> bool:
-    """Validate the query against the ESI schema.
+# def _validate_query(query: EsiQuery, schema_api: EveOpenApiProtocol) -> bool:
+#     """Validate the query against the ESI schema.
 
-    Args:
-        query (EsiQuery): The ESI query.
-        schema (EveOpenApiProtocol): The ESI schema.
+#     Args:
+#         query (EsiQuery): The ESI query.
+#         schema (EveOpenApiProtocol): The ESI schema.
 
-    Returns:
-        bool: True if the query is valid, False otherwise.
-    """
-    valid = schema_api.validate_operation(
-        operation_id=query.operation_id,
-        path_params=query.path_parameters,
-        query_params=query.query_parameters,
-    )
-    return valid
+#     Returns:
+#         bool: True if the query is valid, False otherwise.
+#     """
+#     valid = schema_api.validate_operation(
+#         operation_id=query.operation_id,
+#         path_params=query.path_parameters,
+#         query_params=query.query_parameters,
+#     )
+#     return valid
 
 
 def _inject_etag(
@@ -163,7 +165,7 @@ def paged_query(
     Raises:
         ValueError: If an error occurs and fail_on_error is True.
     """
-    _validate_query(query, schema_api)
+    # _validate_query(query, schema_api)
     response: QueryResponse | None = None
     if schema_api.is_cached(query.operation_id):
         cache_key = make_cache_key(query, schema_api)
@@ -238,7 +240,7 @@ def esi_batch_query(
     results: dict[UUID, QueryResponse] = {}
     one_pass = set[UUID]()
     for key, query in queries.items():
-        _validate_query(query, schema_api)
+        # _validate_query(query, schema_api)
         one_pass.add(key)
         if schema_api.is_paged(query.operation_id):
             results[key] = paged_query(

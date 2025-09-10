@@ -82,7 +82,7 @@ class EsiHttp:
         name: str,
         queue: asyncio.Queue[EsiQuery],
         session: aiohttp.ClientSession,
-        result: dict[UUID, QueryResponse],
+        result: dict[UUID, QueryResponse | None],
     ):
         """Async worker for processing ESI queries from a queue.
 
@@ -102,6 +102,8 @@ class EsiHttp:
                 logger.info(
                     f"{name} skipping query {query.query_id} due to previous errors."
                 )
+                # Skipped queries return None
+                result[query.query_id] = None
                 queue.task_done()
                 continue
             try:
@@ -129,21 +131,23 @@ class EsiHttp:
             finally:
                 queue.task_done()
 
-    def do_query(self, query: EsiQuery) -> QueryResponse:
+    def do_query(self, query: EsiQuery) -> QueryResponse | None:
         """Executes a single ESI API query synchronously.
 
         Args:
             query (EsiQuery): The query to execute.
 
         Returns:
-            QueryResponse: The response from the ESI API.
+            QueryResponse: The response from the ESI API, or None if skipped.
 
         Raises:
             Exception: If the query fails or the API returns an error.
         """
         return self.do_queries({query.query_id: query})[query.query_id]
 
-    def do_queries(self, queries: dict[UUID, EsiQuery]) -> dict[UUID, QueryResponse]:
+    def do_queries(
+        self, queries: dict[UUID, EsiQuery]
+    ) -> dict[UUID, QueryResponse | None]:
         """Executes multiple ESI API queries concurrently.
 
         Args:
