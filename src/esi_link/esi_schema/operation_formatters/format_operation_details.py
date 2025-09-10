@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, TypedDict
 
-from esi_link.esi_schema.eve_openapi_protocol import IndexedOperation
+from esi_link.esi_schema.esi_api_protocol import IndexedOperation
 from esi_link.helpers.indent_lines import indent_lines, prefixed_list_to_lines
 
 # TODO rewrite this to use triple quote f strings

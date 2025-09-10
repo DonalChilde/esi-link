@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from esi_link.esi_schema.eve_openapi_protocol import EveOpenApiProtocol
+from esi_link.esi_schema.esi_api_protocol import EsiApiProtocol
 
 from .models import EsiQuery
 
@@ -29,7 +29,7 @@ class EsiQueryValidatorProtocol(Protocol):
 class SimpleValidator:
     """A simple implementation of the EsiQueryValidatorProtocol that performs basic validation."""
 
-    def __init__(self, eve_api: EveOpenApiProtocol) -> None:
+    def __init__(self, eve_api: EsiApiProtocol) -> None:
         self._eve_api = eve_api
 
     def validate(self, query: EsiQuery) -> None:

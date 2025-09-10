@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from esi_link.esi_schema.eve_openapi import EveOpenApi
+from esi_link.esi_schema.esi_api import EsiApi
 from esi_link.esi_schema.schema_pydantic import Content
 from esi_link.esi_schema.schema_store import SchemaStore
 

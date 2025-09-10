@@ -21,7 +21,7 @@ from uuid import UUID
 
 import aiohttp
 
-from ..esi_schema.eve_openapi_protocol import EveOpenApiProtocol
+from ..esi_schema.esi_api_protocol import EsiApiProtocol
 from ..helpers.header_funcs import limit_remain, limit_reset
 from ..helpers.now_utc import now_utc
 from .models import EsiQuery, QueryResponse
@@ -47,7 +47,7 @@ class EsiHttp:
     """
 
     def __init__(
-        self, schema_api: EveOpenApiProtocol, max_concurrent_requests: int = 50
+        self, schema_api: EsiApiProtocol, max_concurrent_requests: int = 50
     ) -> None:
         self._error_timeout_ends = now_utc()
         """The time at which queries can resume."""

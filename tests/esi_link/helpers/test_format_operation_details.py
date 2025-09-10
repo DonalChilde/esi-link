@@ -1,4 +1,4 @@
-from esi_link.esi_schema.eve_openapi import EveOpenApi
+from esi_link.esi_schema.esi_api import EsiApi
 from esi_link.esi_schema.operation_formatters.format_operation_details import (
     format_operation_details,
 )

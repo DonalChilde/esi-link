@@ -1,12 +1,12 @@
 from uuid import UUID
 
 from esi_link.esi_client.models import EsiQuery, LinkCacheMetadata, QueryResponse
-from esi_link.esi_schema.eve_openapi_protocol import EveOpenApiProtocol
+from esi_link.esi_schema.esi_api_protocol import EsiApiProtocol
 from esi_link.helpers import header_funcs as HF
 from esi_link.helpers.cache_id_from_url import cache_id_from_url
 
 
-def make_cache_key(query: EsiQuery, schema_api: EveOpenApiProtocol) -> UUID:
+def make_cache_key(query: EsiQuery, schema_api: EsiApiProtocol) -> UUID:
     """Generate a unique cache key for the given query and schema.
 
     Args:
@@ -29,7 +29,7 @@ def make_cache_key(query: EsiQuery, schema_api: EveOpenApiProtocol) -> UUID:
 def build_metadata(
     query: EsiQuery,
     response: QueryResponse,
-    schema_api: EveOpenApiProtocol,
+    schema_api: EsiApiProtocol,
 ) -> LinkCacheMetadata:
     """Build cache metadata from the query and response.
 

@@ -9,7 +9,7 @@ from uuid import UUID
 
 from esi_link.esi_client.cache_helpers import build_metadata as build_cache_metadata
 from esi_link.esi_client.models import EsiQuery
-from esi_link.esi_schema.eve_openapi_protocol import EveOpenApiProtocol
+from esi_link.esi_schema.esi_api_protocol import EsiApiProtocol
 from esi_link.helpers import header_funcs as HF
 
 from ..helpers.now_utc import now_utc
@@ -130,7 +130,7 @@ class EsiFileCache(LinkCacheProtocol):
         return CacheStatus.MISS
 
     def build_metadata(
-        self, query: EsiQuery, response: QueryResponse, schema_api: EveOpenApiProtocol
+        self, query: EsiQuery, response: QueryResponse, schema_api: EsiApiProtocol
     ) -> LinkCacheMetadata:
         return build_cache_metadata(query, response, schema_api)
 

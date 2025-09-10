@@ -4,7 +4,7 @@ import logging
 from collections.abc import Sequence
 from typing import Any, Literal, TypedDict
 
-from esi_link.esi_schema.eve_openapi_protocol import IndexedOperation, IndexedOperations
+from esi_link.esi_schema.esi_api_protocol import IndexedOperation, IndexedOperations
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())

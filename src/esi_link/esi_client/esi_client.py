@@ -25,7 +25,7 @@ from uuid import UUID
 from esi_link.esi_client.cache_helpers import make_cache_key
 from esi_link.esi_client.query_validator import EsiQueryValidatorProtocol
 
-from ..esi_schema.eve_openapi_protocol import EveOpenApiProtocol, SplitParameters
+from ..esi_schema.esi_api_protocol import EsiApiProtocol, SplitParameters
 from ..helpers.header_funcs import last_modified, page_count
 from .esi_http import EsiHttp, EsiQuery, QueryResponse
 from .link_cache_protocol import CacheStatus, LinkCacheProtocol
@@ -37,7 +37,7 @@ logger.addHandler(logging.NullHandler())
 class EsiClient:
     def __init__(
         self,
-        schema_api: EveOpenApiProtocol,
+        schema_api: EsiApiProtocol,
         cache: LinkCacheProtocol,
         validator: EsiQueryValidatorProtocol | None = None,
         max_concurrent_requests: int = 50,
@@ -121,7 +121,7 @@ class EsiClient:
 
 
 def _inject_etag(
-    query: EsiQuery, cache: LinkCacheProtocol, schema_api: EveOpenApiProtocol
+    query: EsiQuery, cache: LinkCacheProtocol, schema_api: EsiApiProtocol
 ) -> None:
     # get the etag from the cache
     cache_key = make_cache_key(query, schema_api)
@@ -146,7 +146,7 @@ def _build_pages_queries(
 def paged_query(
     query: EsiQuery,
     cache: LinkCacheProtocol,
-    schema_api: EveOpenApiProtocol,
+    schema_api: EsiApiProtocol,
     esi_http: EsiHttp,
     fail_on_error: bool = False,
 ) -> QueryResponse:
@@ -218,7 +218,7 @@ def paged_query(
 def esi_batch_query(
     queries: dict[UUID, EsiQuery],
     cache: LinkCacheProtocol,
-    schema_api: EveOpenApiProtocol,
+    schema_api: EsiApiProtocol,
     esi_http: EsiHttp,
     fail_on_error: bool = False,
 ) -> dict[UUID, QueryResponse]:

@@ -8,7 +8,7 @@ import typer
 from esi_link.esi_client.esi_client import EsiClient
 from esi_link.esi_client.esi_memory_cache import EsiMemoryCache
 from esi_link.esi_client.models import EsiQuery
-from esi_link.esi_schema.eve_openapi import EveOpenApi
+from esi_link.esi_schema.esi_api import EsiApi
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -81,7 +81,7 @@ def init_client(ctx: typer.Context) -> EsiClient:
     schema_store = ctx.obj.schema_store
     # TODO use real cache.
     cache = EsiMemoryCache()
-    schema_api = EveOpenApi.from_schema_store(schema_store)
+    schema_api = EsiApi.from_schema_store(schema_store)
     client = EsiClient(
         schema_api=schema_api,
         cache=cache,

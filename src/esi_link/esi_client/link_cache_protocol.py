@@ -4,7 +4,7 @@ from enum import StrEnum
 from typing import Protocol
 from uuid import UUID
 
-from esi_link.esi_schema.eve_openapi_protocol import EveOpenApiProtocol
+from esi_link.esi_schema.esi_api_protocol import EsiApiProtocol
 
 from .models import EsiQuery, LinkCachedResponse, LinkCacheMetadata, QueryResponse
 
@@ -61,7 +61,7 @@ class LinkCacheProtocol(Protocol):
         ...
 
     def build_metadata(
-        self, query: EsiQuery, response: QueryResponse, schema_api: EveOpenApiProtocol
+        self, query: EsiQuery, response: QueryResponse, schema_api: EsiApiProtocol
     ) -> LinkCacheMetadata:
         """Build cache metadata for a QueryResponse."""
         ...

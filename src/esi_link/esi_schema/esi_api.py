@@ -14,8 +14,8 @@ from typing import Any
 from esi_link.helpers.resolve_json_ref import resolve_internal_refs
 
 from . import operation_accessors as OA
-from .eve_openapi_protocol import (
-    EveOpenApiProtocol,
+from .esi_api_protocol import (
+    EsiApiProtocol,
     IndexedOperation,
     IndexedOperations,
     SplitParameters,
@@ -24,12 +24,11 @@ from .schema_store import SchemaStore
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
-# FIXME decide on validation signalling. right now the functions return a bool, and throw an exception.
 # TODO output a table of operation_ids,paths, descriptions, and valid inputs.
 # TODO store operation lookup as dict. operation_id={path:str,method:str}?
 
 
-class EveOpenApi(EveOpenApiProtocol):
+class EsiApi(EsiApiProtocol):
     def __init__(
         self,
         compatibility_date: str,
@@ -49,7 +48,7 @@ class EveOpenApi(EveOpenApiProtocol):
         self.indexed_operations: IndexedOperations = OA.index_operations(self.schema)
 
     @classmethod
-    def from_schema_store_path(cls, file_path: Path | None) -> "EveOpenApi":
+    def from_schema_store_path(cls, file_path: Path | None) -> "EsiApi":
         """Create an EveOpenApi instance from a schema store file.
 
         If file_path is None, SchemaStore will download the schema.
@@ -61,7 +60,7 @@ class EveOpenApi(EveOpenApiProtocol):
         return cls(compatibility_date=compatibility_date, spec=spec)
 
     @classmethod
-    def from_schema_store(cls, schema_store: SchemaStore) -> "EveOpenApi":
+    def from_schema_store(cls, schema_store: SchemaStore) -> "EsiApi":
         """Create an EveOpenApi instance from a SchemaStore."""
         download_date = datetime.fromisoformat(schema_store.download_date)
         compatibility_date = download_date.date().isoformat()

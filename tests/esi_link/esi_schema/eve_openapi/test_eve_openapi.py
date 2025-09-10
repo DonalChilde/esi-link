@@ -2,13 +2,13 @@ from typing import Any
 
 import pytest
 
-from esi_link.esi_schema.eve_openapi import EveOpenApi
+from esi_link.esi_schema.esi_api import EsiApi
 
 # pyright: basic
 
 
 def test_get_url(esi_schema: dict[str, Any]):
-    client = EveOpenApi(spec=esi_schema, compatibility_date="2023-01-01")
+    client = EsiApi(spec=esi_schema, compatibility_date="2023-01-01")
     operation_id = "GetMarketsRegionIdHistory"
     path_params = {"region_id": 10000002}
     query_params = {"type_id": 34}
@@ -66,7 +66,7 @@ def test_get_url_sorts_query_params():
         },
     }
 
-    client = EveOpenApi(spec=spec, compatibility_date="2023-01-01")
+    client = EsiApi(spec=spec, compatibility_date="2023-01-01")
     operation_id = "GetFoo"
     path_params = {"id": 1}
 
@@ -83,7 +83,7 @@ def test_get_url_sorts_query_params():
 
 
 def test_index_by_op_id(esi_schema):
-    client = EveOpenApi(spec=esi_schema, compatibility_date="2023-01-01")
+    client = EsiApi(spec=esi_schema, compatibility_date="2023-01-01")
     # Should index all operations with operationId
     operation_ids = list(client.indexed_operations.keys())
     assert operation_ids
@@ -96,7 +96,7 @@ def test_index_by_op_id(esi_schema):
 
 
 def test_validate_operation_happy_path(esi_schema):
-    client = EveOpenApi(spec=esi_schema, compatibility_date="2023-01-01")
+    client = EsiApi(spec=esi_schema, compatibility_date="2023-01-01")
     operation_id = "GetMarketsRegionIdHistory"
     path_params = {"region_id": 10000002}
     query_params = {"type_id": 34}
@@ -104,14 +104,14 @@ def test_validate_operation_happy_path(esi_schema):
 
 
 def test_operation_method_and_path(esi_schema):
-    client = EveOpenApi(spec=esi_schema, compatibility_date="2023-01-01")
+    client = EsiApi(spec=esi_schema, compatibility_date="2023-01-01")
     operation_id = "GetMarketsRegionIdHistory"
     assert client.operation_method(operation_id) == "get"
     assert client.operation_path(operation_id) == "/markets/{region_id}/history"
 
 
 def test_invalid_operation_id_raises(esi_schema):
-    client = EveOpenApi(spec=esi_schema, compatibility_date="2023-01-01")
+    client = EsiApi(spec=esi_schema, compatibility_date="2023-01-01")
     invalid_id = "NotARealOperationId"
     with pytest.raises(ValueError, match="Operation ID not found"):
         client.indexed_operation(invalid_id)
@@ -126,7 +126,7 @@ def test_invalid_operation_id_raises(esi_schema):
 
 
 def test_missing_required_path_param_raises(esi_schema):
-    client = EveOpenApi(spec=esi_schema, compatibility_date="2023-01-01")
+    client = EsiApi(spec=esi_schema, compatibility_date="2023-01-01")
     operation_id = "GetMarketsRegionIdHistory"
     # Missing region_id
     with pytest.raises(ValueError, match="Missing required path parameters"):
@@ -134,7 +134,7 @@ def test_missing_required_path_param_raises(esi_schema):
 
 
 def test_extra_path_param_raises(esi_schema):
-    client = EveOpenApi(spec=esi_schema, compatibility_date="2023-01-01")
+    client = EsiApi(spec=esi_schema, compatibility_date="2023-01-01")
     operation_id = "GetMarketsRegionIdHistory"
     # Extra param not in spec
     with pytest.raises(ValueError, match="Unrecognized path parameters"):
@@ -144,7 +144,7 @@ def test_extra_path_param_raises(esi_schema):
 
 
 def test_extra_query_param_raises(esi_schema):
-    client = EveOpenApi(spec=esi_schema, compatibility_date="2023-01-01")
+    client = EsiApi(spec=esi_schema, compatibility_date="2023-01-01")
     operation_id = "GetMarketsRegionIdHistory"
     # Extra query param not in spec
     with pytest.raises(ValueError, match="Unrecognized query parameters"):

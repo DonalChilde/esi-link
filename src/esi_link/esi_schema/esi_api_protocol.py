@@ -35,7 +35,7 @@ class IndexedOperation:
 IndexedOperations = Mapping[str, IndexedOperation]
 
 
-class EveOpenApiProtocol(Protocol):
+class EsiApiProtocol(Protocol):
     base_url: str = "https://esi.evetech.net/latest"
     compatibility_date: str
     """The compatibility date for the API in YYYY-MM-DD format."""
