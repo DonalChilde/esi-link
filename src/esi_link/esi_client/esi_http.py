@@ -120,7 +120,9 @@ class EsiHttp:
                         )
 
             except Exception as e:
-                logger.error(f"{name} error processing query {query.query_id}: {e}")
+                logger.error(
+                    f"{name} error processing query {query!r}: {e}", exc_info=True
+                )
                 if not self._stop_operations:
                     self._stop_operations = True
                     # self._error_timeout_ends = now_utc() + timedelta(seconds=30)

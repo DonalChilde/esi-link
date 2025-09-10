@@ -24,7 +24,12 @@ def get(
         typer.Option("-p", "--parameter", help="Parameters as key=value strings."),
     ] = [],
 ):
-    """Get ESI data."""
+    """Get ESI data.
+
+    Example:
+        esi-link query get GetMarketsRegionIdHistory -p region_id=10000002 -p type_id=34
+    """
+
     start = perf_counter()
     typer.echo(f"Getting ESI data for operation ID: {operation_id}")
     client = init_client(ctx)

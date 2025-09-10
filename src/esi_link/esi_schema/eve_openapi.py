@@ -126,7 +126,7 @@ class EveOpenApi(EveOpenApiProtocol):
         """
         # Get a dict of required path parameters from the spec
         operation = self.indexed_operation(operation_id)
-        required_params = {x["name"]: x for x in OA.request_path_parameters(operation)}
+        required_params = OA.request_path_parameters(operation)
 
         # Check no extra path parameters are provided in path_params
         if not all(path_param in required_params for path_param in path_params):
@@ -157,7 +157,7 @@ class EveOpenApi(EveOpenApiProtocol):
         """
         # Get the list of required query parameters from the spec
         operation = self.indexed_operation(operation_id)
-        possible_params = {x["name"]: x for x in OA.request_query_parameters(operation)}
+        possible_params = OA.request_query_parameters(operation)
 
         # Check no extra query parameters are provided in query_params
         if not all(query_param in possible_params for query_param in query_params):
@@ -175,7 +175,7 @@ class EveOpenApi(EveOpenApiProtocol):
         return True
 
     def split_request_parameters(
-        self, operation_id: str, parameters: Mapping[str, str | int | float]
+        self, operation_id: str, parameters: dict[str, str]
     ) -> SplitParameters:
         """Split the parameters into their respective categories."""
         split_params = SplitParameters()

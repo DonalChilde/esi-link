@@ -65,8 +65,8 @@ class EveOpenApiProtocol(Protocol):
     def validate_operation(
         self,
         operation_id: str,
-        path_params: Mapping[str, str | int | float],
-        query_params: Mapping[str, str | int | float],
+        path_params: dict[str, str | int | float],
+        query_params: dict[str, str | int | float],
     ) -> bool:
         """Validate the operation parameters.
 
@@ -77,7 +77,7 @@ class EveOpenApiProtocol(Protocol):
     def split_request_parameters(
         self,
         operation_id: str,
-        parameters: Mapping[str, str | int | float],
+        parameters: dict[str, str],
     ) -> SplitParameters:
         """Split the parameters into their respective categories."""
         ...
