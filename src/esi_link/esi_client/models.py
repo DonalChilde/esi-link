@@ -10,14 +10,19 @@ class EsiQuery(BaseModel):
     query_parameters: dict[str, str | int | float] = {}
     request_body: dict[str, str | int | float] = {}  # TODO this might need new types.
     headers: dict[str, str] = {}
+    is_paged_subquery: bool = False
+    """True if this query is a subquery for a paged request."""
+    parent_last_modified: str | None = None
+    """The last modified value from the parent query, if any."""
+    page_number: int | None = None
+    """The page number for paged requests, if any."""
 
 
 # FIXME response should include query, so that we can see whole lifecycle  from a cached response.
-# Consider, move response data to separate Optional class to suport signalling skipped queries? Think about then when and why of skipped queries.
+# Consider, move response data to separate Optional class to support signalling skipped queries? Think about then when and why of skipped queries.
 
 
-class QueryResponse(BaseModel):
-    query_id: UUID
+class ResponseData(BaseModel):
     status_code: int
     status_reason: str
     real_url: str
@@ -25,6 +30,11 @@ class QueryResponse(BaseModel):
     paged_text: list[str] = []
     headers: tuple[tuple[str, str | None], ...] = ()
     completed_on: str
+
+
+class QueryResponse(BaseModel):
+    query: EsiQuery
+    data: ResponseData | None
 
 
 class LinkCacheMetadata(BaseModel):
@@ -42,11 +52,11 @@ class LinkCacheMetadata(BaseModel):
     """The last time this ESI route was checked in rfc 2822 format."""
 
 
-class CacheEntry(BaseModel):
-    """Represents a cached entry."""
+# class CacheEntry(BaseModel):
+#     """Represents a cached entry."""
 
-    metadata: LinkCacheMetadata
-    response: str
+#     metadata: LinkCacheMetadata
+#     response: str
 
 
 class LinkCachedResponse(BaseModel):
