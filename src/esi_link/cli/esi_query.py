@@ -9,6 +9,7 @@ from esi_link.esi_client.esi_client import EsiClient
 from esi_link.esi_client.esi_memory_cache import EsiMemoryCache
 from esi_link.esi_client.models import EsiQuery
 from esi_link.esi_schema.esi_api import EsiApi
+from esi_link.helpers.response_to_json import response_to_json
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -38,6 +39,7 @@ def get(
 
     # split input parameters into key, value pairs
     # will ignore any that don't have an '=', or have more than one '='
+    # FIXME collect as a list so that repeat param keys can be handled.
     params_dict = {
         x[0]: x[1] for x in (y.split("=", 1) for y in parameters) if len(x) == 2
     }
@@ -72,7 +74,8 @@ def get(
     client.validate_query(esi_query)
 
     result = client.query(esi_query)
-    typer.echo(json.dumps(json.loads(result.text), indent=2))
+    jsoned_response = response_to_json(result)
+    typer.echo(json.dumps(jsoned_response, indent=2))
 
     typer.echo(f"Completed in {perf_counter() - start:.2f} seconds.")
 
