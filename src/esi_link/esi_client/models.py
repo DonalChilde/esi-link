@@ -39,7 +39,7 @@ class LinkCacheMetadata(BaseModel):
     last_modified: str
     """The last modified time for the cached response."""
     last_checked: str
-    """The last time this ESI route was checked in ISO 8601 format."""
+    """The last time this ESI route was checked in rfc 2822 format."""
 
 
 class CacheEntry(BaseModel):
