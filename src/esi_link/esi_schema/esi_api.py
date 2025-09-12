@@ -6,9 +6,10 @@ https://swagger.io/specification/
 import json
 import logging
 from collections.abc import Mapping
-from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from whenever import Instant
 
 # from esi_link.esi_schema.schema_pydantic import Operation, Parameter
 from esi_link.helpers.resolve_json_ref import resolve_internal_refs
@@ -55,16 +56,16 @@ class EsiApi(EsiApiProtocol):
         If file_path is None, SchemaStore will download the schema.
         """
         store = SchemaStore(store_path=file_path)
-        download_date = datetime.fromisoformat(store.download_date)
-        compatibility_date = download_date.date().isoformat()
+        download_date = Instant.parse_rfc2822(store.download_date)
+        compatibility_date = download_date.py_datetime().date().isoformat()
         spec = store.esi_schema
         return cls(compatibility_date=compatibility_date, spec=spec)
 
     @classmethod
     def from_schema_store(cls, schema_store: SchemaStore) -> "EsiApi":
         """Create an EveOpenApi instance from a SchemaStore."""
-        download_date = datetime.fromisoformat(schema_store.download_date)
-        compatibility_date = download_date.date().isoformat()
+        download_date = Instant.parse_rfc2822(schema_store.download_date)
+        compatibility_date = download_date.py_datetime().date().isoformat()
         spec = schema_store.esi_schema
         return cls(compatibility_date=compatibility_date, spec=spec)
 

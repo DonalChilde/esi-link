@@ -2,14 +2,14 @@
 
 import logging
 from copy import deepcopy
-from datetime import UTC, datetime
 from uuid import UUID
+
+from whenever import Instant
 
 from esi_link.esi_client.cache_helpers import build_metadata as build_cache_metadata
 from esi_link.esi_schema.esi_api_protocol import EsiApiProtocol
 from esi_link.helpers import header_funcs as HF
 
-from ..helpers.now_utc import now_utc
 from .link_cache_protocol import CacheStatus, LinkCacheProtocol
 from .models import (
     EsiQuery,
@@ -80,7 +80,7 @@ class EsiMemoryCache(LinkCacheProtocol):
         """Get the cache status of an EsiResponse."""
         if cache_key in self._cached_responses.data:
             metadata = self._cached_responses.data[cache_key].metadata
-            if datetime.fromisoformat(metadata.expires).astimezone(UTC) > now_utc():
+            if Instant.parse_rfc2822(metadata.expires) > Instant.now():
                 return CacheStatus.HIT
             return CacheStatus.STALE
         return CacheStatus.MISS

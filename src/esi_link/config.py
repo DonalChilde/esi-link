@@ -4,9 +4,9 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typer import get_app_dir
+from whenever import Instant
 
 from esi_link.helpers.make_safe_env_name import make_safe_env_name
-from esi_link.helpers.now_utc import now_utc
 
 APP_NAMESPACE = "pfmsoft"
 APP_NAME = "Esi Link"
@@ -89,6 +89,6 @@ def init_env_file(dir_path: Path, file_name: str = ".env", overwrite: bool = Fal
 
 
 
-    # File generated at {now_utc().isoformat()}\n
+    # File generated at {Instant.now().format_common_iso()}\n
     """
     env_path.write_text(env_text)

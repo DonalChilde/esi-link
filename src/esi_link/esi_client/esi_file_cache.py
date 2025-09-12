@@ -2,17 +2,17 @@
 
 import logging
 from copy import deepcopy
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Self
 from uuid import UUID
+
+from whenever import Instant
 
 from esi_link.esi_client.cache_helpers import build_metadata as build_cache_metadata
 from esi_link.esi_client.models import EsiQuery
 from esi_link.esi_schema.esi_api_protocol import EsiApiProtocol
 from esi_link.helpers import header_funcs as HF
 
-from ..helpers.now_utc import now_utc
 from .link_cache_protocol import CacheStatus, LinkCacheProtocol
 from .models import (
     LinkCache,
@@ -95,14 +95,17 @@ class EsiFileCache(LinkCacheProtocol):
         return deepcopy(metadata.metadata)
 
     def set(
-        self, cache_key: UUID, cache_metadata: LinkCacheMetadata, value: QueryResponse
+        self,
+        cache_key: UUID,
+        cache_metadata: LinkCacheMetadata,
+        response: QueryResponse,
     ) -> None:
         """Store a response in the cache with its key."""
         if self._cached_responses is None:
             raise ValueError("No cache loaded.")
         self._cached_responses.data[cache_key] = LinkCachedResponse(
             cache_key=cache_key,
-            response=deepcopy(value),
+            response=deepcopy(response),
             metadata=deepcopy(cache_metadata),
         )
 
@@ -124,7 +127,7 @@ class EsiFileCache(LinkCacheProtocol):
             raise ValueError("No cache loaded.")
         if cache_key in self._cached_responses.data:
             metadata = self._cached_responses.data[cache_key].metadata
-            if datetime.fromisoformat(metadata.expires).astimezone(UTC) > now_utc():
+            if Instant.parse_rfc2822(metadata.expires) > Instant.now():
                 return CacheStatus.HIT
             return CacheStatus.STALE
         return CacheStatus.MISS

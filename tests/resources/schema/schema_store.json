@@ -1,6 +1,6 @@
 {
-  "id_": "0d6642df-b83d-4703-a8ed-8398b68a2ac5",
-  "download_date": "2025-09-02T21:04:49.386286+00:00",
+  "id_": "5d878017-c63f-4a2c-ba77-7de83a9564b4",
+  "download_date": "Fri, 12 Sep 2025 15:57:53 GMT",
   "esi_schema": {
     "components": {
       "headers": {
@@ -2252,6 +2252,7 @@
                   "FacWarCorpJoinWithdrawMsg",
                   "FacWarCorpLeaveRequestMsg",
                   "FacWarCorpLeaveWithdrawMsg",
+                  "FacWarDirectEnlistmentRevoked",
                   "FacWarLPDisqualifiedEvent",
                   "FacWarLPDisqualifiedKill",
                   "FacWarLPPayoutEvent",
@@ -3763,6 +3764,14 @@
             "type": "object"
           },
           "type": "array"
+        },
+        "CompatibilityDate": {
+          "examples": [
+            "2025-08-26"
+          ],
+          "format": "date",
+          "type": "string",
+          "x-common-model": "true"
         },
         "ConstellationID": {
           "examples": [
@@ -9590,6 +9599,152 @@
             "type": "object"
           },
           "type": "array"
+        },
+        "MetaChangelog": {
+          "properties": {
+            "changelog": {
+              "additionalProperties": {
+                "items": {
+                  "properties": {
+                    "compatibility_date": {
+                      "examples": [
+                        "2025-08-26"
+                      ],
+                      "format": "date",
+                      "type": "string",
+                      "x-common-model": "true"
+                    },
+                    "description": {
+                      "description": "Description",
+                      "examples": [
+                        "Updated response schema."
+                      ],
+                      "type": "string"
+                    },
+                    "is_breaking": {
+                      "description": "Whether this is a breaking change",
+                      "examples": [
+                        false
+                      ],
+                      "type": "boolean"
+                    },
+                    "method": {
+                      "description": "HTTP method of the route",
+                      "enum": [
+                        "GET",
+                        "POST",
+                        "PUT",
+                        "DELETE"
+                      ],
+                      "examples": [
+                        "GET"
+                      ],
+                      "type": "string"
+                    },
+                    "path": {
+                      "description": "Path of the route",
+                      "examples": [
+                        "/meta/changelog"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "method",
+                    "path",
+                    "compatibility_date",
+                    "is_breaking",
+                    "description"
+                  ],
+                  "type": "object"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "description": "Per date, list changes for that date",
+              "type": "object"
+            }
+          },
+          "required": [
+            "changelog"
+          ],
+          "type": "object"
+        },
+        "MetaChangelogEntry": {
+          "properties": {
+            "compatibility_date": {
+              "examples": [
+                "2025-08-26"
+              ],
+              "format": "date",
+              "type": "string",
+              "x-common-model": "true"
+            },
+            "description": {
+              "description": "Description",
+              "examples": [
+                "Updated response schema."
+              ],
+              "type": "string"
+            },
+            "is_breaking": {
+              "description": "Whether this is a breaking change",
+              "examples": [
+                false
+              ],
+              "type": "boolean"
+            },
+            "method": {
+              "description": "HTTP method of the route",
+              "enum": [
+                "GET",
+                "POST",
+                "PUT",
+                "DELETE"
+              ],
+              "examples": [
+                "GET"
+              ],
+              "type": "string"
+            },
+            "path": {
+              "description": "Path of the route",
+              "examples": [
+                "/meta/changelog"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "method",
+            "path",
+            "compatibility_date",
+            "is_breaking",
+            "description"
+          ],
+          "type": "object"
+        },
+        "MetaCompatibilityDates": {
+          "properties": {
+            "compatibility_dates": {
+              "description": "List of compatibility dates.",
+              "items": {
+                "examples": [
+                  "2025-08-26"
+                ],
+                "format": "date",
+                "type": "string",
+                "x-common-model": "true"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "compatibility_dates"
+          ],
+          "type": "object"
         },
         "RegionID": {
           "examples": [
@@ -22275,6 +22430,7 @@
                             "FacWarCorpJoinWithdrawMsg",
                             "FacWarCorpLeaveRequestMsg",
                             "FacWarCorpLeaveWithdrawMsg",
+                            "FacWarDirectEnlistmentRevoked",
                             "FacWarLPDisqualifiedEvent",
                             "FacWarLPDisqualifiedKill",
                             "FacWarLPPayoutEvent",
@@ -45784,6 +45940,412 @@
           "x-compatibility-date": "2020-01-01"
         }
       },
+      "/meta/changelog": {
+        "get": {
+          "description": "Get the changelog of this API.",
+          "operationId": "GetMetaChangelog",
+          "parameters": [
+            {
+              "description": "The language to use for the response.",
+              "in": "header",
+              "name": "Accept-Language",
+              "schema": {
+                "default": "en",
+                "enum": [
+                  "en",
+                  "de",
+                  "fr",
+                  "ja",
+                  "ru",
+                  "zh",
+                  "ko",
+                  "es"
+                ],
+                "type": "string"
+              }
+            },
+            {
+              "description": "The ETag of the previous request. A 304 will be returned if this matches the current ETag.",
+              "in": "header",
+              "name": "If-None-Match",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "description": "The compatibility date for the request.",
+              "in": "header",
+              "name": "X-Compatibility-Date",
+              "required": true,
+              "schema": {
+                "enum": [
+                  "2020-01-01"
+                ],
+                "format": "date",
+                "type": "string"
+              }
+            },
+            {
+              "description": "The tenant ID for the request.",
+              "example": "",
+              "in": "header",
+              "name": "X-Tenant",
+              "schema": {
+                "default": "tranquility",
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "properties": {
+                      "changelog": {
+                        "additionalProperties": {
+                          "items": {
+                            "properties": {
+                              "compatibility_date": {
+                                "examples": [
+                                  "2025-08-26"
+                                ],
+                                "format": "date",
+                                "type": "string",
+                                "x-common-model": "true"
+                              },
+                              "description": {
+                                "description": "Description",
+                                "examples": [
+                                  "Updated response schema."
+                                ],
+                                "type": "string"
+                              },
+                              "is_breaking": {
+                                "description": "Whether this is a breaking change",
+                                "examples": [
+                                  false
+                                ],
+                                "type": "boolean"
+                              },
+                              "method": {
+                                "description": "HTTP method of the route",
+                                "enum": [
+                                  "GET",
+                                  "POST",
+                                  "PUT",
+                                  "DELETE"
+                                ],
+                                "examples": [
+                                  "GET"
+                                ],
+                                "type": "string"
+                              },
+                              "path": {
+                                "description": "Path of the route",
+                                "examples": [
+                                  "/meta/changelog"
+                                ],
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "method",
+                              "path",
+                              "compatibility_date",
+                              "is_breaking",
+                              "description"
+                            ],
+                            "type": "object"
+                          },
+                          "type": [
+                            "array",
+                            "null"
+                          ]
+                        },
+                        "description": "Per date, list changes for that date",
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "changelog"
+                    ],
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "OK",
+              "headers": {
+                "Cache-Control": {
+                  "description": "Directives for caching mechanisms. It controls how the response can be cached, by whom, and for how long.",
+                  "schema": {
+                    "type": "string"
+                  }
+                },
+                "ETag": {
+                  "description": "The ETag value of the response body. Use this with If-None-Match to check whether the resource has changed.",
+                  "schema": {
+                    "type": "string"
+                  }
+                },
+                "Last-Modified": {
+                  "description": "The last modified date of the response. Use this with If-Modified-Since to check whether the resource has changed.",
+                  "schema": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "default": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "details": {
+                        "description": "List of individual error details.",
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "location": {
+                              "description": "Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id'",
+                              "type": "string"
+                            },
+                            "message": {
+                              "description": "Error message text",
+                              "type": "string"
+                            },
+                            "value": {
+                              "description": "The value at the given location"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "type": [
+                          "array",
+                          "null"
+                        ]
+                      },
+                      "error": {
+                        "description": "Error message.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "error"
+                    ],
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Error",
+              "headers": {
+                "Cache-Control": {
+                  "description": "Directives for caching mechanisms. It controls how the response can be cached, by whom, and for how long.",
+                  "schema": {
+                    "type": "string"
+                  }
+                },
+                "ETag": {
+                  "description": "The ETag value of the response body. Use this with If-None-Match to check whether the resource has changed.",
+                  "schema": {
+                    "type": "string"
+                  }
+                },
+                "Last-Modified": {
+                  "description": "The last modified date of the response. Use this with If-Modified-Since to check whether the resource has changed.",
+                  "schema": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "summary": "Get changelog",
+          "tags": [
+            "Meta"
+          ],
+          "x-cache-age": 0,
+          "x-compatibility-date": "2020-01-01"
+        }
+      },
+      "/meta/compatibility-dates": {
+        "get": {
+          "description": "Get a list of compatibility dates.",
+          "operationId": "GetMetaCompatibilityDates",
+          "parameters": [
+            {
+              "description": "The language to use for the response.",
+              "in": "header",
+              "name": "Accept-Language",
+              "schema": {
+                "default": "en",
+                "enum": [
+                  "en",
+                  "de",
+                  "fr",
+                  "ja",
+                  "ru",
+                  "zh",
+                  "ko",
+                  "es"
+                ],
+                "type": "string"
+              }
+            },
+            {
+              "description": "The ETag of the previous request. A 304 will be returned if this matches the current ETag.",
+              "in": "header",
+              "name": "If-None-Match",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "description": "The compatibility date for the request.",
+              "in": "header",
+              "name": "X-Compatibility-Date",
+              "required": true,
+              "schema": {
+                "enum": [
+                  "2020-01-01"
+                ],
+                "format": "date",
+                "type": "string"
+              }
+            },
+            {
+              "description": "The tenant ID for the request.",
+              "example": "",
+              "in": "header",
+              "name": "X-Tenant",
+              "schema": {
+                "default": "tranquility",
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "properties": {
+                      "compatibility_dates": {
+                        "description": "List of compatibility dates.",
+                        "items": {
+                          "examples": [
+                            "2025-08-26"
+                          ],
+                          "format": "date",
+                          "type": "string",
+                          "x-common-model": "true"
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "compatibility_dates"
+                    ],
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "OK",
+              "headers": {
+                "Cache-Control": {
+                  "description": "Directives for caching mechanisms. It controls how the response can be cached, by whom, and for how long.",
+                  "schema": {
+                    "type": "string"
+                  }
+                },
+                "ETag": {
+                  "description": "The ETag value of the response body. Use this with If-None-Match to check whether the resource has changed.",
+                  "schema": {
+                    "type": "string"
+                  }
+                },
+                "Last-Modified": {
+                  "description": "The last modified date of the response. Use this with If-Modified-Since to check whether the resource has changed.",
+                  "schema": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "default": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "details": {
+                        "description": "List of individual error details.",
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "location": {
+                              "description": "Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id'",
+                              "type": "string"
+                            },
+                            "message": {
+                              "description": "Error message text",
+                              "type": "string"
+                            },
+                            "value": {
+                              "description": "The value at the given location"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "type": [
+                          "array",
+                          "null"
+                        ]
+                      },
+                      "error": {
+                        "description": "Error message.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "error"
+                    ],
+                    "type": "object"
+                  }
+                }
+              },
+              "description": "Error",
+              "headers": {
+                "Cache-Control": {
+                  "description": "Directives for caching mechanisms. It controls how the response can be cached, by whom, and for how long.",
+                  "schema": {
+                    "type": "string"
+                  }
+                },
+                "ETag": {
+                  "description": "The ETag value of the response body. Use this with If-None-Match to check whether the resource has changed.",
+                  "schema": {
+                    "type": "string"
+                  }
+                },
+                "Last-Modified": {
+                  "description": "The last modified date of the response. Use this with If-Modified-Since to check whether the resource has changed.",
+                  "schema": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "summary": "Get compatibility dates",
+          "tags": [
+            "Meta"
+          ],
+          "x-cache-age": 0,
+          "x-compatibility-date": "2020-01-01"
+        }
+      },
       "/route/{origin}/{destination}": {
         "get": {
           "description": "Get the systems between origin and destination",
@@ -54245,6 +54807,9 @@
       },
       {
         "name": "Market"
+      },
+      {
+        "name": "Meta"
       },
       {
         "name": "Planetary Interaction"

@@ -16,14 +16,13 @@ Typical usage example:
 
 import asyncio
 import logging
-from datetime import timedelta
 from uuid import UUID
 
 import aiohttp
+from whenever import Instant, TimeDelta
 
 from ..esi_schema.esi_api_protocol import EsiApiProtocol
 from ..helpers.header_funcs import limit_remain, limit_reset
-from ..helpers.now_utc import now_utc
 from .models import EsiQuery, QueryResponse
 
 logger = logging.getLogger(__name__)
@@ -36,7 +35,7 @@ class EsiHttp:
     Attributes:
         _schema (EveOpenApiProtocol): ESI schema for building requests.
         _max_concurrent_requests (int): Maximum concurrent requests allowed.
-        _error_timeout_ends (datetime): When queries can resume after error.
+        _error_timeout_ends (Instant | None): When queries can resume after error. None when not set yet.
         _default_timeout (int): Default timeout in seconds for error waits.
         _queue_remaining (int): Number of queries left in the queue.
         _stop_operations (bool): Flag to stop further queries after error.
@@ -49,7 +48,7 @@ class EsiHttp:
     def __init__(
         self, schema_api: EsiApiProtocol, max_concurrent_requests: int = 50
     ) -> None:
-        self._error_timeout_ends = now_utc()
+        self._error_timeout_ends: Instant | None = None
         """The time at which queries can resume."""
         self._default_timeout = 30
         self._schema_api = schema_api
@@ -72,8 +71,8 @@ class EsiHttp:
             if self._error_timeout_ends is None:
                 wait_for = self._default_timeout
             else:
-                wait_for = self._error_timeout_ends - now_utc()
-                wait_for = wait_for.total_seconds()
+                wait_for = self._error_timeout_ends - Instant.now()
+                wait_for = wait_for.in_seconds()
         if wait_for > 0:
             await asyncio.sleep(wait_for)
 
@@ -117,7 +116,7 @@ class EsiHttp:
                     self._errors_remaining = limit_remain(response.headers)
                     time_out = limit_reset(response.headers) or self._default_timeout
                     if time_out != -1:
-                        self._error_timeout_ends = now_utc() + timedelta(
+                        self._error_timeout_ends = Instant.now() + TimeDelta(
                             seconds=time_out
                         )
 
@@ -258,5 +257,5 @@ class EsiHttp:
                     headers=tuple(response.headers.items()),
                     text=text,
                     real_url=str(response.real_url),
-                    completed_on=now_utc().isoformat(),
+                    completed_on=Instant.now().format_rfc2822(),
                 )

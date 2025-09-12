@@ -15,13 +15,13 @@ def test_schema_store_loads_from_schema_file(tmp_path: Path):
     """SchemaStore loads schema from file."""
     schema_path = tmp_path / "esi_schema.json"
     dummy_schema: dict[str, Any] = {"openapi": "3.0.0", "info": {"title": "Dummy"}}
-    download_date = "2025-08-26T00:00:00+00:00"
+    download_date = "Tue, 26 Aug 2025 00:00:00 GMT"
     schema_path.write_text(json.dumps(dummy_schema))
     store = SchemaStore.from_schema_file(
         schema_path=schema_path, download_date=download_date, store_path=None
     )
     assert store.esi_schema == dummy_schema
-    assert store.download_date == "2025-08-26T00:00:00+00:00"  # Iso 8601 format
+    assert store.download_date == "Tue, 26 Aug 2025 00:00:00 GMT"  # RFC 2822 format
     assert isinstance(store.schema_id, UUID)
 
 
@@ -30,47 +30,47 @@ def test_schema_store_loads_from_schema_file_and_save(tmp_path: Path):
     schema_path = tmp_path / "esi_schema.json"
     store_path = tmp_path / "schema_store.json"
     dummy_schema: dict[str, Any] = {"openapi": "3.0.0", "info": {"title": "Dummy"}}
-    download_date = "2025-08-26T00:00:00+00:00"
+    download_date = "Tue, 26 Aug 2025 00:00:00 GMT"
     schema_path.write_text(json.dumps(dummy_schema))
     store = SchemaStore.from_schema_file(
         schema_path=schema_path, download_date=download_date, store_path=store_path
     )
     assert store.esi_schema == dummy_schema
-    assert store.download_date == "2025-08-26T00:00:00+00:00"  # Iso 8601 format
+    assert store.download_date == "Tue, 26 Aug 2025 00:00:00 GMT"  # RFC 2822 format
     assert isinstance(store.schema_id, UUID)
     assert store_path.is_file()
     loaded_data = json.loads(store_path.read_text())
     assert loaded_data["esi_schema"] == dummy_schema
-    assert loaded_data["download_date"] == "2025-08-26T00:00:00+00:00"
+    assert loaded_data["download_date"] == "Tue, 26 Aug 2025 00:00:00 GMT"
 
 
 def test_schema_store_loads_from_obj(tmp_path: Path):
     """SchemaStore loads schema from a dictionary object."""
     dummy_schema: dict[str, Any] = {"openapi": "3.0.0", "info": {"title": "Dummy"}}
-    download_date = "2025-08-26T00:00:00+00:00"
+    download_date = "Tue, 26 Aug 2025 00:00:00 GMT"
     store = SchemaStore.from_obj(
         obj=dummy_schema, download_date=download_date, store_path=None
     )
     assert store.esi_schema == dummy_schema
-    assert store.download_date == "2025-08-26T00:00:00+00:00"  # Iso 8601 format
+    assert store.download_date == "Tue, 26 Aug 2025 00:00:00 GMT"  # RFC 2822 format
     assert isinstance(store.schema_id, UUID)
 
 
 def test_schema_store_loads_from_obj_and_save(tmp_path: Path):
     """SchemaStore loads schema from a dictionary object and saves it."""
     dummy_schema: dict[str, Any] = {"openapi": "3.0.0", "info": {"title": "Dummy"}}
-    download_date = "2025-08-26T00:00:00+00:00"
+    download_date = "Tue, 26 Aug 2025 00:00:00 GMT"
     store_path = tmp_path / "schema_store.json"
     store = SchemaStore.from_obj(
         obj=dummy_schema, download_date=download_date, store_path=store_path
     )
     assert store.esi_schema == dummy_schema
-    assert store.download_date == "2025-08-26T00:00:00+00:00"  # Iso 8601 format
+    assert store.download_date == "Tue, 26 Aug 2025 00:00:00 GMT"  # RFC 2822 format
     assert isinstance(store.schema_id, UUID)
     assert (tmp_path / "schema_store.json").is_file()
     loaded_data = json.loads(store_path.read_text())
     assert loaded_data["esi_schema"] == dummy_schema
-    assert loaded_data["download_date"] == "2025-08-26T00:00:00+00:00"
+    assert loaded_data["download_date"] == "Tue, 26 Aug 2025 00:00:00 GMT"
 
 
 def test_schema_store_download(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
@@ -84,15 +84,23 @@ def test_schema_store_download(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
         "esi_link.esi_schema.schema_store.download_text",
         fake_download_text,
     )
+
+    class MockInstant:
+        @staticmethod
+        def now():
+            class MockDateTime:
+                def format_rfc2822(self):
+                    return "Wed, 27 Aug 2025 00:00:00 GMT"
+
+            return MockDateTime()
+
     monkeypatch.setattr(
-        "esi_link.esi_schema.schema_store.now_utc",
-        lambda: type(
-            "dt", (), {"isoformat": lambda self: "2025-08-27T00:00:00+00:00"}
-        )(),
+        "esi_link.esi_schema.schema_store.Instant",
+        MockInstant,
     )
     store = SchemaStore.from_download(store_path=None)
     assert store.esi_schema == dummy_schema
-    assert store.download_date == "2025-08-27T00:00:00+00:00"
+    assert store.download_date == "Wed, 27 Aug 2025 00:00:00 GMT"
     assert isinstance(store.schema_id, UUID)
 
 
@@ -103,7 +111,7 @@ def test_schema_store_update(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     dummy_json = json.dumps(
         {
             "id_": str(UUID(int=1)),
-            "download_date": "2025-08-28T00:00:00+00:00",
+            "download_date": "Thu, 28 Aug 2025 00:00:00 GMT",
             "esi_schema": dummy_schema,
         }
     )
@@ -116,25 +124,33 @@ def test_schema_store_update(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
         "esi_link.esi_schema.schema_store.download_text",
         fake_download_text,
     )
+
+    class MockInstant:
+        @staticmethod
+        def now():
+            class MockDateTime:
+                def format_rfc2822(self):
+                    return "Fri, 29 Aug 2025 00:00:00 GMT"
+
+            return MockDateTime()
+
     monkeypatch.setattr(
-        "esi_link.esi_schema.schema_store.now_utc",
-        lambda: type(
-            "dt", (), {"isoformat": lambda self: "2025-08-29T00:00:00+00:00"}
-        )(),
+        "esi_link.esi_schema.schema_store.Instant",
+        MockInstant,
     )
     store = SchemaStore(schema_path)
     store.update()
     assert store.esi_schema["openapi"] == "3.0.2"
-    assert store.download_date == "2025-08-29T00:00:00+00:00"
+    assert store.download_date == "Fri, 29 Aug 2025 00:00:00 GMT"
     saved = json.loads(schema_path.read_text())
     assert saved["esi_schema"]["openapi"] == "3.0.2"
-    assert saved["download_date"] == "2025-08-29T00:00:00+00:00"
+    assert saved["download_date"] == "Fri, 29 Aug 2025 00:00:00 GMT"
 
 
 def test_save_store_data_writes_file(tmp_path: Path):
     """_save_store_data writes schema data to file correctly."""
     store_path = tmp_path / "esi_schema.json"
-    download_date = "2025-08-30T00:00:00+00:00"
+    download_date = "Sat, 30 Aug 2025 00:00:00 GMT"
     dummy_schema: dict[str, Any] = {"openapi": "3.0.0", "info": {"title": "Dummy"}}
     store = SchemaStore.from_obj(
         obj=dummy_schema,
@@ -145,14 +161,14 @@ def test_save_store_data_writes_file(tmp_path: Path):
     store._save_store_data()
     saved = json.loads(store_path.read_text())
     assert isinstance(UUID(saved["id_"]), UUID)
-    assert saved["download_date"] == "2025-08-30T00:00:00+00:00"
+    assert saved["download_date"] == "Sat, 30 Aug 2025 00:00:00 GMT"
     assert saved["esi_schema"] == dummy_schema
 
 
 def test_save_store_data_raises_if_store_data_none(tmp_path: Path):
     """_save_store_data raises ValueError if _store_data is None."""
     store_path = tmp_path / "esi_schema.json"
-    download_date = "2025-08-30T00:00:00+00:00"
+    download_date = "Sat, 30 Aug 2025 00:00:00 GMT"
     dummy_schema: dict[str, Any] = {"openapi": "3.0.0", "info": {"title": "Dummy"}}
     store = SchemaStore.from_obj(
         obj=dummy_schema,
@@ -171,7 +187,7 @@ def test_save_store_data_raises_if_store_data_none(tmp_path: Path):
 #     dummy_schema: dict[str, Any] = {"openapi": "3.0.0", "info": {"title": "Dummy"}}
 #     store._store_data = SchemaStoreData(
 #         id_=UUID(int=3),
-#         download_date="2025-08-31T00:00:00Z",
+#         download_date="Sun, 31 Aug 2025 00:00:00 GMT",
 #         esi_schema=dummy_schema,
 #     )
 #     with pytest.raises(ValueError, match="SchemaStore file_path is not set."):
@@ -181,7 +197,7 @@ def test_save_store_data_raises_if_store_data_none(tmp_path: Path):
 def test_save_store_data_respects_indent(tmp_path: Path):
     """_save_store_data respects indent_on_save argument."""
     store_path = tmp_path / "esi_schema.json"
-    download_date = "2025-08-30T00:00:00+00:00"
+    download_date = "Sat, 30 Aug 2025 00:00:00 GMT"
     dummy_schema: dict[str, Any] = {"openapi": "3.0.0", "info": {"title": "Dummy"}}
     store = SchemaStore.from_obj(
         obj=dummy_schema,
@@ -198,7 +214,7 @@ def test_save_store_data_respects_indent(tmp_path: Path):
 def test_load_store_data_raises_if_file_missing(tmp_path: Path):
     """_load_store_data raises ValueError if file is missing."""
     store_path = tmp_path / "esi_schema.json"
-    download_date = "2025-08-30T00:00:00+00:00"
+    download_date = "Sat, 30 Aug 2025 00:00:00 GMT"
     dummy_schema: dict[str, Any] = {"openapi": "3.0.0", "info": {"title": "Dummy"}}
     store = SchemaStore.from_obj(
         obj=dummy_schema,
@@ -220,7 +236,7 @@ def test_load_store_data_raises_if_invalid_schema(tmp_path: Path):
         json.dumps(
             {
                 "id_": str(UUID(int=5)),
-                "download_date": "2025-09-02T00:00:00Z",
+                "download_date": "Mon, 02 Sep 2025 00:00:00 GMT",
                 "schema_": {},
             }
         )

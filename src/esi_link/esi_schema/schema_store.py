@@ -16,17 +16,16 @@ Typical usage example:
 
 import json
 import logging
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel
+from whenever import Instant
 
 from esi_link.helpers.resolve_json_ref import resolve_internal_refs
 
 from ..helpers.download_file import download_text
-from ..helpers.now_utc import now_utc
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -39,7 +38,7 @@ class SchemaStoreData(BaseModel):
 
     Attributes:
         id_ (UUID): Unique identifier for the schema.
-        download_date (str): ISO 8601 UTC download date.
+        download_date (str): rfc 2822 UTC download date.
         esi_schema (dict[str, Any]): The ESI OpenAPI schema as a dictionary.
     """
 
@@ -133,7 +132,7 @@ class SchemaStore:
 
         Args:
             schema_path (Path): Path to the schema file.
-            download_date (str): ISO 8601 UTC download date.
+            download_date (str): RFC 2822 UTC download date.
             store_path (Path | None): Path to the store file, or None to not save.
 
         Returns:
@@ -142,12 +141,12 @@ class SchemaStore:
         schema_text = schema_path.read_text()
         schema_json = json.loads(schema_text)
         resolved_schema = resolve_internal_refs(parent=schema_json, child=schema_json)
-        download_date_resolved = datetime.fromisoformat(download_date).astimezone(UTC)
+        download_date_resolved = Instant.parse_rfc2822(download_date)
         if "openapi" not in schema_json:
             raise ValueError("Invalid ESI schema: 'openapi' key not found.")
         store_data = SchemaStoreData(
             id_=uuid4(),
-            download_date=download_date_resolved.isoformat(),
+            download_date=download_date_resolved.format_rfc2822(),
             esi_schema=resolved_schema,
         )
         instance = cls(None, indent_on_save=indent_on_save)
@@ -170,7 +169,7 @@ class SchemaStore:
 
         Args:
             obj (dict[str, Any]): The dictionary object containing schema data.
-            download_date (str): ISO 8601 UTC download date.
+            download_date (str): RFC 2822 UTC download date.
             store_path (Path | None): Path to the store file, or None to not save.
 
         Returns:
@@ -178,12 +177,12 @@ class SchemaStore:
         """
         if "openapi" not in obj:
             raise ValueError("Invalid ESI schema: 'openapi' key not found.")
-        download_date_resolved = datetime.fromisoformat(download_date).astimezone(UTC)
+        download_date_resolved = Instant.parse_rfc2822(download_date)
         instance = cls(None, indent_on_save=indent_on_save)
         resolved_schema = resolve_internal_refs(parent=obj, child=obj)
         instance._store_data = SchemaStoreData(
             id_=uuid4(),
-            download_date=download_date_resolved.isoformat(),
+            download_date=download_date_resolved.format_rfc2822(),
             esi_schema=resolved_schema,
         )
         instance._store_path = store_path
@@ -273,7 +272,7 @@ class SchemaStore:
             logger.error(f"Failed to update schema: {e}")
             raise e
         self._store_data = SchemaStoreData(
-            id_=uuid4(), download_date=now_utc().isoformat(), esi_schema=schema
+            id_=uuid4(), download_date=Instant.now().format_rfc2822(), esi_schema=schema
         )
 
     @property
@@ -309,7 +308,7 @@ class SchemaStore:
         """Return the download date of the loaded ESI schema.
 
         Returns:
-            str: The ISO 8601 UTC download datetime.
+            str: The rfc 2822 UTC download datetime.
 
         Raises:
             ValueError: If schema is not loaded.
