@@ -13,7 +13,7 @@ from esi_link.esi_client.models import EsiQuery
 from esi_link.esi_schema.esi_api_protocol import EsiApiProtocol
 from esi_link.helpers import header_funcs as HF
 
-from .link_cache_protocol import CacheStatus, LinkCacheProtocol
+from .link_cache_protocol import CacheStatus, InvalidCacheRequest, LinkCacheProtocol
 from .models import (
     LinkCache,
     LinkCachedResponse,
@@ -62,36 +62,34 @@ class EsiFileCache(LinkCacheProtocol):
             raise ValueError("No cache to save.")
         self._file_path.write_text(self._cached_responses.model_dump_json())
 
-    def get(self, key: UUID) -> LinkCachedResponse | None:
-        """Retrieve a cached response by its key."""
-        if self._cached_responses is None:
-            raise ValueError("No cache loaded.")
-        cached_value = self._cached_responses.data.get(key)
-
-        if cached_value:
-            logger.info(f"Cache hit for key: {key}")
-        else:
-            logger.info(f"Cache miss for key: {key}")
-        return deepcopy(cached_value)
-
-    def get_response(self, key: UUID) -> QueryResponse | None:
+    def get(self, key: UUID) -> LinkCachedResponse:
         """Retrieve a cached response by its key."""
         if self._cached_responses is None:
             raise ValueError("No cache loaded.")
         cached_value = self._cached_responses.data.get(key)
         if cached_value is None:
-            logger.info(f"Cache miss for key: {key}")
-            return None
+            logger.warning(f"Cache miss for key: {key}, check cache status first.")
+            raise InvalidCacheRequest(f"Cache key {key} not found in cache.")
+        return deepcopy(cached_value)
+
+    def get_response(self, key: UUID) -> QueryResponse:
+        """Retrieve a cached response by its key."""
+        if self._cached_responses is None:
+            raise ValueError("No cache loaded.")
+        cached_value = self._cached_responses.data.get(key)
+        if cached_value is None:
+            logger.warning(f"Cache miss for key: {key}, check cache status first.")
+            raise InvalidCacheRequest(f"Cache key {key} not found in cache.")
         return deepcopy(cached_value.response)
 
-    def get_cache_metadata(self, key: UUID) -> LinkCacheMetadata | None:
+    def get_cache_metadata(self, key: UUID) -> LinkCacheMetadata:
         """Retrieve cache metadata for a cached response by its key."""
         if self._cached_responses is None:
             raise ValueError("No cache loaded.")
         metadata = self._cached_responses.data.get(key)
         if metadata is None:
-            logger.info(f"Cache miss for key: {key}")
-            return None
+            logger.warning(f"Cache miss for key: {key}, check cache status first.")
+            raise InvalidCacheRequest(f"Cache key {key} not found in cache.")
         return deepcopy(metadata.metadata)
 
     def set(
@@ -141,14 +139,21 @@ class EsiFileCache(LinkCacheProtocol):
         """Update the cache metadata for a 304 response."""
         if self._cached_responses is None:
             raise ValueError("No cache loaded.")
-        cached_metadata = self.get_cache_metadata(cache_key)
-        if cached_metadata is None:
-            raise ValueError(f"Cache key {cache_key} not found in cache.")
+        try:
+            # Raise an error if there is no existing cache entry.
+            _ = self.get_cache_metadata(cache_key)
+        except InvalidCacheRequest as e:
+            logger.error(
+                f"Cannot 304 update metadata, no cache entry for cache key: {cache_key}"
+            )
+            raise e from e
+        if response.data is None:
+            raise ValueError("Response data is None, cannot update metadata.")
         new_metadata = LinkCacheMetadata(
             cache_key=cache_key,
-            expires=HF.expires(response.headers),
-            etag=HF.etag(response.headers),
-            last_modified=HF.last_modified(response.headers),
-            last_checked=response.completed_on,
+            expires=HF.expires(response.data.headers),
+            etag=HF.etag(response.data.headers),
+            last_modified=HF.last_modified(response.data.headers),
+            last_checked=response.data.completed_on,
         )
         self._cached_responses.data[cache_key].metadata = new_metadata

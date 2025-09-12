@@ -9,6 +9,10 @@ from esi_link.esi_schema.esi_api_protocol import EsiApiProtocol
 from .models import EsiQuery, LinkCachedResponse, LinkCacheMetadata, QueryResponse
 
 
+class InvalidCacheRequest(Exception):
+    """Raised when an invalid cache request is made."""
+
+
 class CacheStatus(StrEnum):
     """Represents the cache status of an ESI query."""
 
@@ -23,16 +27,42 @@ class CacheStatus(StrEnum):
 class LinkCacheProtocol(Protocol):
     """Protocol for ESI Link cache operations."""
 
-    def get(self, key: UUID) -> LinkCachedResponse | None:
-        """Get an ESI Link cached response from the cache."""
+    def get(self, key: UUID) -> LinkCachedResponse:
+        """Get an ESI Link cached response from the cache.
+
+        Args:
+            key (UUID): The cache key UUID.
+
+        Returns:
+            LinkCachedResponse: The cached response.
+        Raises:
+            InvalidCacheRequest: If the key is not found in the cache.
+
+        """
         ...
 
-    def get_response(self, key: UUID) -> QueryResponse | None:
-        """Get an ESI query response from the cache by key."""
+    def get_response(self, key: UUID) -> QueryResponse:
+        """Get an ESI query response from the cache by key.
+
+        Args:
+            key (UUID): The cache key UUID.
+        Returns:
+            QueryResponse: The cached response.
+        Raises:
+            InvalidCacheRequest: If the key is not found in the cache.
+        """
         ...
 
-    def get_cache_metadata(self, key: UUID) -> LinkCacheMetadata | None:
-        """Get the cache metadata for an ESI query response from the cache."""
+    def get_cache_metadata(self, key: UUID) -> LinkCacheMetadata:
+        """Get the cache metadata for an ESI query response from the cache.
+        Args:
+            key (UUID): The cache key UUID.
+
+        Returns:
+            LinkCacheMetadata: The cache metadata.
+        Raises:
+            InvalidCacheRequest: If the key is not found in the cache.
+        """
         ...
 
     def update_304(self, cache_key: UUID, response: QueryResponse) -> None:
