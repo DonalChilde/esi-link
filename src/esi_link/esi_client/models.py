@@ -12,6 +12,10 @@ class EsiQuery(BaseModel):
     headers: dict[str, str] = {}
 
 
+# FIXME response should include query, so that we can see whole lifecycle  from a cached response.
+# Consider, move response data to separate Optional class to suport signalling skipped queries? Think about then when and why of skipped queries.
+
+
 class QueryResponse(BaseModel):
     query_id: UUID
     status_code: int
