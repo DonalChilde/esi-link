@@ -74,13 +74,15 @@ class EsiClient:
         return None
 
     def split_request_parameters(
-        self, operation_id: str, parameters: dict[str, str] | Sequence[dict[str, str]]
+        self, operation_id: str, parameters: Sequence[dict[str, str]]
     ) -> SplitParameters:
         """Split a list of request parameter {key:value} into their respective path, query, and header categories."""
-        if isinstance(parameters, Sequence):
-            param_dict = {k: v for d in parameters for k, v in d.items()}
-        else:
-            param_dict = parameters
+
+        # NOTE this flattens the list of dicts into a single dict, which means that
+        # repeated keys will be lost. This is a limitation of the current implementation.
+        # To fully support repeated keys, the schema API and split_request_parameters
+        # method would need to be updated to accept a list of values for each key.
+        param_dict = {k: v for d in parameters for k, v in d.items()}
         return self.schema_api.split_request_parameters(operation_id, param_dict)
 
     def validate_query(self, esi_query: EsiQuery) -> None:
