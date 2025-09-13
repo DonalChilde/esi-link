@@ -39,5 +39,5 @@ def response_to_json(response: QueryResponse) -> Any:
                 msg = f"Expected each page in response.paged_text to be a list, got {type(page_data)}"
                 logger.warning(msg)
                 raise TypeError(msg)
-            json_response.extend(page_data)
-    return json_response
+            json_response.extend(page_data)  # type: ignore
+    return json_response  # type: ignore
