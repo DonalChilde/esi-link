@@ -1,7 +1,6 @@
 from uuid import UUID
 
-from esi_link.esi_client.models import EsiQuery, LinkCacheMetadata, QueryResponse
-from esi_link.esi_schema import operation_accessors as OA
+from esi_link.esi_client.models import EsiQuery, LinkCacheMetadata
 from esi_link.esi_schema.esi_api_protocol import EsiApiProtocol
 from esi_link.helpers import header_funcs as HF
 from esi_link.helpers.cache_id_from_url import cache_id_from_url
@@ -15,7 +14,7 @@ def is_cachable(query: EsiQuery, esi_api: EsiApiProtocol) -> bool:
         esi_api (EsiApiProtocol): The ESI API schema.
     """
     operation = esi_api.indexed_operation(query.operation_id)
-    cachable = all((operation.method.lower() == "get", not query.is_paged_subquery))
+    cachable = all((operation.method.lower() == "get",))
     return cachable
 
 
@@ -41,7 +40,6 @@ def make_cache_key(query: EsiQuery, esi_api: EsiApiProtocol) -> UUID:
 
 def build_metadata(
     query: EsiQuery,
-    response: QueryResponse,
     esi_api: EsiApiProtocol,
 ) -> LinkCacheMetadata:
     """Build cache metadata from the query and response.
@@ -54,11 +52,13 @@ def build_metadata(
     Returns:
         LinkCacheMetadata: The cache metadata.
     """
+    if query.response is None:
+        raise ValueError("Query response is None, cannot build metadata.")
     cache_key = make_cache_key(query, esi_api=esi_api)
-    expires = HF.expires(response.headers)
-    etag = HF.etag(response.headers)
-    last_modified_value = HF.last_modified(response.headers)
-    last_checked = response.completed_on
+    expires = HF.expires(query.response.headers)
+    etag = HF.etag(query.response.headers)
+    last_modified_value = HF.last_modified(query.response.headers)
+    last_checked = query.response.completed_on
 
     metadata = LinkCacheMetadata(
         cache_key=cache_key,

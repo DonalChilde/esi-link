@@ -16,7 +16,7 @@ Typical usage example:
 
 import asyncio
 import logging
-from uuid import UUID
+from collections.abc import Sequence
 
 import aiohttp
 from whenever import Instant, TimeDelta
@@ -81,7 +81,6 @@ class EsiHttp:
         name: str,
         queue: asyncio.Queue[EsiQuery],
         session: aiohttp.ClientSession,
-        result: dict[UUID, QueryResponse | None],
     ):
         """Async worker for processing ESI queries from a queue.
 
@@ -102,19 +101,22 @@ class EsiHttp:
                     f"{name} skipping query {query.query_id} due to previous errors."
                 )
                 # Skipped queries return None
-                result[query.query_id] = None
+                query.response = None
                 queue.task_done()
                 continue
             try:
-                response = await self._do_get_query(
+                await self._do_get_query(
                     query=query,
                     session=session,
                 )
-                result[response.query_id] = response
-                if response.status_code >= 400:
+                if query.response is None:
+                    continue
+                if query.response.status_code >= 400:
                     self._errors += 1
-                    self._errors_remaining = limit_remain(response.headers)
-                    time_out = limit_reset(response.headers) or self._default_timeout
+                    self._errors_remaining = limit_remain(query.response.headers)
+                    time_out = (
+                        limit_reset(query.response.headers) or self._default_timeout
+                    )
                     if time_out != -1:
                         self._error_timeout_ends = Instant.now() + TimeDelta(
                             seconds=time_out
@@ -130,7 +132,7 @@ class EsiHttp:
             finally:
                 queue.task_done()
 
-    def do_query(self, query: EsiQuery) -> QueryResponse | None:
+    def do_query(self, query: EsiQuery) -> None:
         """Executes a single ESI API query synchronously.
 
         Args:
@@ -142,11 +144,10 @@ class EsiHttp:
         Raises:
             Exception: If the query fails or the API returns an error.
         """
-        return self.do_queries({query.query_id: query})[query.query_id]
+        self.do_queries((query,))
+        return None
 
-    def do_queries(
-        self, queries: dict[UUID, EsiQuery]
-    ) -> dict[UUID, QueryResponse | None]:
+    def do_queries(self, queries: Sequence[EsiQuery]) -> None:
         """Executes multiple ESI API queries concurrently.
 
         Args:
@@ -165,21 +166,20 @@ class EsiHttp:
             workers = len(queries)
         self._queue_remaining = len(queries)
 
-        result = asyncio.run(self._run_tasks(workers, queries))
-        return result
+        asyncio.run(self._run_tasks(workers, queries))
 
     async def _run_tasks(
         self,
         workers: int,
-        queries: dict[UUID, EsiQuery],
+        queries: Sequence[EsiQuery],
     ):
         queue: asyncio.Queue[EsiQuery] = asyncio.Queue()
-        result: dict[UUID, QueryResponse] = {}
-        for query in queries.values():
+
+        for query in queries:
             queue.put_nowait(query)
         async with aiohttp.ClientSession() as session:
             tasks = [
-                asyncio.create_task(self._worker(f"Worker-{i}", queue, session, result))
+                asyncio.create_task(self._worker(f"Worker-{i}", queue, session))
                 for i in range(1, workers + 1)
             ]
             # Wait for all items in the queue to be processed
@@ -188,16 +188,15 @@ class EsiHttp:
             for task in tasks:
                 task.cancel()
 
-        return result
-
     def _inject_compatability_date(self, headers):
+        # TODO figure out compat date logic
         pass
 
     async def _do_get_query(
         self,
         query: EsiQuery,
         session: aiohttp.ClientSession,
-    ) -> QueryResponse:
+    ) -> None:
         url = self._schema_api.build_url(
             operation_id=query.operation_id,
             path_params=query.path_parameters,
@@ -250,8 +249,7 @@ class EsiHttp:
                             f"{response.status} {response.reason}"
                         )
                 text = await response.text()
-                return QueryResponse(
-                    query_id=query.query_id,
+                response = QueryResponse(
                     status_code=response.status,
                     status_reason=response.reason or "",
                     headers=tuple(response.headers.items()),
@@ -259,3 +257,4 @@ class EsiHttp:
                     real_url=str(response.real_url),
                     completed_on=Instant.now().format_rfc2822(),
                 )
+                query.response = response

@@ -131,11 +131,11 @@ class EsiFileCache(LinkCacheProtocol):
         return CacheStatus.MISS
 
     def build_metadata(
-        self, query: EsiQuery, response: QueryResponse, schema_api: EsiApiProtocol
+        self, query: EsiQuery, schema_api: EsiApiProtocol
     ) -> LinkCacheMetadata:
-        return build_cache_metadata(query, response, schema_api)
+        return build_cache_metadata(query, schema_api)
 
-    def update_304(self, cache_key: UUID, response: QueryResponse) -> None:
+    def update_304(self, cache_key: UUID, query: EsiQuery) -> None:
         """Update the cache metadata for a 304 response."""
         if self._cached_responses is None:
             raise ValueError("No cache loaded.")
@@ -147,13 +147,20 @@ class EsiFileCache(LinkCacheProtocol):
                 f"Cannot 304 update metadata, no cache entry for cache key: {cache_key}"
             )
             raise e from e
-        if response.data is None:
+        if query.response is None:
             raise ValueError("Response data is None, cannot update metadata.")
         new_metadata = LinkCacheMetadata(
             cache_key=cache_key,
-            expires=HF.expires(response.data.headers),
-            etag=HF.etag(response.data.headers),
-            last_modified=HF.last_modified(response.data.headers),
-            last_checked=response.data.completed_on,
+            expires=HF.expires(query.response.headers),
+            etag=HF.etag(query.response.headers),
+            last_modified=HF.last_modified(query.response.headers),
+            last_checked=query.response.completed_on,
         )
         self._cached_responses.data[cache_key].metadata = new_metadata
+        cached_response = self._cached_responses.data[cache_key].response
+        query_response = deepcopy(query.response)
+        # Preserve any paged text already in the cache.
+        query_response.text = cached_response.text
+        query_response.paged_text = cached_response.paged_text
+        # cache the new response with old text data.
+        self._cached_responses.data[cache_key].response = query_response

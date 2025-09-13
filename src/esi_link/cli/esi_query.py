@@ -4,6 +4,8 @@ from typing import Annotated
 from uuid import uuid4
 
 import typer
+from rich import print_json
+from rich.pretty import pprint
 
 from esi_link.esi_client.esi_client import EsiClient
 from esi_link.esi_client.esi_memory_cache import EsiMemoryCache
@@ -73,9 +75,14 @@ def get(
     )
     client.validate_query(esi_query)
 
-    result = client.query(esi_query)
-    jsoned_response = response_to_json(result)
-    typer.echo(json.dumps(jsoned_response, indent=2))
+    client.query(esi_query)
+    if esi_query.response is None:
+        typer.echo("No response received for query.")
+        raise typer.Exit(code=1)
+    jsoned_response = response_to_json(esi_query.response)
+    print_json(data=jsoned_response)
+    # print_json(EsiQuery.model_dump_json(esi_query))
+    # typer.echo(json.dumps(jsoned_response, indent=2))
 
     typer.echo(f"Completed in {perf_counter() - start:.2f} seconds.")
 

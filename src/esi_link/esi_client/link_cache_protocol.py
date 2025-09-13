@@ -65,7 +65,7 @@ class LinkCacheProtocol(Protocol):
         """
         ...
 
-    def update_304(self, cache_key: UUID, response: QueryResponse) -> None:
+    def update_304(self, cache_key: UUID, query: EsiQuery) -> None:
         """Update the cache metadata for a 304 response."""
         ...
 
@@ -91,7 +91,7 @@ class LinkCacheProtocol(Protocol):
         ...
 
     def build_metadata(
-        self, query: EsiQuery, response: QueryResponse, schema_api: EsiApiProtocol
+        self, query: EsiQuery, schema_api: EsiApiProtocol
     ) -> LinkCacheMetadata:
         """Build cache metadata for a QueryResponse."""
         ...
