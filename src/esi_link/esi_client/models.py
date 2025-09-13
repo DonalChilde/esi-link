@@ -3,26 +3,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 
-class EsiQuery(BaseModel):
-    query_id: UUID
-    operation_id: str
-    path_parameters: dict[str, str | int | float] = {}
-    query_parameters: dict[str, str | int | float] = {}
-    request_body: dict[str, str | int | float] = {}  # TODO this might need new types.
-    headers: dict[str, str] = {}
-    is_paged_subquery: bool = False
-    """True if this query is a subquery for a paged request."""
-    parent_last_modified: str | None = None
-    """The last modified value from the parent query, if any."""
-    page_number: int | None = None
-    """The page number for paged requests, if any."""
-
-
-# FIXME response should include query, so that we can see whole lifecycle  from a cached response.
-# Consider, move response data to separate Optional class to support signalling skipped queries? Think about then when and why of skipped queries.
-
-
-class ResponseData(BaseModel):
+class QueryResponse(BaseModel):
     status_code: int
     status_reason: str
     real_url: str
@@ -32,9 +13,18 @@ class ResponseData(BaseModel):
     completed_on: str
 
 
-class QueryResponse(BaseModel):
-    query: EsiQuery
-    data: ResponseData | None
+class EsiQuery(BaseModel):
+    query_id: UUID
+    operation_id: str
+    path_parameters: dict[str, str | int | float] = {}
+    query_parameters: dict[str, str | int | float] = {}
+    request_body: dict[str, str | int | float] = {}  # TODO this might need new types.
+    headers: dict[str, str] = {}
+    response: QueryResponse | None = None
+
+
+# FIXME response should include query, so that we can see whole lifecycle  from a cached response.
+# Consider, move response data to separate Optional class to support signalling skipped queries? Think about then when and why of skipped queries.
 
 
 class LinkCacheMetadata(BaseModel):
