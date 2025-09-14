@@ -6,14 +6,15 @@ from typing import Annotated, Any
 from uuid import uuid4
 
 import typer
+from rich import print as rich_print
 
 from esi_link.esi_client.esi_client import EsiClient
 from esi_link.esi_client.esi_memory_cache import EsiMemoryCache
-from esi_link.esi_client.models import EsiQuery
+from esi_link.esi_client.models import EsiQuery, EsiQueryResult
 from esi_link.esi_schema.esi_api import EsiApi
 from esi_link.esi_schema.esi_api_protocol import SplitParameters
 from esi_link.helpers.csv import write_dicts_to_csv
-from esi_link.helpers.response_to_json import response_to_json
+from esi_link.helpers.response_to_json import query_to_result
 from esi_link.helpers.validate_file_out import validate_file_out
 
 app = typer.Typer(no_args_is_help=True)
@@ -32,18 +33,29 @@ def get(
     csv_data: Annotated[
         Path | None, typer.Option(help="Path to save the query response as CSV.")
     ] = None,
-    json_data: Annotated[
-        Path | None, typer.Option(help="Path to save the query response as JSON.")
-    ] = None,
-    json_query: Annotated[
+    query_json: Annotated[
         Path | None,
-        typer.Option(help="Path to save the completed but unprocessed query as JSON."),
+        typer.Option(
+            help="Path to save the completed query to a JSON file, with response data as json."
+        ),
+    ] = None,
+    query_text: Annotated[
+        Path | None,
+        typer.Option(
+            help="Path to save the completed query to a JSON file, with response data as text."
+        ),
     ] = None,
     console: Annotated[
-        bool, typer.Option(help="Print the query response as JSON to console.")
+        bool,
+        typer.Option(
+            help="Print only the json data from a completed query to the console, without any metadata."
+        ),
     ] = True,
     console_query: Annotated[
-        bool, typer.Option(help="Print the completed but unprocessed query to console.")
+        bool,
+        typer.Option(
+            help="Print the completed query to the console, with response data as text."
+        ),
     ] = False,
     json_indent: Annotated[int, typer.Option(help="Indent level for JSON output.")] = 2,
     file_overwrite: Annotated[
@@ -79,34 +91,41 @@ def get(
         headers=split_parameters.header,
     )
     client.validate_query(esi_query)
+    if client.is_paged(esi_query):
+        if not any((csv_data, query_json, query_text)):
+            rich_print(
+                "[red]Warning: This operation is paged, and no output file was specified. Output is too large for terminal. Operation Aborted."
+            )
+            raise typer.Exit(code=1)
     client.query(esi_query)
     if esi_query.response is None:
         typer.echo("No response received for query. See logs for details.")
         raise typer.Exit(code=1)
-    jsoned_response = response_to_json(esi_query.response)
+    result = query_to_result(esi_query)
     if csv_data:
-        if isinstance(jsoned_response, list) and all(
-            isinstance(item, dict) for item in jsoned_response
+        if isinstance(result.response.data, list) and all(
+            isinstance(item, dict)
+            for item in result.response.data  # type: ignore
         ):
-            save_csv(jsoned_response, csv_data, file_overwrite)
-        elif isinstance(jsoned_response, dict):
-            save_csv([jsoned_response], csv_data, file_overwrite)
+            save_csv(result.response.data, csv_data, file_overwrite)  # type: ignore
+        elif isinstance(result.response.data, dict):  # type: ignore
+            save_csv([result.response.data], csv_data, file_overwrite)  # type: ignore
         else:
             typer.echo(
                 "Response data is not a list of dictionaries or a single dictionary. Cannot save as CSV."
             )
-    if json_data:
-        save_json(jsoned_response, json_data, file_overwrite, json_indent)
-    if json_query:
-        save_json_query(esi_query, json_query, file_overwrite, json_indent)
+    if query_json:
+        validate_file_out(query_json, overwrite=file_overwrite)
+        query_json.write_text(
+            EsiQueryResult.model_dump_json(result, indent=json_indent)
+        )
+    if query_text:
+        validate_file_out(query_text, overwrite=file_overwrite)
+        query_text.write_text(esi_query.model_dump_json(indent=json_indent))
     if console_query:
-        typer.echo(EsiQuery.model_dump_json(esi_query, indent=json_indent))
+        rich_print(esi_query)
     if console:
-        # print_json(data=jsoned_response, indent=json_indent)
-        typer.echo(json.dumps(jsoned_response, indent=2))
-    # print_json(data=jsoned_response)
-    # print_json(EsiQuery.model_dump_json(esi_query))
-    # typer.echo(json.dumps(jsoned_response, indent=2))
+        rich_print(result.response.data)  # pyright: ignore[reportUnknownMemberType]
 
     typer.echo(f"Completed in {perf_counter() - start:.2f} seconds.")
 
@@ -114,26 +133,9 @@ def get(
 def save_csv(data: list[dict[str, Any]], path: Path, overwrite: bool) -> None:
     """Save data as CSV to the given path."""
     if not data:
-        typer.echo("No data to save as CSV.")
+        rich_print("[red]No data to save as CSV.")
         return
     write_dicts_to_csv(data, path, overwrite=overwrite)
-
-
-def save_json(data: Any, path: Path, overwrite: bool, indent: int) -> None:
-    """Save data as JSON to the given path."""
-    if not data:
-        typer.echo("No data to save as JSON.")
-        return
-    validate_file_out(path, overwrite=overwrite)
-    path.write_text(json.dumps(data, indent=indent))
-
-
-def save_json_query(
-    esi_query: EsiQuery, path: Path, overwrite: bool, indent: int
-) -> None:
-    """Save the EsiQuery as JSON to the given path."""
-    validate_file_out(path, overwrite=overwrite)
-    path.write_text(esi_query.model_dump_json(indent=indent))
 
 
 def debug_print_split_parameters(
