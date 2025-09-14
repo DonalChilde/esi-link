@@ -22,6 +22,9 @@ class SplitParameters:
         default_factory=dict[str, str | int | float]
     )
 
+    def count(self) -> int:
+        return len(self.path) + len(self.query) + len(self.header) + len(self.unknown)
+
 
 @dataclass(slots=True)
 class IndexedOperation:
