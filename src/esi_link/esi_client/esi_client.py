@@ -130,12 +130,16 @@ def paged_query(
 ) -> None:
     """Execute a paged ESI query, handling cache, paging, and errors.
 
+    This function executes a single ESI query that may involve multiple pages of results.
+    It is ment to be called from within a batch query operation, and expects the cache resource
+    to be already open.
+
     Modifies the input query in-place by setting its response attribute with
     the combined response data from all pages.
 
     Args:
         query (EsiQuery): The ESI query to execute. Modified in-place.
-        cache (LinkCacheProtocol): The cache protocol.
+        cache (LinkCacheProtocol): The cache protocol. Expects the cache to be open.
         esi_api (EsiApiProtocol): The ESI API.
         esi_http (EsiHttp): The ESI HTTP client for executing queries.
 
@@ -258,41 +262,46 @@ def esi_batch_query(
             paged.append(query)
         else:
             not_paged.append(query)
-    for query in not_paged:
-        # see if we can satisfy the query from cache
-        if is_cachable(query, esi_api):
-            cache_key = make_cache_key(query, esi_api)
-            cache_status = cache.status(cache_key)
-            if cache_status is CacheStatus.HIT:
-                response = cache.get_response(cache_key)
-                query.response = response
-            elif cache_status is CacheStatus.STALE:
-                # If the cache is stale, we need to revalidate it
-                _inject_etag(query, cache, esi_api)
-    # execute all non-paged queries that still need a response
-    esi_http.do_queries([x for x in not_paged if x.response is None])
-    for query in not_paged:
-        if query.response is None:
-            logger.error(f"Response data is None for query {query!r}.")
-            raise ValueError(
-                f"Response data is None for query {query.query_id}. Check logs for more information."
-            )
+    with cache as open_cache:
+        for query in not_paged:
+            # see if we can satisfy the query from cache
+            if is_cachable(query, esi_api):
+                cache_key = make_cache_key(query, esi_api)
+                cache_status = open_cache.status(cache_key)
+                if cache_status is CacheStatus.HIT:
+                    response = open_cache.get_response(cache_key)
+                    query.response = response
+                elif cache_status is CacheStatus.STALE:
+                    # If the cache is stale, we need to revalidate it
+                    _inject_etag(query, open_cache, esi_api)
+        # execute all non-paged queries that still need a response
+        esi_http.do_queries([x for x in not_paged if x.response is None])
+        for query in not_paged:
+            if query.response is None:
+                logger.error(f"Response data is None for query {query!r}.")
+                raise ValueError(
+                    f"Response data is None for query {query.query_id}. Check logs for more information."
+                )
 
-        if is_cachable(query, esi_api):
-            if query.response.status_code == 304:
-                # If we get a 304 response, we can return the cached response
-                cache_key = make_cache_key(query, esi_api)
-                cache.update_304(cache_key, query)
-                query.response = cache.get_response(cache_key)
-            elif query.response.status_code == 200:
-                # If we get a 200 response, we need to update the cache
-                cache_key = make_cache_key(query, esi_api)
-                metadata = cache.build_metadata(query=query, schema_api=esi_api)
-                cache.set(cache_key, metadata, query.response)
-        if query.response.status_code not in (200, 201, 204, 304):
-            logger.error(f"Bad response for {query!r}.")
-            raise ValueError(
-                f"Unexpected status code: {query.response.status_code} for {query.query_id}. Check logs for more information."
+            if is_cachable(query, esi_api):
+                if query.response.status_code == 304:
+                    # If we get a 304 response, we can return the cached response
+                    cache_key = make_cache_key(query, esi_api)
+                    open_cache.update_304(cache_key, query)
+                    query.response = open_cache.get_response(cache_key)
+                elif query.response.status_code == 200:
+                    # If we get a 200 response, we need to update the cache
+                    cache_key = make_cache_key(query, esi_api)
+                    metadata = open_cache.build_metadata(
+                        query=query, schema_api=esi_api
+                    )
+                    open_cache.set(cache_key, metadata, query.response)
+            if query.response.status_code not in (200, 201, 204, 304):
+                logger.error(f"Bad response for {query!r}.")
+                raise ValueError(
+                    f"Unexpected status code: {query.response.status_code} for {query.query_id}. Check logs for more information."
+                )
+        for query in paged:
+            paged_query(
+                query=query, cache=open_cache, esi_api=esi_api, esi_http=esi_http
             )
-    for query in paged:
-        paged_query(query=query, cache=cache, esi_api=esi_api, esi_http=esi_http)
