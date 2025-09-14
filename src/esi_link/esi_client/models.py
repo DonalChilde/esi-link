@@ -16,7 +16,7 @@ class QueryResponse(BaseModel):
     completed_on: str
 
 
-class QueryResponseJson(BaseModel):
+class QueryResponseResult(BaseModel):
     """Represents a parsed JSON response from an ESI query."""
 
     status_code: int
@@ -37,7 +37,19 @@ class EsiQuery(BaseModel):
     query_parameters: dict[str, str | int | float] = {}
     request_body: dict[str, str | int | float] = {}  # TODO this might need new types.
     headers: dict[str, str] = {}
-    response: QueryResponse | QueryResponseJson | None = None
+    response: QueryResponse | None = None
+
+
+class EsiQueryResult(BaseModel):
+    """Represents the result of an ESI query."""
+
+    query_id: UUID
+    operation_id: str
+    path_parameters: dict[str, str | int | float] = {}
+    query_parameters: dict[str, str | int | float] = {}
+    request_body: dict[str, str | int | float] = {}  # TODO this might need new types.
+    headers: dict[str, str] = {}
+    response: QueryResponseResult
 
 
 class LinkCacheMetadata(BaseModel):

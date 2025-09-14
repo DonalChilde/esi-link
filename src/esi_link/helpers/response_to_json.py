@@ -3,49 +3,50 @@ import logging
 from copy import deepcopy
 from typing import Any
 
-from esi_link.esi_client.models import EsiQuery, QueryResponse, QueryResponseJson
+from esi_link.esi_client.models import (
+    EsiQuery,
+    EsiQueryResult,
+    QueryResponse,
+    QueryResponseResult,
+)
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
-def query_to_json(query: EsiQuery) -> EsiQuery:
-    """Convert an EsiQuery with a QueryResponse to one with a QueryResponseJson.
+def query_to_result(query: EsiQuery) -> EsiQueryResult:
+    """Convert an EsiQuery with a QueryResponse to EsiQueryResult.
 
     This is useful for serializing the query to JSON for storage or transmission.
     Args:
         query (EsiQuery): The EsiQuery to convert.
     Returns:
-        EsiQuery: A new EsiQuery with the response converted to QueryResponseJson.
+        EsiQueryResult: A new EsiQueryResult with the response converted to QueryResponseResult.
     Raises:
-        ValueError: If the query.response is None or already a QueryResponseJson.
-        TypeError: If the query.response is of an unexpected type.
+        ValueError: If the query.response is None.
+
     """
     if query.response is None:
         raise ValueError("query.response is None, cannot convert to JSON.")
-    if isinstance(query.response, QueryResponse):
-        json_data = response_to_json(query.response)
-        query_json = EsiQuery(
-            query_id=query.query_id,
-            operation_id=query.operation_id,
-            path_parameters=deepcopy(query.path_parameters),
-            query_parameters=deepcopy(query.query_parameters),
-            request_body=deepcopy(query.request_body),
-            headers=deepcopy(query.headers),
-            response=QueryResponseJson(
-                status_code=query.response.status_code,
-                status_reason=query.response.status_reason,
-                real_url=query.response.real_url,
-                data=json_data,
-                headers=deepcopy(query.response.headers),
-                completed_on=query.response.completed_on,
-            ),
-        )
-        return query_json
-    elif isinstance(query.response, QueryResponseJson):
-        raise ValueError("query.response is already a QueryResponseJson.")
-    else:
-        raise TypeError(f"Unexpected type for query.response: {type(query.response)}")
+
+    json_data = response_to_json(query.response)
+    query_json = EsiQueryResult(
+        query_id=query.query_id,
+        operation_id=query.operation_id,
+        path_parameters=deepcopy(query.path_parameters),
+        query_parameters=deepcopy(query.query_parameters),
+        request_body=deepcopy(query.request_body),
+        headers=deepcopy(query.headers),
+        response=QueryResponseResult(
+            status_code=query.response.status_code,
+            status_reason=query.response.status_reason,
+            real_url=query.response.real_url,
+            data=json_data,
+            headers=deepcopy(query.response.headers),
+            completed_on=query.response.completed_on,
+        ),
+    )
+    return query_json
 
 
 def response_to_json(response: QueryResponse) -> Any:
