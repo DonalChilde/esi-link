@@ -145,6 +145,10 @@ def _build_pages_queries(query: EsiQuery) -> Sequence[EsiQuery]:
     if query.response is None:
         raise ValueError("Query response is None, cannot build paged queries.")
     pages = page_count(query.response.headers)
+    if pages < 1:
+        raise ValueError(f"Invalid page count: {pages}. Expected >= 1.")
+    if pages > 1000:  # Reasonable upper limit to prevent excessive requests
+        logger.warning(f"Large page count detected: {pages}. This may take a while.")
     for page in range(2, pages + 1):
         paged_query = deepcopy(query)
         paged_query.query_parameters = {**query.query_parameters, "page": page}
@@ -160,27 +164,29 @@ def paged_query(
 ) -> None:
     """Execute a paged ESI query, handling cache, paging, and errors.
 
+    Modifies the input query in-place by setting its response attribute with
+    the combined response data from all pages.
+
     Args:
-        query (EsiQuery): The ESI query.
+        query (EsiQuery): The ESI query to execute. Modified in-place.
         cache (LinkCacheProtocol): The cache protocol.
-        schema_api (EveOpenApiProtocol): The ESI schema.
+        schema_api (EsiApiProtocol): The ESI schema.
         esi_http (EsiHttp): The ESI HTTP client for executing queries.
-        fail_on_error (bool, optional): Whether to raise on error. Defaults to False.
 
     Returns:
-        QueryResponse: The combined response for all pages.
+        None: The query object is modified in-place.
 
     Raises:
-        ValueError: If an error occurs and fail_on_error is True.
+        ValueError: If an error occurs during query execution or validation.
     """
-    # _validate_query(query, schema_api)
-    # response: QueryResponse | None = None
+    # See if we can satisfy the query from cache
     if is_cachable(query, schema_api):
         cache_key = make_cache_key(query, schema_api)
         cache_status = cache.status(cache_key)
         if cache_status is CacheStatus.HIT:
             query.response = cache.get_response(cache_key)
             return
+        # TODO refactor so that only one more do_query is required before the paged queries.
         elif cache_status is CacheStatus.STALE:
             # If the cache is stale, we need to revalidate it
             _inject_etag(query, cache, schema_api)
@@ -201,7 +207,7 @@ def paged_query(
         raise ValueError(
             f"Response data is None for query {query.query_id}. Check logs for more information."
         )
-    if query.response.status_code not in [200, 201, 204]:
+    if query.response.status_code != 200:
         logger.error(f"Bad response for {query!r}")
         raise ValueError(
             f"Unexpected status code: {query.response.status_code} for {query.query_id}. Check logs for more information."
@@ -225,7 +231,7 @@ def paged_query(
                 f"Last-Modified header mismatch. parent={parent_last_modified}. {p_query!r}"
             )
             raise ValueError(
-                f"Last-Modified header mismatch for paged query {p_query.query_id}. Check logs for more information."
+                f"Last-Modified header mismatch for paged query {p_query.query_id}. Data changed on server during request. Try Again. Check logs for more information."
             )
         query.response.paged_text.append(p_query.response.text)
 
@@ -259,24 +265,28 @@ def esi_batch_query(
         ValueError: If an error occurs and fail_on_error is True.
     """
 
-    one_pass: list[EsiQuery] = list(queries)
+    not_paged: list[EsiQuery] = []
     paged: list[EsiQuery] = []
+    # split queries into paged and not paged
     for query in queries:
         if schema_api.is_paged(query.operation_id):
             paged.append(query)
-            one_pass.remove(query)
-            if is_cachable(query, schema_api):
-                cache_key = make_cache_key(query, schema_api)
-                cache_status = cache.status(cache_key)
-                if cache_status is CacheStatus.HIT:
-                    response = cache.get_response(cache_key)
-                    query.response = response
-                    one_pass.remove(query)
-                elif cache_status is CacheStatus.STALE:
-                    # If the cache is stale, we need to revalidate it
-                    _inject_etag(query, cache, schema_api)
-    esi_http.do_queries(one_pass)
-    for query in one_pass:
+        else:
+            not_paged.append(query)
+    for query in not_paged:
+        # see if we can satisfy the query from cache
+        if is_cachable(query, schema_api):
+            cache_key = make_cache_key(query, schema_api)
+            cache_status = cache.status(cache_key)
+            if cache_status is CacheStatus.HIT:
+                response = cache.get_response(cache_key)
+                query.response = response
+            elif cache_status is CacheStatus.STALE:
+                # If the cache is stale, we need to revalidate it
+                _inject_etag(query, cache, schema_api)
+    # execute all non-paged queries that still need a response
+    esi_http.do_queries([x for x in not_paged if x.response is None])
+    for query in not_paged:
         if query.response is None:
             logger.error(f"Response data is None for query {query!r}.")
             raise ValueError(
