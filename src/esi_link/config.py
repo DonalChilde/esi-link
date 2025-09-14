@@ -1,5 +1,6 @@
 """A configuration object using pydantic-settings for Esi Link"""
 
+from enum import StrEnum
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -15,6 +16,12 @@ _app_dir = get_app_dir(app_name=f"{APP_NAMESPACE}_{APP_NAME}", force_posix=True)
 _app_env_prefix = make_safe_env_name(f"{APP_NAMESPACE}_{APP_NAME}_")
 
 
+class CacheType(StrEnum):
+    FILE = "file"
+    MEMORY = "memory"
+    SQLITE = "sqlite"
+
+
 class AppConfig(BaseSettings):
     name: str
     app_dir: Path = Path(_app_dir)
@@ -23,6 +30,9 @@ class AppConfig(BaseSettings):
     schema_dir: Path = app_dir / "schema"
     cache_dir: Path = app_dir / "cache"
     temp_dir: Path = app_dir / "temp"
+
+    cache_type: CacheType = CacheType.FILE
+    cache_file: Path = cache_dir / "esi_cache.json"
 
     app_secret: str = ""
     client_secret: str = ""
