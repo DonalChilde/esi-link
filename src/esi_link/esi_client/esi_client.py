@@ -90,6 +90,10 @@ class EsiClient:
         if self.validator:
             self.validator.validate(esi_query)
 
+    def is_paged(self, esi_query: EsiQuery) -> bool:
+        """Check if the operation is paged."""
+        return self.schema_api.is_paged(esi_query.operation_id)
+
 
 # def make_cache_key(query: EsiQuery, schema_api: EveOpenApiProtocol) -> UUID:
 #     """Generate a unique cache key for the given query and schema.
