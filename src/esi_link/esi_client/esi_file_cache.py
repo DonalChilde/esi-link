@@ -3,6 +3,7 @@
 import logging
 from copy import deepcopy
 from pathlib import Path
+from time import perf_counter
 from typing import Self
 from uuid import UUID
 
@@ -48,13 +49,18 @@ class EsiFileCache(LinkCacheProtocol):
         self._cached_responses = None
 
     def _load_cache(self) -> LinkCache:
+        start = perf_counter()
         if not self._file_path.is_file():
             logger.info(f"No cache file found at {self._file_path}, starting fresh.")
             return LinkCache(data={})
         result = LinkCache.model_validate_json(self._file_path.read_text())
+        logger.info(
+            f"Cache loaded from {self._file_path} in {perf_counter() - start:.2f} seconds, {len(result.data)} entries, {self._file_path.stat().st_size:,} bytes."
+        )
         return result
 
     def _save_cache(self) -> None:
+        start = perf_counter()
         if not self._file_path.parent.exists():
             self._file_path.parent.mkdir(parents=True)
         if self._file_path.is_dir():
@@ -62,6 +68,9 @@ class EsiFileCache(LinkCacheProtocol):
         if self._cached_responses is None:
             raise ValueError("No cache to save.")
         self._file_path.write_text(self._cached_responses.model_dump_json())
+        logger.info(
+            f"Cache saved to {self._file_path} in {perf_counter() - start:.2f} seconds, {len(self._cached_responses.data)} entries, {self._file_path.stat().st_size:,} bytes."
+        )
 
     def get(self, key: UUID) -> LinkCachedResponse:
         """Retrieve a cached response by its key."""
@@ -107,18 +116,21 @@ class EsiFileCache(LinkCacheProtocol):
             response=deepcopy(response),
             metadata=deepcopy(cache_metadata),
         )
+        logger.info(f"Cache set for key: {cache_key}")
 
     def clear(self) -> None:
         """Clear the entire cache."""
         if self._cached_responses is None:
             raise ValueError("No cache loaded.")
         self._cached_responses.data.clear()
+        logger.info("Cache cleared.")
 
     def remove(self, key: UUID) -> None:
         """Remove a cached response by its key."""
         if self._cached_responses is None:
             raise ValueError("No cache loaded.")
         self._cached_responses.data.pop(key, None)
+        logger.info(f"Cache removed for key: {key}")
 
     def status(self, cache_key: UUID) -> CacheStatus:
         """Get the cache status of an EsiResponse."""
@@ -126,9 +138,17 @@ class EsiFileCache(LinkCacheProtocol):
             raise ValueError("No cache loaded.")
         if cache_key in self._cached_responses.data:
             metadata = self._cached_responses.data[cache_key].metadata
-            if Instant.parse_rfc2822(metadata.expires) > Instant.now():
+            til_expiration = Instant.parse_rfc2822(metadata.expires) - Instant.now()
+            if til_expiration.in_seconds() > 0:
+                logger.info(
+                    f"Cache hit for key: {cache_key}, expires at {metadata.expires} in {til_expiration.in_seconds():.2f} seconds."
+                )
                 return CacheStatus.HIT
+            logger.info(
+                f"Cache stale for key: {cache_key}, expired at {metadata.expires}, {til_expiration.in_seconds() * -1:.2f} seconds ago"
+            )
             return CacheStatus.STALE
+        logger.info(f"Cache miss for key: {cache_key}")
         return CacheStatus.MISS
 
     def build_metadata(
@@ -165,3 +185,4 @@ class EsiFileCache(LinkCacheProtocol):
         query_response.paged_text = cached_response.paged_text
         # cache the new response with old text data.
         self._cached_responses.data[cache_key].response = query_response
+        logger.info(f"Cache metadata updated for key: {cache_key}")
