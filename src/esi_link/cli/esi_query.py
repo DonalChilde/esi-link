@@ -70,7 +70,7 @@ def get(
 
     start = perf_counter()
     typer.echo(f"Getting ESI data for operation ID: {operation_id}")
-    client = init_client(ctx)
+    client: EsiClient = ctx.obj.client
     # split input parameters into key, value pairs
     params_list = parse_params(parameters)
     split_parameters = client.split_request_parameters(operation_id, params_list)
@@ -97,6 +97,7 @@ def get(
                 "[red]Warning: This operation is paged, and no output file was specified. Output is too large for terminal. Operation Aborted."
             )
             raise typer.Exit(code=1)
+
     client.query(esi_query)
     if esi_query.response is None:
         typer.echo("No response received for query. See logs for details.")
@@ -175,16 +176,3 @@ def parse_params(params: list[str]) -> Sequence[dict[str, str]]:
         params_list.append({key: value})
 
     return params_list
-
-
-def init_client(ctx: typer.Context) -> EsiClient:
-    # FIXME client should be created during startup, and stored in ctx.obj so that the code is only in one place.
-    schema_store = ctx.obj.schema_store
-    # TODO use real cache.
-    cache = EsiMemoryCache()
-    schema_api = EsiApi.from_schema_store(schema_store)
-    client = EsiClient(
-        schema_api=schema_api,
-        cache=cache,
-    )
-    return client
