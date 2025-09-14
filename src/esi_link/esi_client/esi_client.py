@@ -39,21 +39,21 @@ logger.addHandler(logging.NullHandler())
 class EsiClient:
     def __init__(
         self,
-        schema_api: EsiApiProtocol,
+        esi_api: EsiApiProtocol,
         cache: LinkCacheProtocol,
         validator: EsiQueryValidatorProtocol | None = None,
         max_concurrent_requests: int = 50,
     ) -> None:
-        self.schema_api = schema_api
+        self.esi_api = esi_api
         self.cache = cache
-        self.link = EsiHttp(schema_api, max_concurrent_requests)
+        self.link = EsiHttp(esi_api, max_concurrent_requests)
         self.validator = validator
 
     def query(self, esi_query: EsiQuery) -> None:
         esi_batch_query(
             queries=(esi_query,),
             cache=self.cache,
-            schema_api=self.schema_api,
+            esi_api=self.esi_api,
             esi_http=self.link,
         )
         return None
@@ -68,7 +68,7 @@ class EsiClient:
         esi_batch_query(
             queries=queries,
             cache=self.cache,
-            schema_api=self.schema_api,
+            esi_api=self.esi_api,
             esi_http=self.link,
         )
         return None
@@ -83,7 +83,7 @@ class EsiClient:
         # To fully support repeated keys, the schema API and split_request_parameters
         # method would need to be updated to accept a list of values for each key.
         param_dict = {k: v for d in parameters for k, v in d.items()}
-        return self.schema_api.split_request_parameters(operation_id, param_dict)
+        return self.esi_api.split_request_parameters(operation_id, param_dict)
 
     def validate_query(self, esi_query: EsiQuery) -> None:
         """Validate the query against the ESI schema."""
@@ -92,45 +92,7 @@ class EsiClient:
 
     def is_paged(self, esi_query: EsiQuery) -> bool:
         """Check if the operation is paged."""
-        return self.schema_api.is_paged(esi_query.operation_id)
-
-
-# def make_cache_key(query: EsiQuery, schema_api: EveOpenApiProtocol) -> UUID:
-#     """Generate a unique cache key for the given query and schema.
-
-#     Args:
-#         query (EsiQuery): The ESI query.
-#         schema (EveOpenApiProtocol): The ESI schema.
-
-#     Returns:
-#         UUID: The cache key for the query.
-#     """
-#     url = schema_api.build_url(
-#         operation_id=query.operation_id,
-#         path_params=query.path_parameters,
-#         query_params=query.query_parameters,
-#         include_query=True,
-#     )
-#     cache_key = cache_id_from_url(url)
-#     return cache_key
-
-
-# def _validate_query(query: EsiQuery, schema_api: EveOpenApiProtocol) -> bool:
-#     """Validate the query against the ESI schema.
-
-#     Args:
-#         query (EsiQuery): The ESI query.
-#         schema (EveOpenApiProtocol): The ESI schema.
-
-#     Returns:
-#         bool: True if the query is valid, False otherwise.
-#     """
-#     valid = schema_api.validate_operation(
-#         operation_id=query.operation_id,
-#         path_params=query.path_parameters,
-#         query_params=query.query_parameters,
-#     )
-#     return valid
+        return self.esi_api.is_paged(esi_query.operation_id)
 
 
 def _inject_etag(
@@ -163,7 +125,7 @@ def _build_pages_queries(query: EsiQuery) -> Sequence[EsiQuery]:
 def paged_query(
     query: EsiQuery,
     cache: LinkCacheProtocol,
-    schema_api: EsiApiProtocol,
+    esi_api: EsiApiProtocol,
     esi_http: EsiHttp,
 ) -> None:
     """Execute a paged ESI query, handling cache, paging, and errors.
@@ -174,7 +136,7 @@ def paged_query(
     Args:
         query (EsiQuery): The ESI query to execute. Modified in-place.
         cache (LinkCacheProtocol): The cache protocol.
-        schema_api (EsiApiProtocol): The ESI schema.
+        esi_api (EsiApiProtocol): The ESI API.
         esi_http (EsiHttp): The ESI HTTP client for executing queries.
 
     Returns:
@@ -184,24 +146,24 @@ def paged_query(
         ValueError: If an error occurs during query execution or validation.
     """
     # See if we can satisfy the query from cache
-    if is_cachable(query, schema_api):
-        cache_key = make_cache_key(query, schema_api)
+    if is_cachable(query, esi_api):
+        cache_key = make_cache_key(query, esi_api)
         cache_status = cache.status(cache_key)
         if cache_status is CacheStatus.HIT:
             query.response = cache.get_response(cache_key)
             return
         elif cache_status is CacheStatus.STALE:
             # If the cache is stale, we need to revalidate it
-            _inject_etag(query, cache, schema_api)
+            _inject_etag(query, cache, esi_api)
     esi_http.do_query(query)
     if query.response is None:
         raise ValueError(
             f"Response data is None for query {query.query_id}. Check logs for more information."
         )
-    if is_cachable(query, schema_api):
+    if is_cachable(query, esi_api):
         if query.response.status_code == 304:
             # If we get a 304 response, we can update and return the cached response
-            cache_key = make_cache_key(query, schema_api)
+            cache_key = make_cache_key(query, esi_api)
             cache.update_304(cache_key, query)
             response = cache.get_response(cache_key)
             query.response = response
@@ -238,10 +200,10 @@ def paged_query(
         raise ValueError(
             f"Not all pages received for query {query.query_id}. Check logs for more information."
         )
-    if is_cachable(query, schema_api):
+    if is_cachable(query, esi_api):
         # add the completed response to the cache.
-        cache_key = make_cache_key(query, schema_api)
-        metadata = cache.build_metadata(query=query, schema_api=schema_api)
+        cache_key = make_cache_key(query, esi_api)
+        metadata = cache.build_metadata(query=query, schema_api=esi_api)
         cache.set(cache_key, metadata, query.response)
     return None
 
@@ -269,7 +231,7 @@ def confirm_all_pages_received(query: EsiQuery) -> bool:
 def esi_batch_query(
     queries: Sequence[EsiQuery],
     cache: LinkCacheProtocol,
-    schema_api: EsiApiProtocol,
+    esi_api: EsiApiProtocol,
     esi_http: EsiHttp,
 ) -> None:
     """Execute a batch of ESI queries, handling cache, paging, and errors.
@@ -277,7 +239,7 @@ def esi_batch_query(
     Args:
         queries (dict[UUID, EsiQuery]): Dictionary of queries to execute.
         cache (LinkCacheProtocol): The cache protocol.
-        schema (EveOpenApiProtocol): The ESI schema.
+        esi_api (EsiApiProtocol): The ESI API.
         link (EsiLink): The ESI link for executing queries.
         fail_on_error (bool, optional): Whether to raise on error. Defaults to False.
 
@@ -292,21 +254,21 @@ def esi_batch_query(
     paged: list[EsiQuery] = []
     # split queries into paged and not paged
     for query in queries:
-        if schema_api.is_paged(query.operation_id):
+        if esi_api.is_paged(query.operation_id):
             paged.append(query)
         else:
             not_paged.append(query)
     for query in not_paged:
         # see if we can satisfy the query from cache
-        if is_cachable(query, schema_api):
-            cache_key = make_cache_key(query, schema_api)
+        if is_cachable(query, esi_api):
+            cache_key = make_cache_key(query, esi_api)
             cache_status = cache.status(cache_key)
             if cache_status is CacheStatus.HIT:
                 response = cache.get_response(cache_key)
                 query.response = response
             elif cache_status is CacheStatus.STALE:
                 # If the cache is stale, we need to revalidate it
-                _inject_etag(query, cache, schema_api)
+                _inject_etag(query, cache, esi_api)
     # execute all non-paged queries that still need a response
     esi_http.do_queries([x for x in not_paged if x.response is None])
     for query in not_paged:
@@ -316,16 +278,16 @@ def esi_batch_query(
                 f"Response data is None for query {query.query_id}. Check logs for more information."
             )
 
-        if is_cachable(query, schema_api):
+        if is_cachable(query, esi_api):
             if query.response.status_code == 304:
                 # If we get a 304 response, we can return the cached response
-                cache_key = make_cache_key(query, schema_api)
+                cache_key = make_cache_key(query, esi_api)
                 cache.update_304(cache_key, query)
                 query.response = cache.get_response(cache_key)
             elif query.response.status_code == 200:
                 # If we get a 200 response, we need to update the cache
-                cache_key = make_cache_key(query, schema_api)
-                metadata = cache.build_metadata(query=query, schema_api=schema_api)
+                cache_key = make_cache_key(query, esi_api)
+                metadata = cache.build_metadata(query=query, schema_api=esi_api)
                 cache.set(cache_key, metadata, query.response)
         if query.response.status_code not in (200, 201, 204, 304):
             logger.error(f"Bad response for {query!r}.")
@@ -333,4 +295,4 @@ def esi_batch_query(
                 f"Unexpected status code: {query.response.status_code} for {query.query_id}. Check logs for more information."
             )
     for query in paged:
-        paged_query(query=query, cache=cache, schema_api=schema_api, esi_http=esi_http)
+        paged_query(query=query, cache=cache, esi_api=esi_api, esi_http=esi_http)
