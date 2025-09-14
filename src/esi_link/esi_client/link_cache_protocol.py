@@ -1,7 +1,7 @@
 """Eve Argus ESI Cache Protocol."""
 
 from enum import StrEnum
-from typing import Protocol
+from typing import Protocol, Self
 from uuid import UUID
 
 from esi_link.esi_schema.esi_api_protocol import EsiApiProtocol
@@ -26,6 +26,19 @@ class CacheStatus(StrEnum):
 
 class LinkCacheProtocol(Protocol):
     """Protocol for ESI Link cache operations."""
+
+    def __enter__(self) -> Self:
+        """Enter the runtime context and load cache from file."""
+        ...
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: object | None,
+    ) -> None:
+        """Exit the runtime context and save the ESI cache to file."""
+        ...
 
     def get(self, key: UUID) -> LinkCachedResponse:
         """Get an ESI Link cached response from the cache.

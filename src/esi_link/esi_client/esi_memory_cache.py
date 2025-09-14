@@ -2,6 +2,7 @@
 
 import logging
 from copy import deepcopy
+from typing import Self
 from uuid import UUID
 
 from whenever import Instant
@@ -28,6 +29,19 @@ class EsiMemoryCache(LinkCacheProtocol):
 
     def __init__(self) -> None:
         self._cached_responses: LinkCache = LinkCache()
+
+    def __enter__(self) -> Self:
+        """Enter the runtime context."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: object | None,
+    ) -> None:
+        """Exit the runtime context."""
+        pass
 
     def get(self, key: UUID) -> LinkCachedResponse:
         """Retrieve a cached response by its key."""
