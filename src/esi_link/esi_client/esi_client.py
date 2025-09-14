@@ -186,27 +186,23 @@ def paged_query(
         if cache_status is CacheStatus.HIT:
             query.response = cache.get_response(cache_key)
             return
-        # TODO refactor so that only one more do_query is required before the paged queries.
         elif cache_status is CacheStatus.STALE:
             # If the cache is stale, we need to revalidate it
             _inject_etag(query, cache, schema_api)
-            esi_http.do_query(query)
-            if query.response is None:
-                raise ValueError(
-                    f"Response data is None for query {query.query_id}. Check logs for more information."
-                )
-            if query.response.status_code == 304:
-                # If we get a 304 response, we can update and return the cached response
-                cache.update_304(cache_key, query)
-                response = cache.get_response(cache_key)
-                query.response = response
-                return
-    if query.response is None:
-        esi_http.do_query(query)
+    esi_http.do_query(query)
     if query.response is None:
         raise ValueError(
             f"Response data is None for query {query.query_id}. Check logs for more information."
         )
+    if is_cachable(query, schema_api):
+        if query.response.status_code == 304:
+            # If we get a 304 response, we can update and return the cached response
+            cache_key = make_cache_key(query, schema_api)
+            cache.update_304(cache_key, query)
+            response = cache.get_response(cache_key)
+            query.response = response
+            return
+
     if query.response.status_code != 200:
         logger.error(f"Bad response for {query!r}")
         raise ValueError(
@@ -234,13 +230,36 @@ def paged_query(
                 f"Last-Modified header mismatch for paged query {p_query.query_id}. Data changed on server during request. Try Again. Check logs for more information."
             )
         query.response.paged_text.append(p_query.response.text)
-
+    if not confirm_all_pages_received(query):
+        raise ValueError(
+            f"Not all pages received for query {query.query_id}. Check logs for more information."
+        )
     if is_cachable(query, schema_api):
         # add the completed response to the cache.
         cache_key = make_cache_key(query, schema_api)
         metadata = cache.build_metadata(query=query, schema_api=schema_api)
         cache.set(cache_key, metadata, query.response)
     return None
+
+
+def confirm_all_pages_received(query: EsiQuery) -> bool:
+    """Confirm that all pages for a paged query have been received.
+
+    Args:
+        query (EsiQuery): The ESI query to check.
+
+    Returns:
+        bool: True if all pages have been received, False otherwise.
+    """
+    if query.response is None:
+        return False
+    pages = page_count(query.response.headers) if query.response else 0
+    if pages != len(query.response.paged_text) + 1:
+        logger.error(
+            f"Not all pages received for query {query.query_id}. Expected {pages}, got {len(query.response.paged_text) + 1}."
+        )
+        return False
+    return True
 
 
 def esi_batch_query(
