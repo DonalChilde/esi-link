@@ -1,4 +1,5 @@
 import json
+import logging
 from collections.abc import Sequence
 from pathlib import Path
 from time import perf_counter
@@ -9,14 +10,14 @@ import typer
 from rich import print as rich_print
 
 from esi_link.esi_client.esi_client import EsiClient
-from esi_link.esi_client.esi_memory_cache import EsiMemoryCache
 from esi_link.esi_client.models import EsiQuery, EsiQueryResult
-from esi_link.esi_schema.esi_api import EsiApi
 from esi_link.esi_schema.esi_api_protocol import SplitParameters
 from esi_link.helpers.csv import write_dicts_to_csv
 from esi_link.helpers.response_to_json import query_to_result
 from esi_link.helpers.validate_file_out import validate_file_out
 
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 app = typer.Typer(no_args_is_help=True)
 
 
@@ -129,6 +130,9 @@ def get(
         rich_print(result.response.data)  # pyright: ignore[reportUnknownMemberType]
 
     typer.echo(f"Completed in {perf_counter() - start:.2f} seconds.")
+    logger.info(
+        f"Get Query to {esi_query.response.real_url} completed in {perf_counter() - start:.2f} seconds."
+    )
 
 
 def save_csv(data: list[dict[str, Any]], path: Path, overwrite: bool) -> None:
