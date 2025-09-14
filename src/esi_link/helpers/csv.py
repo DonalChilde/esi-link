@@ -16,7 +16,7 @@ def write_dicts_to_csv(
     file_path: Path,
     fieldnames: list[str] | None = None,
     overwrite: bool = False,
-    **kwargs,
+    **kwargs: dict[str, Any],
 ) -> int:
     """write_dicts_to_csv .
 
