@@ -45,6 +45,7 @@ class EsiFileCache(LinkCacheProtocol):
     ) -> None:
         """Exit the runtime context and save the ESI cache to file."""
         self._save_cache()
+        self._cached_responses = None
 
     def _load_cache(self) -> LinkCache:
         if not self._file_path.is_file():
