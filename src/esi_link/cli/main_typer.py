@@ -1,7 +1,8 @@
 """Command-line interface."""
 
+import logging
 from dataclasses import dataclass
-from time import perf_counter_ns
+from time import perf_counter, perf_counter_ns
 from typing import Annotated
 
 import typer
@@ -23,6 +24,10 @@ from .esi_schema import app as schema_app
 app = typer.Typer(no_args_is_help=True)
 app.add_typer(schema_app, name="schema", help="Manage ESI schema.")
 app.add_typer(query_app, name="query", help="Query ESI data.")
+
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 @dataclass
@@ -114,6 +119,7 @@ def load_schema(ctx: typer.Context) -> SchemaStore:
 
 def init_config(ctx: typer.Context) -> None:
     """Initialize the CLI configuration with cache and client."""
+    start = perf_counter()
     ctx.obj.schema_store = load_schema(ctx)
     ctx.obj.esi_api = EsiApi.from_schema_store(ctx.obj.schema_store)
     # TODO option to clear cache entries older than X days
@@ -131,6 +137,7 @@ def init_config(ctx: typer.Context) -> None:
         cache=ctx.obj.cache,
         max_concurrent_requests=50,
     )
+    logger.info(f"EsiClient initialized in {perf_counter() - start:.2f} seconds.")
 
 
 if __name__ == "__main__":
