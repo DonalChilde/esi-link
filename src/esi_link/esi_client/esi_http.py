@@ -66,6 +66,7 @@ class EsiHttp:
         self._errors = 0
 
     async def _wait_for_error_limit_reset(self):
+        # FIXME needs attention and testing.
         wait_for = 0
         if self._errors_remaining < 10:
             if self._error_timeout_ends is None:
