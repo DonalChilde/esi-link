@@ -1,9 +1,12 @@
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel
 
 
 class QueryResponse(BaseModel):
+    """Represents a raw response from an ESI query."""
+
     status_code: int
     status_reason: str
     real_url: str
@@ -13,18 +16,28 @@ class QueryResponse(BaseModel):
     completed_on: str
 
 
+class QueryResponseJson(BaseModel):
+    """Represents a parsed JSON response from an ESI query."""
+
+    status_code: int
+    status_reason: str
+    real_url: str
+    data: Any
+    """The query response data parsed as JSON."""
+    headers: tuple[tuple[str, str | None], ...] = ()
+    completed_on: str
+
+
 class EsiQuery(BaseModel):
+    """Represents an ESI query. If the response is not None, the query has been made."""
+
     query_id: UUID
     operation_id: str
     path_parameters: dict[str, str | int | float] = {}
     query_parameters: dict[str, str | int | float] = {}
     request_body: dict[str, str | int | float] = {}  # TODO this might need new types.
     headers: dict[str, str] = {}
-    response: QueryResponse | None = None
-
-
-# FIXME response should include query, so that we can see whole lifecycle  from a cached response.
-# Consider, move response data to separate Optional class to support signalling skipped queries? Think about then when and why of skipped queries.
+    response: QueryResponse | QueryResponseJson | None = None
 
 
 class LinkCacheMetadata(BaseModel):
