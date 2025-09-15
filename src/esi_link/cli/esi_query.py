@@ -98,8 +98,9 @@ def get(
                 "[red]Warning: This operation is paged, and no output file was specified. Output is too large for terminal. Operation Aborted."
             )
             raise typer.Exit(code=1)
-
+    logger.info(f"Executing ESI Query: {esi_query!r}")
     client.query(esi_query)
+    logger.debug(f"ESI Query completed in {perf_counter() - start:.2f} seconds.")
     if esi_query.response is None:
         typer.echo("No response received for query. See logs for details.")
         raise typer.Exit(code=1)
