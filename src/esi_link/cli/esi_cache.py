@@ -1,13 +1,21 @@
 import typer
+from rich import print as rich_print
 
 app = typer.Typer(no_args_is_help=True)
-
-from esi_link.esi_client.esi_file_cache import EsiFileCache
 
 
 @app.command()
 def clear(ctx: typer.Context):
     """Clear the ESI cache file."""
-
-    ctx.obj.cache.clear()
+    with ctx.obj.cache as cache:
+        cache.clear()
     typer.echo("ESI cache cleared.")
+
+
+@app.command()
+def stats(ctx: typer.Context):
+    """Show statistics about the ESI cache."""
+    with ctx.obj.cache as cache:
+        stats = cache.stats()
+    typer.echo("ESI Cache Statistics:")
+    rich_print(stats)

@@ -2,7 +2,7 @@
 
 import logging
 from copy import deepcopy
-from typing import Self
+from typing import Any, Self
 from uuid import UUID
 
 from whenever import Instant
@@ -97,6 +97,17 @@ class EsiMemoryCache(LinkCacheProtocol):
             return CacheStatus.STALE
         return CacheStatus.MISS
 
+    def stats(self) -> dict[str, Any]:
+        """Get statistics about the cache as a JSON-serializable dict."""
+        total_entries = len(self._cached_responses.data)
+        total_entries = len(self._cached_responses.data)
+        loaded_size_bytes = "NA"
+        return {
+            "total_entries": total_entries,
+            "loaded_size_bytes": loaded_size_bytes,
+            "load_time_seconds": "NA",
+        }
+
     def build_metadata(
         self, query: EsiQuery, schema_api: EsiApiProtocol
     ) -> LinkCacheMetadata:
@@ -116,6 +127,7 @@ class EsiMemoryCache(LinkCacheProtocol):
             raise ValueError("Response data is None, cannot update metadata.")
         new_metadata = LinkCacheMetadata(
             cache_key=cache_key,
+            url=query.response.real_url,
             expires=HF.expires(query.response.headers),
             etag=HF.etag(query.response.headers),
             last_modified=HF.last_modified(query.response.headers),

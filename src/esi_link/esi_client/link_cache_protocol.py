@@ -1,7 +1,7 @@
 """Eve Argus ESI Cache Protocol."""
 
 from enum import StrEnum
-from typing import Protocol, Self
+from typing import Any, Protocol, Self
 from uuid import UUID
 
 from esi_link.esi_schema.esi_api_protocol import EsiApiProtocol
@@ -101,6 +101,10 @@ class LinkCacheProtocol(Protocol):
 
     def status(self, cache_key: UUID) -> CacheStatus:
         """Get the cache status of a query."""
+        ...
+
+    def stats(self) -> dict[str, Any]:
+        """Get statistics about the cache as a JSON-serializable dict."""
         ...
 
     def build_metadata(

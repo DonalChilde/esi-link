@@ -1,7 +1,21 @@
+from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel
+
+
+class ResponseSource(StrEnum):
+    """Indicates the source of a response."""
+
+    CACHE = "cache"
+    """The response was served from cache."""
+    LIVE = "live"
+    """The response was served from the live ESI API."""
+    LIVE_304 = "live_304"
+    """The response was served from the live ESI API with a 304 Not Modified status."""
+    NOT_SET = "not_set"
+    """The response source is not set."""
 
 
 class QueryResponse(BaseModel):
@@ -14,6 +28,7 @@ class QueryResponse(BaseModel):
     paged_text: list[str] = []
     headers: tuple[tuple[str, str | None], ...] = ()
     completed_on: str
+    source: ResponseSource = ResponseSource.NOT_SET
 
 
 class QueryResponseResult(BaseModel):
@@ -26,6 +41,7 @@ class QueryResponseResult(BaseModel):
     """The query response data parsed as JSON."""
     headers: tuple[tuple[str, str | None], ...] = ()
     completed_on: str
+    source: ResponseSource = ResponseSource.NOT_SET
 
 
 class EsiQuery(BaseModel):
@@ -57,6 +73,8 @@ class LinkCacheMetadata(BaseModel):
 
     cache_key: UUID
     """The cache key UUID, built from the get request url."""
+    url: str
+    """The full URL for the GET request."""
     expires: str
     """The expiration time for the cache key."""
     etag: str

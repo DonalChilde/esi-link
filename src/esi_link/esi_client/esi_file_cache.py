@@ -4,7 +4,7 @@ import logging
 from copy import deepcopy
 from pathlib import Path
 from time import perf_counter
-from typing import Self
+from typing import Any, Self
 from uuid import UUID
 
 from whenever import Instant
@@ -32,6 +32,7 @@ class EsiFileCache(LinkCacheProtocol):
     def __init__(self, file_path: Path) -> None:
         self._file_path = file_path
         self._cached_responses: LinkCache | None = None
+        self._load_time: float = 0.0
 
     def __enter__(self) -> Self:
         """Enter the runtime context and load cache from file."""
@@ -54,8 +55,10 @@ class EsiFileCache(LinkCacheProtocol):
             logger.info(f"No cache file found at {self._file_path}, starting fresh.")
             return LinkCache(data={})
         result = LinkCache.model_validate_json(self._file_path.read_text())
+        end = perf_counter()
+        self._load_time = end - start
         logger.info(
-            f"Cache loaded from {self._file_path} in {perf_counter() - start:.2f} seconds, {len(result.data)} entries, {self._file_path.stat().st_size:,} bytes."
+            f"Cache loaded from {self._file_path} in {self._load_time:.2f} seconds, {len(result.data)} entries, {self._file_path.stat().st_size:,} bytes."
         )
         return result
 
@@ -116,7 +119,10 @@ class EsiFileCache(LinkCacheProtocol):
             response=deepcopy(response),
             metadata=deepcopy(cache_metadata),
         )
-        logger.info(f"Cache set for key: {cache_key}")
+        til_expiration = Instant.parse_rfc2822(cache_metadata.expires) - Instant.now()
+        logger.info(
+            f"Cache set for key: {cache_key}, url: {cache_metadata.url}, expires at {cache_metadata.expires} in {til_expiration.in_seconds():.2f} seconds."
+        )
 
     def clear(self) -> None:
         """Clear the entire cache."""
@@ -141,15 +147,29 @@ class EsiFileCache(LinkCacheProtocol):
             til_expiration = Instant.parse_rfc2822(metadata.expires) - Instant.now()
             if til_expiration.in_seconds() > 0:
                 logger.info(
-                    f"Cache hit for key: {cache_key}, expires at {metadata.expires} in {til_expiration.in_seconds():.2f} seconds."
+                    f"Cache hit for key: {cache_key}, url: {metadata.url}, expires at {metadata.expires} in {til_expiration.in_seconds():.2f} seconds."
                 )
                 return CacheStatus.HIT
             logger.info(
-                f"Cache stale for key: {cache_key}, expired at {metadata.expires}, {til_expiration.in_seconds() * -1:.2f} seconds ago"
+                f"Cache stale for key: {cache_key}, url: {metadata.url}, expired at {metadata.expires}, {til_expiration.in_seconds() * -1:.2f} seconds ago"
             )
             return CacheStatus.STALE
         logger.info(f"Cache miss for key: {cache_key}")
         return CacheStatus.MISS
+
+    def stats(self) -> dict[str, Any]:
+        """Get statistics about the cache as a JSON-serializable dict."""
+        if self._cached_responses is None:
+            raise ValueError("No cache loaded.")
+        total_entries = len(self._cached_responses.data)
+        loaded_size_bytes = (
+            self._file_path.stat().st_size if self._file_path.exists() else 0
+        )
+        return {
+            "total_entries": total_entries,
+            "loaded_size_bytes": loaded_size_bytes,
+            "load_time_seconds": self._load_time,
+        }
 
     def build_metadata(
         self, query: EsiQuery, schema_api: EsiApiProtocol
@@ -172,6 +192,7 @@ class EsiFileCache(LinkCacheProtocol):
             raise ValueError("Response data is None, cannot update metadata.")
         new_metadata = LinkCacheMetadata(
             cache_key=cache_key,
+            url=query.response.real_url,
             expires=HF.expires(query.response.headers),
             etag=HF.etag(query.response.headers),
             last_modified=HF.last_modified(query.response.headers),
@@ -185,4 +206,7 @@ class EsiFileCache(LinkCacheProtocol):
         query_response.paged_text = cached_response.paged_text
         # cache the new response with old text data.
         self._cached_responses.data[cache_key].response = query_response
-        logger.info(f"Cache metadata updated for key: {cache_key}")
+        til_expiration = Instant.parse_rfc2822(new_metadata.expires) - Instant.now()
+        logger.info(
+            f"Cache metadata updated for key: {cache_key}, url: {new_metadata.url}, expires at {new_metadata.expires} in {til_expiration.in_seconds():.2f} seconds."
+        )

@@ -62,6 +62,7 @@ def build_metadata(
 
     metadata = LinkCacheMetadata(
         cache_key=cache_key,
+        url=query.response.real_url,
         expires=expires,
         etag=etag,
         last_modified=last_modified_value,
