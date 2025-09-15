@@ -7,7 +7,7 @@ from esi_link import CONFIG
 from esi_link.cli.helpers import filter_if_silent
 from esi_link.esi_schema.esi_api import EsiApi
 from esi_link.esi_schema.operation_formatters.format_operations_by_tag import (
-    format_operations_by_tag_string,
+    operations_by_tag_table,
 )
 from esi_link.esi_schema.schema_store import SchemaStore
 
@@ -78,4 +78,4 @@ def operations(ctx: typer.Context):
     """Show available operations for the ESI schema."""
     store = ctx.obj.schema_store
     eve_api = EsiApi.from_schema_store(store)
-    typer.echo(format_operations_by_tag_string(eve_api))
+    typer.echo(operations_by_tag_table(eve_api))

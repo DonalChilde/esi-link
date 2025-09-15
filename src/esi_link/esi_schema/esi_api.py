@@ -75,105 +75,12 @@ class EsiApi(EsiApiProtocol):
         resolved_schema = resolve_internal_refs(parent=schema, child=schema)
         return resolved_schema
 
-    # def _index_by_operation_id(self) -> dict[str, IndexedOperation]:
-    #     """Index the operations by their ID."""
-    #     by_operation_id: dict[str, IndexedOperation] = {}
-    #     for path, methods in self.schema.get("paths", {}).items():
-    #         for method, operation in methods.items():
-    #             operation_id = operation.get("operationId")
-    #             response_codes = list(operation.get("responses", {}).keys())
-    #             if len(response_codes) == 1 and response_codes[0] in (
-    #                 "200",
-    #                 "201",
-    #                 "204",
-    #             ):
-    #                 success_code = response_codes[0]
-    #             else:
-    #                 logger.warning(
-    #                     f"Operation {operation_id} has multiple or no success codes: {response_codes}. Defaulting to empty string."
-    #                 )
-    #                 success_code = ""
-    #             if operation_id:
-    #                 by_operation_id[operation_id] = IndexedOperation(
-    #                     operation_id=operation_id,
-    #                     method=method,
-    #                     path=path,
-    #                     operation=operation,
-    #                     success_code=success_code,
-    #                 )
-    #     return by_operation_id
-
     def _load_spec(self) -> dict[str, Any]:
         """Load the OpenAPI specification from the specified file."""
         if self.schema_path is None or not self.schema_path.exists():
             raise ValueError(f"Spec path is invalid: {self.schema_path}")
         with open(self.schema_path, encoding="utf-8") as file:
             return json.load(file)
-
-    # def _check_path_params(
-    #     self,
-    #     operation_id: str,
-    #     path_params: Mapping[str, str | int | float],
-    # ) -> bool:
-    #     """Check if the required path parameters are present for the given operation ID.
-
-    #     Args:
-    #         op_id (str): The operation ID.
-    #         operation (Literal["get", "put", "post", "delete"]): The HTTP operation type.
-    #         path_params (dict[str, str]): A dictionary of path parameters.
-
-    #     Returns:
-    #         bool: True if all required path parameters are present, False otherwise.
-    #     """
-    #     # Get a dict of required path parameters from the spec
-    #     operation = self.indexed_operation(operation_id)
-    #     required_params = OA.request_path_parameters(operation)
-
-    #     # Check no extra path parameters are provided in path_params
-    #     if not all(path_param in required_params for path_param in path_params):
-    #         raise ValueError(
-    #             f"Unrecognized path parameters given.:{path_params=}, {required_params=}"
-    #         )
-
-    #     # Check if all required parameters are present in the provided path_params
-    #     if not all(required_param in path_params for required_param in required_params):
-    #         raise ValueError(
-    #             f"Missing required path parameters: {path_params=}, {required_params=}"
-    #         )
-    #     return True
-
-    # def _check_query(
-    #     self,
-    #     operation_id: str,
-    #     query_params: Mapping[str, str | int | float],
-    # ) -> bool:
-    #     """Check if the required query parameters are present for the given operation ID.
-
-    #     Args:
-    #         op_id (str): The operation ID.
-    #         query_params (dict[str, str]): A dictionary of query parameters.
-
-    #     Returns:
-    #         bool: True if all required query parameters are present, False otherwise.
-    #     """
-    #     # Get the list of required query parameters from the spec
-    #     operation = self.indexed_operation(operation_id)
-    #     possible_params = OA.request_query_parameters(operation)
-
-    #     # Check no extra query parameters are provided in query_params
-    #     if not all(query_param in possible_params for query_param in query_params):
-    #         raise ValueError(
-    #             f"Unrecognized query parameters given: {query_params=}, {possible_params=}"
-    #         )
-
-    #     # Check if all required parameters are present in the provided query_params
-    #     for key, value in possible_params.items():
-    #         if value.get("required", False):
-    #             if key not in query_params:
-    #                 raise ValueError(
-    #                     f"Missing required query parameters: {query_params=}, {possible_params=}"
-    #                 )
-    #     return True
 
     def split_request_parameters(
         self, operation_id: str, parameters: dict[str, str]
@@ -193,25 +100,6 @@ class EsiApi(EsiApiProtocol):
                 split_params.unknown[key] = value
         return split_params
 
-    # def validate_operation(
-    #     self,
-    #     operation_id: str,
-    #     path_params: Mapping[str, str | int | float],
-    #     query_params: Mapping[str, str | int | float],
-    # ) -> bool:
-    #     """Validate the operation parameters."""
-    #     if operation_id not in self.indexed_operations:
-    #         raise ValueError(f"Operation ID not found: {operation_id}")
-    #     valid = all(
-    #         (
-    #             self._check_path_params(
-    #                 operation_id=operation_id, path_params=path_params
-    #             ),
-    #             self._check_query(operation_id=operation_id, query_params=query_params),
-    #         ),
-    #     )
-    #     return valid
-
     def build_url(
         self,
         operation_id: str,
@@ -230,11 +118,7 @@ class EsiApi(EsiApiProtocol):
         Returns:
             str: The constructed URL.
         """
-        # self.validate_operation(
-        #     operation_id=operation_id,
-        #     path_params=path_params,
-        #     query_params=query_params,
-        # )
+
         # Build the path by replacing placeholders with actual values
         operation = self.indexed_operation(operation_id)
         path_template = operation.path
@@ -284,46 +168,3 @@ class EsiApi(EsiApiProtocol):
             raise ValueError(f"Operation ID not found: {operation_id}")
         operation = self.indexed_operations[operation_id]
         return operation.path
-
-    # def request_parameters(self, operation_id: str) -> Sequence[Parameter]:
-    #     """Collect the request parameters for the given operation ID from the schema.
-
-    #     Args:
-    #         operation_id (str): The operation ID.
-
-    #     Returns:
-    #         dict[str, dict[str, Any]]: A dictionary of request parameters.
-    #     """
-    #     operation_schema = self.operation_schema(operation_id)
-    #     request_parameters = operation_schema.operation.parameters
-    #     return request_parameters
-
-    # def response_content(self, operation_id: str) -> dict[str, dict[str, Any]]:
-    #     """Collect the status 200 response content for the given operation ID from the schema.
-
-    #     Args:
-    #         operation_id (str): The operation ID.
-
-    #     Returns:
-    #         dict[str, dict[str, Any]]: A dictionary of response parameters.
-    #     """
-    #     operation_schema = self.operation_schema(operation_id)
-    #     response_content = operation_schema.operation.responses.get("200", {}).get(
-    #         "content", {}
-    #     )
-    #     return response_content
-
-    # def response_headers(self, operation_id: str) -> dict[str, dict[str, Any]]:
-    #     """Collect the status 200 response headers for the given operation ID from the schema.
-
-    #     Args:
-    #         operation_id (str): The operation ID.
-
-    #     Returns:
-    #         dict[str, dict[str, Any]]: A dictionary of response headers.
-    #     """
-    #     operation_schema = self.operation_schema(operation_id)
-    #     response_headers = operation_schema.operation.responses.get("200", {}).get(
-    #         "headers", {}
-    #     )
-    #     return response_headers

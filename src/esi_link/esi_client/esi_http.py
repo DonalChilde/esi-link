@@ -189,9 +189,9 @@ class EsiHttp:
             for task in tasks:
                 task.cancel()
 
-    def _inject_compatability_date(self, headers):
+    def _inject_compatability_date(self, headers: dict[str, str]):
         # TODO figure out compat date logic
-        pass
+        headers["X-Esi-Compatibility-Date"] = self._schema_api.compatibility_date
 
     async def _do_get_query(
         self,
@@ -205,7 +205,8 @@ class EsiHttp:
             include_query=False,
         )
         headers = query.headers
-        headers["X-Esi-Compatibility-Date"] = self._schema_api.compatibility_date
+        self._inject_compatability_date(headers)
+
         async with session.request(
             method=self._schema_api.operation_method(query.operation_id),
             url=url,

@@ -1,45 +1,60 @@
+from textwrap import fill
+
+from esi_link.esi_schema import operation_accessors as OA
 from esi_link.esi_schema.esi_api import EsiApi
 
-# TODO use operation accessors where possible
 
-
-def format_operations_by_tag_string(api: EsiApi) -> str:
+def operations_by_tag_table(api: EsiApi, max_width: int = 120) -> str:
     """
     Return available operations grouped by tag, sorted alphabetically inside each tag,
     and indicate if authorization is required (flag after operation id).
 
     Args:
-        api (EveOpenApi): The OpenAPI client instance.
+        api (EsiApi): The OpenAPI client instance.
 
     Returns:
-        str: Formatted string of operations grouped by tag.
+        str: A formatted string table of operations grouped by tag.
     """
-    tag_map: dict[str, list[tuple[str, str, str]]] = {}
-    for op_schema in api.indexed_operations.values():
-        tags = op_schema.operation.get("tags", [])
-        description = (
-            op_schema.operation.get("description", "").strip() or "(no description)"
-        )
-        description = description.replace("\n", " ")
-        requires_auth = bool(op_schema.operation.get("security"))
-        auth_flag = "[auth]" if requires_auth else ""
-        for tag in tags:
-            tag_map.setdefault(tag, []).append(
-                (op_schema.operation_id, auth_flag, description)
-            )
+    operations_by_tag = OA.operations_by_tag(api.indexed_operations)
+
+    if not operations_by_tag:
+        return "No operations found."
 
     lines: list[str] = []
-    for tag in sorted(tag_map):
-        lines.append(f"{tag}")
-        for operation_id, auth_flag, desc in sorted(
-            tag_map[tag], key=lambda x: x[0].lower()
-        ):
-            lines.append(f"  {operation_id} {auth_flag}: {desc}")
-        lines.append("")  # Blank line between tags
+    sorted_tags = sorted(operations_by_tag.keys())
+
+    for tag in sorted_tags:
+        # Tag header
+        lines.append(f"\n{tag.upper()}")
+        lines.append("=" * len(tag))
+
+        # Sort operations within the tag alphabetically by operation_id
+        sorted_operations = sorted(
+            operations_by_tag[tag], key=lambda op: op.operation_id
+        )
+
+        # Find the maximum operation_id length for alignment
+        max_op_id_length = max(len(op.operation_id) for op in sorted_operations)
+        # Ensure minimum width for readability
+        col_width = max(max_op_id_length, 25)
+
+        # Table header
+        lines.append(f"{'Operation ID':<{col_width + 2}} {'Auth':<6} Description")
+        lines.append("-" * (max_width))
+
+        # Operations
+        for operation in sorted_operations:
+            auth_flag = "Yes" if operation.requires_auth else "No"
+            # Some descriptions have newlines; replace with asterisk for single-line display
+            description = operation.description.replace("\n", " * ")
+            operation_line = f"{operation.operation_id:<{col_width + 2}} {auth_flag:<6} {description}"
+            # make the line wrap if the description is too long
+            operation_line = fill(
+                operation_line,
+                width=max_width,
+                subsequent_indent=" " * (col_width + 10),
+                break_long_words=False,
+            )
+            lines.append(operation_line)
+
     return "\n".join(lines)
-
-
-# Usage example:
-# api = EveOpenApi.from_schema_store(schema_store)
-# output = get_operations_by_tag_string(api)
-# print(output)

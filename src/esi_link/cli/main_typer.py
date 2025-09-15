@@ -127,8 +127,12 @@ def init_config(ctx: typer.Context) -> None:
     # TODO option to clear cache entries older than X days
     if CONFIG.cache_type == CacheType.FILE:
         ctx.obj.cache = EsiFileCache(file_path=CONFIG.cache_file)
+        typer.echo(
+            f"Using file cache at {CONFIG.cache_file}, cache file size {CONFIG.cache_file.stat().st_size:,} bytes."
+        )
     elif CONFIG.cache_type == CacheType.MEMORY:
         ctx.obj.cache = EsiMemoryCache()
+        typer.echo("Using in-memory cache. Cache will be lost when program exits.")
     elif CONFIG.cache_type == CacheType.SQLITE:
         raise NotImplementedError("SQLite cache is not implemented yet.")
     else:

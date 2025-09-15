@@ -1,8 +1,8 @@
 """Accessor functions for ESI schema operations."""
 
 import logging
-from collections.abc import Sequence
-from typing import Any, Literal, TypedDict
+from dataclasses import dataclass
+from typing import Any, Literal
 
 from esi_link.esi_schema.esi_api_protocol import IndexedOperation, IndexedOperations
 
@@ -10,10 +10,15 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
-class TagOperationDetails(TypedDict):
+@dataclass
+class TagOperationDetails:
     operation_id: str
     description: str
     requires_auth: bool
+
+
+TagMapOperationDetails = dict[str, list[TagOperationDetails]]
+"""Dict of tag names to list of operation details."""
 
 
 def is_cached(operation_schema: IndexedOperation) -> bool:
@@ -177,9 +182,9 @@ def response_201_headers(operation_schema: IndexedOperation) -> dict[str, Any]:
 
 def operations_by_tag(
     operations: dict[str, IndexedOperation],
-) -> dict[str, list[TagOperationDetails]]:
+) -> TagMapOperationDetails:
     """Group operation_ids by their tags."""
-    tag_map: dict[str, list[TagOperationDetails]] = {}
+    tag_map: TagMapOperationDetails = {}
     for op_schema in operations.values():
         tags = op_schema.operation.get("tags", [])
         for tag in tags:
@@ -230,6 +235,7 @@ def index_operations(schema: dict[str, dict[str, Any]]) -> IndexedOperations:
                 logger.warning(
                     f"Operation {operation_id} has multiple or no success codes: {response_codes}. Defaulting to empty string."
                 )
+                # TODO decide how to handle multiple success codes, maye use space delimited string?
                 success_code = ""
             if operation_id:
                 by_operation_id[operation_id] = IndexedOperation(

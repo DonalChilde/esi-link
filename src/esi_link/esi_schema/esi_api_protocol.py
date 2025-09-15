@@ -35,7 +35,7 @@ class IndexedOperation:
     success_code: Literal["200", "201", "204", ""] = "200"
 
 
-IndexedOperations = Mapping[str, IndexedOperation]
+IndexedOperations = dict[str, IndexedOperation]
 
 
 class EsiApiProtocol(Protocol):
