@@ -8,6 +8,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, TypedDict
 
+from rich.panel import Panel
+from rich.table import Table
+
+from esi_link.esi_schema import operation_accessors as OA
 from esi_link.esi_schema.esi_api_protocol import IndexedOperation
 from esi_link.helpers.indent_lines import indent_lines, prefixed_list_to_lines
 
@@ -298,3 +302,35 @@ def response_body_parameters(content_schema: dict[str, Any]) -> Sequence[_Param]
         )
         param_list.append(_param)
     return param_list
+
+
+def operation_detail_table(indexed_operation: IndexedOperation) -> Table:
+    """Return a Rich Table for one operation, its description, and tables of request parameters, response body parameters, and headers.
+
+    Args:
+        indexed_operation (IndexedOperation): The indexed operation object.
+
+    Returns:
+        Table: A Rich Table containing the operation details.
+    """
+    table = Table(show_header=False, header_style="bold magenta")
+    table.add_column("Field")
+    table.add_column("Value")
+
+    table.add_row("Operation ID", indexed_operation.operation_id)
+    table.add_row(
+        "Description", OA.description(indexed_operation) or "(no description)"
+    )
+    table.add_row("Tags", ", ".join(OA.tags(indexed_operation)))
+    table.add_row("Cache Age", str(OA.x_cache_age(indexed_operation) or "Not Defined"))
+    table.add_row(
+        "Compatibility Date",
+        OA.x_compatibility_date(indexed_operation) or "Not Defined",
+    )
+    table.add_row(
+        "Authentication Required", str(OA.is_auth_required(indexed_operation))
+    )
+    if OA.is_auth_required(indexed_operation):
+        scopes = OA.oauth2_scopes(indexed_operation)
+        table.add_row("Scopes", ", ".join(scopes))
+    return table

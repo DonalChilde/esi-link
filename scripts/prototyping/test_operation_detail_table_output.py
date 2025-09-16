@@ -3,9 +3,11 @@
 
 from pathlib import Path
 
+from rich.console import Console
+
 from esi_link.esi_schema.esi_api import EsiApi
-from esi_link.esi_schema.operation_formatters.format_operations_by_tag import (
-    operations_by_tag_table,
+from esi_link.esi_schema.operation_formatters.format_operation_details import (
+    operation_detail_table,
 )
 from esi_link.esi_schema.schema_store import SchemaStore
 
@@ -19,10 +21,12 @@ def main():
     # Create the API instance
     api = EsiApi.from_schema_store(schema_store)
 
-    # Generate the table
-    result = operations_by_tag_table(api)
-
-    print(result)
+    indexed_operation = api.indexed_operations.get(
+        "GetCharactersCharacterIdWalletTransactions"
+    )
+    detail_table = operation_detail_table(indexed_operation)
+    console = Console()
+    console.print(detail_table)
 
 
 if __name__ == "__main__":
