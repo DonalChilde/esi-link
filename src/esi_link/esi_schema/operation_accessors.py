@@ -181,11 +181,14 @@ def response_201_headers(operation_schema: IndexedOperation) -> dict[str, Any]:
 
 
 def operations_by_tag(
-    operations: dict[str, IndexedOperation],
+    operations_detail: dict[str, IndexedOperation],
 ) -> TagMapOperationDetails:
-    """Group operation_ids by their tags."""
+    """Group operation_ids by their tags.
+
+    Tags are sorted alphabetically, and operations within each tag are also sorted alphabetically.
+    """
     tag_map: TagMapOperationDetails = {}
-    for op_schema in operations.values():
+    for op_schema in operations_detail.values():
         tags = op_schema.operation.get("tags", [])
         for tag in tags:
             details = TagOperationDetails(
@@ -194,7 +197,11 @@ def operations_by_tag(
                 requires_auth=bool(op_schema.operation.get("security")),
             )
             tag_map.setdefault(tag, []).append(details)
-    return tag_map
+    sorted_tag_map: TagMapOperationDetails = dict(sorted(tag_map.items()))
+    # sort operations within each tag by operation_id
+    for tag, operations_detail in sorted_tag_map.items():  # type: ignore
+        sorted_tag_map[tag] = sorted(operations_detail, key=lambda op: op.operation_id)  # type: ignore
+    return sorted_tag_map
 
 
 def operation_by_path_method(

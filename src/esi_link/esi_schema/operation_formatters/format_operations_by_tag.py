@@ -21,20 +21,14 @@ def operations_by_tag_table(api: EsiApi, max_width: int = 120) -> str:
         return "No operations found."
 
     lines: list[str] = []
-    sorted_tags = sorted(operations_by_tag.keys())
 
-    for tag in sorted_tags:
+    for tag in operations_by_tag.keys():
         # Tag header
         lines.append(f"\n{tag.upper()}")
         lines.append("=" * len(tag))
 
-        # Sort operations within the tag alphabetically by operation_id
-        sorted_operations = sorted(
-            operations_by_tag[tag], key=lambda op: op.operation_id
-        )
-
         # Find the maximum operation_id length for alignment
-        max_op_id_length = max(len(op.operation_id) for op in sorted_operations)
+        max_op_id_length = max(len(op.operation_id) for op in operations_by_tag[tag])
         # Ensure minimum width for readability
         col_width = max(max_op_id_length, 25)
 
@@ -43,7 +37,7 @@ def operations_by_tag_table(api: EsiApi, max_width: int = 120) -> str:
         lines.append("-" * (max_width))
 
         # Operations
-        for operation in sorted_operations:
+        for operation in operations_by_tag[tag]:
             auth_flag = "Yes" if operation.requires_auth else "No"
             # Some descriptions have newlines; replace with asterisk for single-line display
             description = operation.description.replace("\n", " * ")
