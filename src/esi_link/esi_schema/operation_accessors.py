@@ -37,6 +37,22 @@ def is_paged(operation_schema: IndexedOperation) -> bool:
     )
 
 
+def is_auth_required(operation_schema: IndexedOperation) -> bool:
+    """Check if an operation requires authentication."""
+    return bool(operation_schema.operation.get("security"))
+
+
+def oauth2_scopes(operation_schema: IndexedOperation) -> list[str]:
+    """Get the authentication scopes required for an operation."""
+    security: list[dict[str, Any]] = operation_schema.operation.get("security", [])
+    scopes: list[str] = []
+    if security:
+        for sec in security:
+            if "OAuth2" in sec:
+                scopes.extend(sec["OAuth2"])
+    return scopes
+
+
 def x_cache_age(operation_schema: IndexedOperation) -> int | None:
     """Get the x-cache-age for an operation, if any."""
     return operation_schema.operation.get("x-cache-age")
@@ -53,6 +69,17 @@ def request_parameters(operation_schema: IndexedOperation) -> dict[str, dict[str
         param["name"]: param
         for param in operation_schema.operation.get("parameters", [])
     }
+
+
+def tags(operation_schema: IndexedOperation) -> list[str]:
+    """Get the tags for an operation."""
+    return operation_schema.operation.get("tags", [])
+
+
+def description(operation_schema: IndexedOperation) -> str:
+    """Get the description for an operation."""
+    op_description: str = operation_schema.operation.get("description", "")
+    return op_description.strip().replace("\n", " ")
 
 
 def request_header_parameters(
@@ -181,26 +208,26 @@ def response_201_headers(operation_schema: IndexedOperation) -> dict[str, Any]:
 
 
 def operations_by_tag(
-    operations_detail: dict[str, IndexedOperation],
+    indexed_operations: dict[str, IndexedOperation],
 ) -> TagMapOperationDetails:
     """Group operation_ids by their tags.
 
     Tags are sorted alphabetically, and operations within each tag are also sorted alphabetically.
     """
     tag_map: TagMapOperationDetails = {}
-    for op_schema in operations_detail.values():
-        tags = op_schema.operation.get("tags", [])
-        for tag in tags:
+    for indexed_operation in indexed_operations.values():
+        op_tags = tags(indexed_operation)
+        for tag in op_tags:
             details = TagOperationDetails(
-                operation_id=op_schema.operation_id,
-                description=op_schema.operation.get("description", "(no description)"),
-                requires_auth=bool(op_schema.operation.get("security")),
+                operation_id=indexed_operation.operation_id,
+                description=description(indexed_operation),
+                requires_auth=is_auth_required(indexed_operation),
             )
             tag_map.setdefault(tag, []).append(details)
     sorted_tag_map: TagMapOperationDetails = dict(sorted(tag_map.items()))
     # sort operations within each tag by operation_id
-    for tag, operations_detail in sorted_tag_map.items():  # type: ignore
-        sorted_tag_map[tag] = sorted(operations_detail, key=lambda op: op.operation_id)  # type: ignore
+    for tag, indexed_operations in sorted_tag_map.items():  # type: ignore
+        sorted_tag_map[tag] = sorted(indexed_operations, key=lambda op: op.operation_id)  # type: ignore
     return sorted_tag_map
 
 
