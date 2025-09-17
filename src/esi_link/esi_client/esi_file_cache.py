@@ -13,6 +13,7 @@ from esi_link.esi_client.cache_helpers import build_metadata as build_cache_meta
 from esi_link.esi_client.models import EsiQuery
 from esi_link.esi_schema.esi_api_protocol import EsiApiProtocol
 from esi_link.helpers import header_funcs as HF
+from esi_link.helpers.human_readable_file_size import file_size
 from esi_link.helpers.validate_file_out import validate_file_out
 
 from .link_cache_protocol import CacheStatus, InvalidCacheRequest, LinkCacheProtocol
@@ -168,13 +169,11 @@ class EsiFileCache(LinkCacheProtocol):
         if self._cached_responses is None:
             raise ValueError("No cache loaded.")
         total_entries = len(self._cached_responses.data)
-        loaded_size_bytes = (
-            self._file_path.stat().st_size if self._file_path.exists() else 0
-        )
+        loaded_size_bytes = file_size(self._file_path)
         return {
             "total_entries": total_entries,
             "loaded_size_bytes": loaded_size_bytes,
-            "load_time_seconds": self._load_time,
+            "load_time_seconds": f"{self._load_time:.6f}",
         }
 
     def build_metadata(
