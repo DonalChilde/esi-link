@@ -16,6 +16,7 @@ from esi_link.esi_client.link_cache_protocol import LinkCacheProtocol
 from esi_link.esi_schema.esi_api import EsiApi
 from esi_link.esi_schema.esi_api_protocol import EsiApiProtocol
 from esi_link.esi_schema.schema_store import SchemaStore
+from esi_link.helpers.human_readable_file_size import file_size
 from esi_link.helpers.indent_lines import indent_lines
 
 from .esi_cache import app as cache_app
@@ -128,7 +129,7 @@ def init_config(ctx: typer.Context) -> None:
     if CONFIG.cache_type == CacheType.FILE:
         ctx.obj.cache = EsiFileCache(file_path=CONFIG.cache_file)
         typer.echo(
-            f"Using file cache at {CONFIG.cache_file}, cache file size {CONFIG.cache_file.stat().st_size:,} bytes."
+            f"Using file cache at {CONFIG.cache_file}, cache file size {file_size(CONFIG.cache_file)}."
         )
     elif CONFIG.cache_type == CacheType.MEMORY:
         ctx.obj.cache = EsiMemoryCache()
