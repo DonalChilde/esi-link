@@ -13,6 +13,7 @@ from esi_link.esi_client.cache_helpers import build_metadata as build_cache_meta
 from esi_link.esi_client.models import EsiQuery
 from esi_link.esi_schema.esi_api_protocol import EsiApiProtocol
 from esi_link.helpers import header_funcs as HF
+from esi_link.helpers.validate_file_out import validate_file_out
 
 from .link_cache_protocol import CacheStatus, InvalidCacheRequest, LinkCacheProtocol
 from .models import (
@@ -33,6 +34,11 @@ class EsiFileCache(LinkCacheProtocol):
         self._file_path = file_path
         self._cached_responses: LinkCache | None = None
         self._load_time: float = 0.0
+        if not self._file_path.is_file():
+            validate_file_out(self._file_path)
+            self._cached_responses = LinkCache(data={})
+            self._save_cache()
+            logger.info(f"Created new cache file at {self._file_path}")
 
     def __enter__(self) -> Self:
         """Enter the runtime context and load cache from file."""
