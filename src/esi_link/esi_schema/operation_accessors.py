@@ -129,14 +129,14 @@ def response_200_content(operation_schema: IndexedOperation) -> dict[str, Any]:
     )
 
 
-def response_200_schema(operation_schema: IndexedOperation) -> dict[str, Any] | None:
+def response_200_schema(operation_schema: IndexedOperation) -> dict[str, Any]:
     """Get the response schema for a 200 response in an operation, if any."""
     return (
         operation_schema.operation.get("responses", {})
         .get("200", {})
         .get("content", {})
         .get("application/json", {})
-        .get("schema")
+        .get("schema", {})
     )
 
 
