@@ -8,7 +8,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, TypedDict
 
+from rich.json import JSON
 from rich.panel import Panel
+from rich.pretty import Pretty
 from rich.table import Table
 
 from esi_link.esi_schema import operation_accessors as OA
@@ -334,3 +336,70 @@ def operation_detail_table(indexed_operation: IndexedOperation) -> Table:
         scopes = OA.oauth2_scopes(indexed_operation)
         table.add_row("Scopes", ", ".join(scopes))
     return table
+
+
+def operation_parameters_table(
+    indexed_operation: IndexedOperation,
+) -> Table:
+    """Return a Rich Table for the request parameters of an operation.
+
+    Args:
+        indexed_operation (IndexedOperation): The indexed operation object.
+
+    Returns:
+        Table: A Rich Table containing the request parameters.
+    """
+    output_params: list[dict[str, str]] = []
+    parameters = OA.request_parameters(indexed_operation)
+    for parameter in parameters.values():
+        output_param = {
+            "Name": parameter.get("name", ""),
+            "Group": parameter.get("in", ""),
+            "Type": parameter.get("schema", {}).get("type", ""),
+            "Required": parameter.get("required", False),
+            "Description": parameter.get("description", ""),
+        }
+        if "enum" in parameter.get("schema", {}):
+            output_param["Description"] += (
+                f" (Possible values: {', '.join(map(str, parameter['schema']['enum']))})"
+            )
+        if "default" in parameter.get("schema", {}):
+            output_param["Description"] += (
+                f" (Default: {parameter['schema']['default']})"
+            )
+        output_params.append(output_param)
+    # todo sort output_params by group, then by name
+    output_params.sort(key=lambda x: (x["Group"], x["Name"]))
+    table = Table(show_header=True, header_style="bold magenta")
+    table.add_column("Name")
+    table.add_column("Group")
+    table.add_column("Type")
+    table.add_column("Required")
+    table.add_column("Description")
+
+    for output_param in output_params:
+        table.add_row(
+            output_param["Name"],
+            output_param["Group"],
+            output_param["Type"],
+            str(output_param["Required"]),
+            output_param["Description"],
+        )
+    return table
+
+
+def operation_response_200_panel(
+    indexed_operation: IndexedOperation,
+) -> Panel:
+    """Return a Rich Table for the response body parameters of an operation.
+
+    Args:
+        indexed_operation (IndexedOperation): The indexed operation object.
+    Returns:
+        Table: A Rich Table containing the response body parameters.
+    """
+
+    content_schema = OA.response_200_schema(indexed_operation)
+    schema_json = JSON.from_data(content_schema, indent=2)
+    panel = Panel(schema_json, title="Response Body Schema", expand=False)
+    return panel
