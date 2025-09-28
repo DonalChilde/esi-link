@@ -17,7 +17,7 @@ class TagOperationDetails:
     requires_auth: bool
 
 
-TagMapOperationDetails = dict[str, list[TagOperationDetails]]
+type TagMapOperationDetails = dict[str, list[TagOperationDetails]]
 """Dict of tag names to list of operation details."""
 
 
