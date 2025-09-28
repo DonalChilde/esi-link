@@ -25,6 +25,13 @@ class SplitParameters:
     def count(self) -> int:
         return len(self.path) + len(self.query) + len(self.header) + len(self.unknown)
 
+    def get(self, key: str) -> str | int | float | None:
+        """Get a parameter value by key from any of the parameter dicts."""
+        for param_dict in (self.path, self.query, self.header, self.unknown):
+            if key in param_dict:
+                return param_dict[key]
+        return None
+
 
 @dataclass(slots=True)
 class IndexedOperation:

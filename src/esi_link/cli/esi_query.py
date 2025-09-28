@@ -7,10 +7,12 @@ from typing import Annotated, Any
 from uuid import uuid4
 
 import typer
+from esi_auth import get_authorized_characters
 from rich import print as rich_print
 
 from esi_link.esi_client.esi_client import EsiClient
 from esi_link.esi_client.models import EsiQuery, EsiQueryResult
+from esi_link.esi_schema import operation_accessors as OA
 from esi_link.esi_schema.esi_api_protocol import SplitParameters
 from esi_link.helpers.csv import write_dicts_to_csv
 from esi_link.helpers.response_to_json import query_to_result
@@ -31,36 +33,55 @@ def get(
         list[str],
         typer.Option("-p", "--parameter", help="Parameters as key=value strings."),
     ] = [],
+    auth: Annotated[
+        str | None,
+        typer.Option(
+            "-a",
+            "--auth",
+            help="Character ID to use for this request if authorization is required.",
+        ),
+    ] = None,
     csv_data: Annotated[
-        Path | None, typer.Option(help="Path to save the query response as CSV.")
+        Path | None,
+        typer.Option("--csv", help="Path to save the query response as CSV."),
     ] = None,
     query_json: Annotated[
         Path | None,
         typer.Option(
-            help="Path to save the completed query to a JSON file, with response data as json."
+            "-j",
+            "--json",
+            help="Path to save the completed query to a JSON file, with response data as json.",
         ),
     ] = None,
     query_text: Annotated[
         Path | None,
         typer.Option(
-            help="Path to save the completed query to a JSON file, with response data as text."
+            "-t",
+            "--text",
+            help="Path to save the completed query to a JSON file, with response data as text.",
         ),
     ] = None,
     console: Annotated[
         bool,
         typer.Option(
-            help="Print only the json data from a completed query to the console, without any metadata."
+            "-c",
+            "--console-json",
+            help="Print only the json data from a completed query to the console, without any metadata.",
         ),
-    ] = True,
+    ] = False,
     console_query: Annotated[
         bool,
         typer.Option(
-            help="Print the completed query to the console, with response data as text."
+            "--console-query",
+            help="Print the completed query to the console, with response data as text.",
         ),
     ] = False,
-    json_indent: Annotated[int, typer.Option(help="Indent level for JSON output.")] = 2,
+    json_indent: Annotated[
+        int, typer.Option("-i", "--json-indent", help="Indent level for JSON output.")
+    ] = 2,
     file_overwrite: Annotated[
-        bool, typer.Option(help="Allow overwriting existing files.")
+        bool,
+        typer.Option("-o", "--overwrite", help="Allow overwriting existing files."),
     ] = False,
 ):
     """Get ESI data.
@@ -70,6 +91,10 @@ def get(
     """
 
     start = perf_counter()
+    if not any((console, console_query, csv_data, query_json, query_text)):
+        typer.echo("No output selected, query aborted.")
+        raise typer.Exit(code=1)
+
     typer.echo(f"Getting ESI data for operation ID: {operation_id}")
     client: EsiClient = ctx.obj.client
     # split input parameters into key, value pairs
@@ -83,13 +108,30 @@ def get(
         typer.echo(
             f"Warning: The count of input parameters does not match the split parameters. Were some parameter names repeated? {parameters!r}"
         )
-    debug_print_split_parameters(ctx, parameters, split_parameters)
+    headers = split_parameters.header
+    operation = ctx.obj.esi_api.indexed_operation(operation_id)
+    if OA.is_auth_required(operation):
+        if auth is None:
+            typer.echo(
+                f"Operation {operation_id} requires authentication. Please provide a character ID with --auth."
+            )
+            raise typer.Exit(code=1)
+        authorized_characters = get_authorized_characters()
+        character = authorized_characters.get(int(auth))
+        if character is None:
+            typer.echo(
+                f"Character ID {auth} is not authorized. Please authorize first using esi-auth."
+            )
+            raise typer.Exit(code=1)
+        headers["Authorization"] = f"Bearer {character.access_token}"
+
+    # debug_print_split_parameters(ctx, parameters, split_parameters)
     esi_query = EsiQuery(
         query_id=uuid4(),
         operation_id=operation_id,
         path_parameters=split_parameters.path,
         query_parameters=split_parameters.query,
-        headers=split_parameters.header,
+        headers=headers,
     )
     client.validate_query(esi_query)
     if client.is_paged(esi_query):
