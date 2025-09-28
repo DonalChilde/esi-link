@@ -12,7 +12,7 @@ from esi_link.helpers.make_safe_env_name import make_safe_env_name
 APP_NAMESPACE = "pfmsoft"
 APP_NAME = "Esi Link"
 
-_app_dir = get_app_dir(app_name=f"{APP_NAMESPACE}_{APP_NAME}", force_posix=True)
+_app_dir = get_app_dir(app_name=f"{APP_NAMESPACE}-{APP_NAME}")
 _app_env_prefix = make_safe_env_name(f"{APP_NAMESPACE}_{APP_NAME}_")
 
 
