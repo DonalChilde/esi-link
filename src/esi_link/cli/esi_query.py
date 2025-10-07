@@ -123,7 +123,6 @@ def get(
     console: Annotated[
         bool,
         typer.Option(
-            "-c",
             "--console-json",
             help="Print only the json data from a completed query to the console, without any metadata.",
         ),
@@ -136,7 +135,7 @@ def get(
         ),
     ] = False,
     json_indent: Annotated[
-        int, typer.Option("-i", "--json-indent", help="Indent level for JSON output.")
+        int, typer.Option("--json-indent", help="Indent level for JSON output.")
     ] = 2,
     file_overwrite: Annotated[
         bool,
