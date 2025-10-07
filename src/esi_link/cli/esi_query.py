@@ -7,13 +7,13 @@ from typing import Annotated, Any
 from uuid import uuid4
 
 import typer
-from esi_auth import get_authorized_characters
+from esi_auth import CharacterToken, get_authorized_characters
 from rich import print as rich_print
 
 from esi_link.esi_client.esi_client import EsiClient
 from esi_link.esi_client.models import EsiQuery, EsiQueryResult
 from esi_link.esi_schema import operation_accessors as OA
-from esi_link.esi_schema.esi_api_protocol import SplitParameters
+from esi_link.esi_schema.esi_api_protocol import EsiApiProtocol, SplitParameters
 from esi_link.helpers.csv import write_dicts_to_csv
 from esi_link.helpers.response_to_json import query_to_result
 from esi_link.helpers.validate_file_out import validate_file_out
@@ -21,6 +21,49 @@ from esi_link.helpers.validate_file_out import validate_file_out
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 app = typer.Typer(no_args_is_help=True)
+
+
+def validate_auth_params(
+    esi_api: EsiApiProtocol,
+    operation_id: str,
+    character_id: int | None,
+    client_id: int | None,
+    client_alias: str | None,
+) -> CharacterToken | None:
+    """Validate authentication parameters for an operation.
+
+    If the operation requires authentication, ensure that a character ID is provided
+    and that the character is authorized. Return the CharacterToken if valid, else None.
+
+    Args:
+        esi_api: The ESI API instance to use for operation lookup.
+        operation_id: The ID of the operation to check.
+        character_id: The character ID to use for authentication.
+        client_id: The client ID to use for authentication.
+        client_alias: The client alias to use for authentication.
+    """
+    operation = esi_api.indexed_operation(operation_id)
+    if OA.is_auth_required(operation):
+        if character_id is None:
+            typer.echo(
+                f"Operation {operation_id} requires authentication. Please provide a character ID with --character-id or -c."
+            )
+            raise typer.Exit(code=1)
+        try:
+            authorized_characters = get_authorized_characters(
+                client_id=client_id, client_alias=client_alias
+            )
+            character_token = authorized_characters.get(character_id)
+            if character_token is None:
+                typer.echo(
+                    f"Character ID {character_id} is not authorized. Please authorize first using esi-auth."
+                )
+                raise typer.Exit(code=1)
+            return character_token
+        except Exception as e:
+            typer.echo(f"Error retrieving authorized characters: {e}")
+            raise typer.Exit(code=1) from e
+    return None
 
 
 @app.command()
@@ -33,12 +76,28 @@ def get(
         list[str],
         typer.Option("-p", "--parameter", help="Parameters as key=value strings."),
     ] = [],
-    auth: Annotated[
+    character_id: Annotated[
+        int | None,
+        typer.Option(
+            "-c",
+            "--character-id",
+            help="Character ID to use for this request if authorization is required.",
+        ),
+    ] = None,
+    client_id: Annotated[
+        int | None,
+        typer.Option(
+            "-i",
+            "--client-id",
+            help="Client ID to use for this request if authorization is required.",
+        ),
+    ] = None,
+    client_alias: Annotated[
         str | None,
         typer.Option(
             "-a",
-            "--auth",
-            help="Character ID to use for this request if authorization is required.",
+            "--client-alias",
+            help="Alias for the client ID to use for authorization. Either the client ID or client alias must be provided.",
         ),
     ] = None,
     csv_data: Annotated[
@@ -98,6 +157,8 @@ def get(
     typer.echo(f"Getting ESI data for operation ID: {operation_id}")
     client: EsiClient = ctx.obj.client
     # split input parameters into key, value pairs
+    if character_id:
+        parameters.append(f"character_id={character_id}")
     params_list = parse_params(parameters)
     split_parameters = client.split_request_parameters(operation_id, params_list)
     if split_parameters.unknown:
@@ -109,21 +170,15 @@ def get(
             f"Warning: The count of input parameters does not match the split parameters. Were some parameter names repeated? {parameters!r}"
         )
     headers = split_parameters.header
-    operation = ctx.obj.esi_api.indexed_operation(operation_id)
-    if OA.is_auth_required(operation):
-        if auth is None:
-            typer.echo(
-                f"Operation {operation_id} requires authentication. Please provide a character ID with --auth."
-            )
-            raise typer.Exit(code=1)
-        authorized_characters = get_authorized_characters()
-        character = authorized_characters.get(int(auth))
-        if character is None:
-            typer.echo(
-                f"Character ID {auth} is not authorized. Please authorize first using esi-auth."
-            )
-            raise typer.Exit(code=1)
-        headers["Authorization"] = f"Bearer {character.access_token}"
+    character_token = validate_auth_params(
+        esi_api=ctx.obj.esi_api,
+        operation_id=operation_id,
+        character_id=character_id,
+        client_id=client_id,
+        client_alias=client_alias,
+    )
+    if character_token:
+        headers["Authorization"] = f"Bearer {character_token.access_token}"
 
     # debug_print_split_parameters(ctx, parameters, split_parameters)
     esi_query = EsiQuery(
