@@ -8,11 +8,11 @@ from typing import Annotated
 import typer
 
 from esi_link import CONFIG
+from esi_link.cache.esi_file_cache import EsiFileCache
+from esi_link.cache.esi_memory_cache import EsiMemoryCache
+from esi_link.cache.link_cache_protocol import LinkCacheProtocol
 from esi_link.config import CacheType
 from esi_link.esi_client.esi_client import EsiClient
-from esi_link.esi_client.esi_file_cache import EsiFileCache
-from esi_link.esi_client.esi_memory_cache import EsiMemoryCache
-from esi_link.esi_client.link_cache_protocol import LinkCacheProtocol
 from esi_link.esi_schema.esi_api import EsiApi
 from esi_link.esi_schema.esi_api_protocol import EsiApiProtocol
 from esi_link.esi_schema.schema_store import SchemaStore

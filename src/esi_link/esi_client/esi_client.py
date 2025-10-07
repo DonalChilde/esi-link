@@ -21,17 +21,17 @@ import logging
 from collections.abc import Sequence
 from copy import deepcopy
 
-from esi_link.esi_client.cache_helpers import is_cachable, make_cache_key
+from esi_link.cache.cache_helpers import is_cachable, make_cache_key
 from esi_link.esi_client.models import ResponseSource
 from esi_link.esi_client.query_validator import (
     EsiQueryValidatorProtocol,
     ValidationError,
 )
 
+from ..cache.link_cache_protocol import CacheStatus, LinkCacheProtocol
 from ..esi_schema.esi_api_protocol import EsiApiProtocol, SplitParameters
 from ..helpers.header_funcs import last_modified, page_count
 from .esi_http import EsiHttp, EsiQuery
-from .link_cache_protocol import CacheStatus, LinkCacheProtocol
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())

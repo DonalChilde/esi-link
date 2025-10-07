@@ -1,9 +1,9 @@
 import json
 from uuid import uuid4
 
+from esi_link.cache.esi_memory_cache import EsiMemoryCache
 from esi_link.esi_client.esi_client import EsiQuery, esi_batch_query
 from esi_link.esi_client.esi_http import EsiHttp
-from esi_link.esi_client.esi_memory_cache import EsiMemoryCache
 from esi_link.esi_client.models import QueryResponse
 from esi_link.esi_schema.esi_api import EsiApi
 from esi_link.esi_schema.schema_store import SchemaStore

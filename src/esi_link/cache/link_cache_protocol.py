@@ -6,7 +6,12 @@ from uuid import UUID
 
 from esi_link.esi_schema.esi_api_protocol import EsiApiProtocol
 
-from .models import EsiQuery, LinkCachedResponse, LinkCacheMetadata, QueryResponse
+from ..esi_client.models import (
+    EsiQuery,
+    LinkCachedResponse,
+    LinkCacheMetadata,
+    QueryResponse,
+)
 
 
 class InvalidCacheRequest(Exception):
