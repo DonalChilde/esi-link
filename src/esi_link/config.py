@@ -22,6 +22,9 @@ class CacheType(StrEnum):
     SQLITE = "sqlite"
 
 
+# TODO refactor with settings improvements from esi-auth, settings manager, etc
+
+
 class AppConfig(BaseSettings):
     name: str
     app_dir: Path = Path(_app_dir)

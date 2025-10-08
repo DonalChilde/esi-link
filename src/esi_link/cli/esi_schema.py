@@ -13,6 +13,8 @@ from esi_link.esi_schema.schema_store import SchemaStore
 
 app = typer.Typer(no_args_is_help=True)
 
+# TODO add raw json output of operation, with path and method.
+
 
 @app.command()
 def update(

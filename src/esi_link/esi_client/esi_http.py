@@ -28,6 +28,10 @@ from .models import EsiQuery, QueryResponse
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
+# TODO handle new rate limit strategy from CCP
+# https://developers.eveonline.com/blog/article/esi-rate-limits-have-changed
+# https://developers.eveonline.com/docs/services/esi/rate-limiting/
+
 
 class EsiHttp:
     """Handles concurrent requests and error management for Eve Online ESI API.
