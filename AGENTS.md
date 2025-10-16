@@ -30,6 +30,7 @@ applyTo: "**/*.py"
 - Prefer lines do not exceed 88 characters.
 - Use blank lines to separate functions, classes, and code blocks where appropriate.
 - Code will be formatted and linted using ruff. The configuration is located in the `pyproject.toml`.
+- Calls to functions with more than one argument should prefer keyword args.
 
 ## Edge Cases and Testing
 
