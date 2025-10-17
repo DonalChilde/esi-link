@@ -30,7 +30,7 @@ from esi_link.esi_client.query_validator import (
 
 from ..cache.link_cache_protocol import CacheStatus, LinkCacheProtocol
 from ..esi_schema.esi_api_protocol import EsiApiProtocol, SplitParameters
-from ..helpers.header_funcs import last_modified, page_count
+from ..helpers.header_funcs import last_modified, pages_available
 from .esi_http import EsiHttp, EsiQuery
 
 logger = logging.getLogger(__name__)
@@ -111,7 +111,7 @@ def _build_pages_queries(query: EsiQuery) -> Sequence[EsiQuery]:
     paged_queries: list[EsiQuery] = []
     if query.response is None:
         raise ValueError("Query response is None, cannot build paged queries.")
-    pages = page_count(query.response.headers)
+    pages = pages_available(query.response.headers)
     if pages < 1:
         raise ValueError(f"Invalid page count: {pages}. Expected >= 1.")
     if pages > 1000:  # Reasonable upper limit to prevent excessive requests
@@ -230,7 +230,7 @@ def confirm_all_pages_received(query: EsiQuery) -> bool:
     """
     if query.response is None:
         return False
-    pages = page_count(query.response.headers) if query.response else 0
+    pages = pages_available(query.response.headers) if query.response else 0
     if pages != len(query.response.paged_text) + 1:
         logger.error(
             f"Not all pages received for query {query.query_id}. Expected {pages}, got {len(query.response.paged_text) + 1}."

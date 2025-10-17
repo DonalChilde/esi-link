@@ -1,9 +1,9 @@
 """Functions for retrieving values from ESi headers."""
 
-HeadersType = tuple[tuple[str, str | None], ...]
+type HeadersType = tuple[tuple[str, str | None], ...]
 
 
-def page_count(headers: HeadersType) -> int:
+def pages_available(headers: HeadersType) -> int:
     """Get the page count from the response headers."""
     for header in headers:
         if header[0].lower() == "x-pages":
@@ -56,3 +56,50 @@ def etag(headers: HeadersType) -> str:
 def inject_compatibility_date(headers: dict[str, str], compatibility_date: str) -> None:
     """Inject the compatibility date into the request headers."""
     headers["X-Esi-Compatibility-Date"] = compatibility_date
+
+
+# FIXME: return strings over ints.
+
+
+def retry_after(headers: HeadersType) -> int:
+    """Get the retry-after seconds from the response headers."""
+    default: int = -1
+    for header in headers:
+        if header[0].lower() == "retry-after":
+            return int(header[1] or default)
+    return default
+
+
+def rate_limit_group(headers: HeadersType) -> str:
+    """Get the rate limit group from the response headers."""
+    for header in headers:
+        if header[0].lower() == "x-rate-limit-group":
+            return header[1] if header[1] else ""
+    return ""
+
+
+def rate_limit_limit(headers: HeadersType) -> str:
+    """Get the rate limit from the response headers."""
+    default: str = ""
+    for header in headers:
+        if header[0].lower() == "x-ratelimit-limit":
+            return header[1] or default
+    return default
+
+
+def rate_limit_remaining(headers: HeadersType) -> str:
+    """Get the rate limit remaining from the response headers."""
+    default: str = ""
+    for header in headers:
+        if header[0].lower() == "x-ratelimit-remaining":
+            return header[1] or default
+    return default
+
+
+def rate_limit_used(headers: HeadersType) -> str:
+    """Get the rate limit used from the response headers."""
+    default: str = ""
+    for header in headers:
+        if header[0].lower() == "x-ratelimit-used":
+            return header[1] or default
+    return default

@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from copy import deepcopy
-from dataclasses import dataclass, field
 from pathlib import Path
 from types import TracebackType
 from typing import Any, Optional
@@ -9,469 +8,490 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 
 import aiohttp
 from aiolimiter import AsyncLimiter
-from pydantic import BaseModel, Field
 from whenever import Instant
 
-from esi_link.helpers.resolve_json_ref import resolve_internal_refs
+from esi_link import operation_accessors as OA
+from esi_link.helpers import header_funcs as HF
+from esi_link.models import (
+    CachedResponse,
+    CacheProtocol,
+    EsiHttpProtocol,
+    EsiLinkError,
+    EsiLinkProtocol,
+    EsiRequest,
+    EsiRequests,
+    EsiSchema,
+    HandlerConfig,
+    HandlerManagerProtocol,
+    HandlerNotFoundError,
+    HttpRequest,
+    HttpResponse,
+    InvalidHandlerError,
+    ResponseContext,
+    ResponseHandlerProtocol,
+)
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 ESI_LINK_NAMESPACE = uuid5(NAMESPACE_URL, "esi-link")
 
-##################################################################################
-# Exceptions
-##################################################################################
+# ##################################################################################
+# # Exceptions
+# ##################################################################################
 
 
-class EsiLinkError(Exception):
-    """Base exception for ESI Link errors."""
+# class EsiLinkError(Exception):
+#     """Base exception for ESI Link errors."""
 
-    pass
+#     pass
 
 
-class HandlerNotFoundError(EsiLinkError):
-    """Raised when a specified handler is not found."""
+# class HandlerNotFoundError(EsiLinkError):
+#     """Raised when a specified handler is not found."""
 
-    pass
+#     pass
 
 
-class InvalidHandlerError(EsiLinkError):
-    """Raised when a handler is invalid or cannot be instantiated."""
+# class InvalidHandlerError(EsiLinkError):
+#     """Raised when a handler is invalid or cannot be instantiated."""
 
-    pass
+#     pass
 
 
-###########################################################################
-# Models
-###########################################################################
+# ###########################################################################
+# # Models
+# ###########################################################################
 
-# TODO make utility commands in cli to output UUID and Instant in iso format to support hand crafting Esi Requests.
+# # TODO make utility commands in cli to output UUID and Instant in iso format to support hand crafting Esi Requests.
 
 
-def _get_current_instant() -> Instant:
-    """Factory function to get current instant for default values.
+# def _get_current_instant() -> Instant:
+#     """Factory function to get current instant for default values.
 
-    This function is used as a default_factory to avoid circular dependencies
-    that can occur when using Instant.now directly in field definitions.
+#     This function is used as a default_factory to avoid circular dependencies
+#     that can occur when using Instant.now directly in field definitions.
 
-    Returns:
-        Current instant in time.
-    """
-    return Instant.now()
+#     Returns:
+#         Current instant in time.
+#     """
+#     return Instant.now()
 
 
-class HandlerConfig(BaseModel):
-    """Configuration for a response handler."""
+# class HandlerConfig(BaseModel):
+#     """Configuration for a response handler."""
 
-    name: str
-    """Name of the handler. Handler names are namespaced. The esi-link.foo namespace is reserved."""
-    config: dict[str, Any] = {}
-    """Configuration specific to the handler."""
+#     name: str
+#     """Name of the handler. Handler names are namespaced. The esi-link.foo namespace is reserved."""
+#     config: dict[str, Any] = {}
+#     """Configuration specific to the handler."""
 
 
-class AuthParams(BaseModel):
-    character_id: int
-    client_id: str
-    client_alias: str
+# class AuthParams(BaseModel):
+#     character_id: int
+#     client_id: str
+#     client_alias: str
 
 
-class EsiRequest(BaseModel):
-    """Represents a single ESI request to be executed."""
+# class EsiRequest(BaseModel):
+#     """Represents a single ESI request to be executed."""
 
-    query_id: UUID
-    operation_id: str
-    path_parameters: dict[str, str | int | float] = {}
-    query_parameters: dict[str, str | int | float] = {}
-    auth_parameters: Optional[AuthParams] = None
-    request_body: Any = None
-    headers: dict[str, str] = {}
-    handlers: list[HandlerConfig] = []
-    """List of handler configurations to apply to this request."""
+#     query_id: UUID
+#     operation_id: str
+#     path_parameters: dict[str, str | int | float] = {}
+#     query_parameters: dict[str, str | int | float] = {}
+#     auth_parameters: Optional[AuthParams] = None
+#     request_body: Any = None
+#     headers: dict[str, str] = {}
+#     handlers: list[HandlerConfig] = []
+#     """List of handler configurations to apply to this request."""
 
 
-class EsiRequests(BaseModel):
-    """Represents a batch of ESI requests to be executed."""
+# class EsiRequests(BaseModel):
+#     """Represents a batch of ESI requests to be executed."""
 
-    requests: dict[UUID, EsiRequest]
-    created_on: Instant = Field(default_factory=_get_current_instant)
+#     requests: dict[UUID, EsiRequest]
+#     created_on: Instant = Field(default_factory=_get_current_instant)
 
-    def save_to_file(self, file_path: Path, overwrite: bool = False) -> None:
-        """Save the EsiRequests instance to a JSON file.
+#     def save_to_file(self, file_path: Path, overwrite: bool = False) -> None:
+#         """Save the EsiRequests instance to a JSON file.
 
-        Args:
-            file_path: Path to the file where the JSON representation will be saved.
-            overwrite: Whether to overwrite the file if it exists. Defaults to False.
-        """
-        if file_path.is_dir():
-            raise EsiLinkError(f"{file_path} is a directory.")
-        if file_path.is_file() and not overwrite:
-            raise EsiLinkError(
-                f"{file_path} already exists. Use overwrite=True to overwrite."
-            )
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(file_path, "w") as file:
-            file.write(self.model_dump_json(indent=2))
+#         Args:
+#             file_path: Path to the file where the JSON representation will be saved.
+#             overwrite: Whether to overwrite the file if it exists. Defaults to False.
+#         """
+#         if file_path.is_dir():
+#             raise EsiLinkError(f"{file_path} is a directory.")
+#         if file_path.is_file() and not overwrite:
+#             raise EsiLinkError(
+#                 f"{file_path} already exists. Use overwrite=True to overwrite."
+#             )
+#         file_path.parent.mkdir(parents=True, exist_ok=True)
+#         with open(file_path, "w") as file:
+#             file.write(self.model_dump_json(indent=2))
 
-    @classmethod
-    def load_from_file(cls, file_path: Path) -> "EsiRequests":
-        """Load an EsiRequests instance from a JSON file.
+#     @classmethod
+#     def load_from_file(cls, file_path: Path) -> "EsiRequests":
+#         """Load an EsiRequests instance from a JSON file.
 
-        Args:
-            file_path: Path to the JSON file to load.
+#         Args:
+#             file_path: Path to the JSON file to load.
 
-        Returns:
-            An instance of EsiRequests.
-        """
-        if not file_path.is_file():
-            raise EsiLinkError(f"{file_path} does not exist or is not a file.")
-        try:
-            data = file_path.read_text()
-            result = cls.model_validate_json(data)
-        except Exception as e:
-            raise EsiLinkError(
-                f"Failed to load EsiRequests from {file_path}: {e}"
-            ) from e
-        return result
-
-
-class ResponseContext:
-    obj: dict[str, Any]
-
-
-class CachedResponse(BaseModel):
-    """Represents a cached ESI response."""
-
-    cache_key: UUID
-    """The cache key UUID, built from the EsiRequest."""
-    cached_on: Instant = Field(default_factory=_get_current_instant)
-    """The instant when the response was cached."""
-    response: "HttpResponse"
-    """The cached response data."""
-
-    def is_stale(self) -> bool:
-        """Determine if the cached response is stale.
-
-        This method should be implemented to check if the cached response is still valid.
-        For example, it could check the expiration time or ETag.
-
-        Returns:
-            True if the cached response is stale, False otherwise.
-        """
-        # Placeholder implementation; actual logic will depend on caching strategy.
-        return False
-
-
-@dataclass(slots=True)
-class IndexedOperation:
-    operation_id: str
-    method: str
-    path: str
-    operation: dict[str, Any] = field(default_factory=dict[str, Any])
-
-
-class EsiSchema(BaseModel):
-    """Represents the ESI OpenAPI schema.
-
-    The schema is normalized and indexed by operation ID for efficient access.
-    """
-
-    download_date: Instant
-    """The date the schema was downloaded."""
-    operations: dict[str, IndexedOperation] = Field(default_factory=dict)
-    """A mapping of operation IDs to IndexedOperation instances."""
-    security_schemes: dict[str, Any] = Field(default_factory=dict)
-    """A mapping of security scheme names to their definitions."""
-    info: dict[str, Any] = Field(default_factory=dict)
-    """The info section of the OpenAPI schema."""
-    openapi: str
-    """The OpenAPI version."""
-    servers: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
-    """The servers section of the OpenAPI schema."""
-    tags: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
-    """The tags section of the OpenAPI schema."""
-
-    @classmethod
-    def from_schema(cls, schema: dict[str, Any], download_date: Instant) -> "EsiSchema":
-        """Create an EsiSchema instance from a raw OpenAPI schema dictionary.
-
-        Normalizes and indexes the schema for efficient access.
-
-        Args:
-            schema: The OpenAPI schema as a dictionary.
-            download_date: The date the schema was downloaded.
-
-        Returns:
-            An instance of EsiSchema.
-        """
-        schema_copy = deepcopy(schema)
-        dereferenced_schema = resolve_internal_refs(schema_copy, schema_copy)
-
-        operations: dict[str, IndexedOperation] = {}
-        paths = dereferenced_schema.get("paths", {})
-        for path, methods in paths.items():
-            for method, operation in methods.items():
-                operation_id = operation.get("operationId")
-                if operation_id:
-                    operations[operation_id] = IndexedOperation(
-                        operation_id=operation_id,
-                        method=method.upper(),
-                        path=path,
-                        operation=operation,
-                    )
-        return cls(
-            download_date=download_date,
-            operations=operations,
-            security_schemes=dereferenced_schema.get("components", {}).get(
-                "securitySchemes", {}
-            ),
-            info=dereferenced_schema.get("info", {}),
-            openapi=dereferenced_schema.get("openapi", ""),
-            servers=dereferenced_schema.get("servers", []),
-            tags=dereferenced_schema.get("tags", []),
-        )
-
-
-@dataclass(slots=True)
-class HttpRequest:
-    method: str
-    url: str
-    is_paged: bool
-    ctx: ResponseContext
-    esi_request: EsiRequest
-    cache_key: Optional[UUID] = None
-    """The cache key UUID, built from the EsiRequest. None if caching is not used."""
-    app_handlers: list["ResponseHandlerProtocol"] = field(
-        default_factory=list["ResponseHandlerProtocol"]
-    )
-    """App level handlers to process the response. These are run before any request level handlers."""
-    user_handlers: list["ResponseHandlerProtocol"] = field(
-        default_factory=list["ResponseHandlerProtocol"]
-    )
-    """Request level handlers to process the response. These are run after any app level handlers."""
-    headers: dict[str, str] = field(default_factory=dict[str, str])
-    """App level headers to include in the request. These are merged with any request level headers."""
-    timeout: int = 10
-
-
-class HttpResponse(BaseModel):
-    status_code: int
-    reason: str | None
-    url: str
-    headers: dict[str, str | None]  # Multidict or tuple of tuples?
-    json_data: Any = None
-    etag: str = ""
-    last_modified: str = ""
-    expires: str = ""
-    completed_on: Instant = Field(default_factory=_get_current_instant)
-
-
-############################################################################
-# Protocols
-############################################################################
-class ResponseHandlerProtocol:
-    """Protocol for handling ESI responses."""
-
-    async def handle_response(
-        self,
-        ctx: ResponseContext,
-        http_response: HttpResponse,
-        request: EsiRequest,
-    ) -> Any:
-        """Handle the response from an ESI request.
-
-        Args:
-            ctx: The response context.
-            http_response: The HttpResponse object.
-            request: The original EsiRequest object.
-
-        Returns:
-            The processed response data.
-        """
-        ...
-
-    @classmethod
-    def from_config(cls, config: HandlerConfig) -> "ResponseHandlerProtocol":
-        """Create an instance of the handler from a configuration.
-
-        Args:
-            config: The HandlerConfig instance containing the configuration.
-
-        Returns:
-            An instance of the handler.
-
-        Raises:
-            InvalidHandlerError: If the handler cannot be instantiated.
-        """
-        ...
-
-    @classmethod
-    def example_config(cls) -> tuple[HandlerConfig, str]:
-        """Return an example configuration for this handler, with a text description.
-
-        Example does not have to be a valid config, but should illustrate the main options.
-        """
-        ...
-
-    @classmethod
-    def validate_config(cls, config: HandlerConfig) -> None:
-        """Validate the handler configuration.
-
-        Args:
-            config: The HandlerConfig instance containing the configuration.
-
-        Raises:
-            InvalidHandlerError: If the configuration is invalid.
-        """
-        ...
-
-
-class HandlerManagerProtocol:
-    def get_handler(self, config: HandlerConfig) -> ResponseHandlerProtocol:
-        """Get a handler by config.
-
-        Args:
-            config: The HandlerConfig instance containing the configuration.
-        Returns:
-            An instance of the handler.
-
-        Raises:
-            HandlerNotFoundError: If the handler is not found.
-        """
-        ...
-
-    def register_handler(
-        self, name: str, handler_cls: type[ResponseHandlerProtocol]
-    ) -> None:
-        """Register a handler class with a name.
-
-        Args:
-            name: The name of the handler.
-            handler_cls: The handler class to register.
-
-        Raises:
-            InvalidHandlerError: If the handler class is invalid.
-        """
-        ...
-
-
-class CacheProtocol:
-    def generate_cache_key(
-        self, esi_request: EsiRequest, esi_schema: EsiSchema
-    ) -> UUID | None:
-        """Generate a cache key for the given ESI request.
-
-        Args:
-            request: The EsiRequest instance for which to generate the cache key.
-            esi_schema: The EsiSchema instance representing the ESI OpenAPI schema.
-        Returns:
-            A UUID representing the cache key, or None if caching is not applicable.
-
-        ...
-        """
-        ...
-
-    def is_cached(self, cache_key: UUID) -> bool:
-        """Check if a response is cached for the given cache key.
-        Args:
-            cache_key: The UUID cache key to check.
-        Returns:
-            True if a cached response exists for the cache key, False otherwise.
-        ...
-        """
-        ...
-
-    def get_cached_response(self, cache_key: UUID) -> Optional[CachedResponse]:
-        """Retrieve a cached response by its cache key.
-
-        Args:
-            cache_key: The UUID cache key of the cached response.
-
-        Returns:
-            The CachedResponse instance if found, otherwise None.
-
-        ...
-        """
-        ...
-
-    def store_cached_response(self, cached_response: CachedResponse) -> None:
-        """Store a cached response.
-
-        Args:
-            cached_response: The CachedResponse instance to store.
-
-        ...
-        """
-        ...
-
-    def update_cached_response(
-        self, cache_key: UUID, http_response: HttpResponse
-    ) -> None:
-        """Update an existing cached response.
-
-        Args:
-            cached_response: The CachedResponse instance to update.
-
-        ...
-        """
-        ...
-
-
-class EsiLinkProtocol:
-    """Protocol for ESI Link implementations."""
-
-    esi_schema: EsiSchema
-    """The ESI OpenAPI schema."""
-    esi_http: "EsiHttpProtocol"
-    """The ESI HTTP client implementation."""
-    handler_manager: HandlerManagerProtocol
-    """The handler manager for response handlers."""
-
-    async def execute_requests(
-        self,
-        ctx: ResponseContext,
-        requests: EsiRequests,
-    ) -> None:
-        """Execute a batch of ESI requests.
-
-        Args:
-            requests: The EsiRequests instance containing the requests to execute.
-            session: An optional aiohttp ClientSession to use for the requests.
-            response_handler: An optional ResponseHandlerProtocol to process responses.
-
-        Returns:
-            A dictionary mapping request UUIDs to their responses.
-        """
-        ...
-
-
-class EsiHttpProtocol:
-    """Protocol for ESI HTTP client implementations."""
-
-    session: aiohttp.ClientSession | None
-    cache: CacheProtocol
-
-    async def __aenter__(self) -> "EsiHttpRateLimited": ...
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        tb: TracebackType | None,
-    ) -> None: ...
-
-    async def execute_requests(
-        self,
-        requests: list[HttpRequest],
-    ) -> None:
-        """Execute a list of HTTP requests.
-
-        Args:
-            requests: A list of HttpRequest instances to execute.
-
-        Returns:
-            A dictionary mapping request UUIDs to their responses.
-        """
-        ...
+#         Returns:
+#             An instance of EsiRequests.
+#         """
+#         if not file_path.is_file():
+#             raise EsiLinkError(f"{file_path} does not exist or is not a file.")
+#         try:
+#             data = file_path.read_text()
+#             result = cls.model_validate_json(data)
+#         except Exception as e:
+#             raise EsiLinkError(
+#                 f"Failed to load EsiRequests from {file_path}: {e}"
+#             ) from e
+#         return result
+
+
+# class ResponseContext:
+#     obj: dict[str, Any]
+
+
+# class CachedResponse(BaseModel):
+#     """Represents a cached ESI response."""
+
+#     cache_key: UUID
+#     """The cache key UUID, built from the EsiRequest."""
+#     cached_on: Instant = Field(default_factory=_get_current_instant)
+#     """The instant when the response was cached."""
+#     response: "HttpResponse"
+#     """The cached response data."""
+
+#     def is_stale(self) -> bool:
+#         """Determine if the cached response is stale.
+
+#         This method should be implemented to check if the cached response is still valid.
+#         For example, it could check the expiration time or ETag.
+
+#         Returns:
+#             True if the cached response is stale, False otherwise.
+#         """
+#         # Placeholder implementation; actual logic will depend on caching strategy.
+#         return False
+
+
+# @dataclass(slots=True)
+# class IndexedOperation:
+#     operation_id: str
+#     method: str
+#     path: str
+#     operation: dict[str, Any] = field(default_factory=dict[str, Any])
+
+
+# class EsiSchema(BaseModel):
+#     """Represents the ESI OpenAPI schema.
+
+#     The schema is normalized and indexed by operation ID for efficient access.
+#     """
+
+#     download_date: Instant
+#     """The date the schema was downloaded."""
+#     operations: dict[str, IndexedOperation] = Field(default_factory=dict)
+#     """A mapping of operation IDs to IndexedOperation instances."""
+#     security_schemes: dict[str, Any] = Field(default_factory=dict)
+#     """A mapping of security scheme names to their definitions."""
+#     info: dict[str, Any] = Field(default_factory=dict)
+#     """The info section of the OpenAPI schema."""
+#     openapi: str
+#     """The OpenAPI version."""
+#     servers: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
+#     """The servers section of the OpenAPI schema."""
+#     tags: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
+#     """The tags section of the OpenAPI schema."""
+
+#     @classmethod
+#     def from_schema(cls, schema: dict[str, Any], download_date: Instant) -> "EsiSchema":
+#         """Create an EsiSchema instance from a raw OpenAPI schema dictionary.
+
+#         Normalizes and indexes the schema for efficient access.
+
+#         Args:
+#             schema: The OpenAPI schema as a dictionary.
+#             download_date: The date the schema was downloaded.
+
+#         Returns:
+#             An instance of EsiSchema.
+#         """
+#         schema_copy = deepcopy(schema)
+#         dereferenced_schema = resolve_internal_refs(schema_copy, schema_copy)
+
+#         operations: dict[str, IndexedOperation] = {}
+#         paths = dereferenced_schema.get("paths", {})
+#         for path, methods in paths.items():
+#             for method, operation in methods.items():
+#                 operation_id = operation.get("operationId")
+#                 if operation_id:
+#                     operations[operation_id] = IndexedOperation(
+#                         operation_id=operation_id,
+#                         method=method.upper(),
+#                         path=path,
+#                         operation=operation,
+#                     )
+#         return cls(
+#             download_date=download_date,
+#             operations=operations,
+#             security_schemes=dereferenced_schema.get("components", {}).get(
+#                 "securitySchemes", {}
+#             ),
+#             info=dereferenced_schema.get("info", {}),
+#             openapi=dereferenced_schema.get("openapi", ""),
+#             servers=dereferenced_schema.get("servers", []),
+#             tags=dereferenced_schema.get("tags", []),
+#         )
+
+
+# @dataclass(slots=True)
+# class HttpRequest:
+#     method: str
+#     url: str
+#     is_paged: bool
+#     ctx: ResponseContext
+#     esi_request: EsiRequest
+#     cache_key: Optional[UUID] = None
+#     """The cache key UUID, built from the EsiRequest. None if caching is not used."""
+#     app_handlers: list["ResponseHandlerProtocol"] = field(
+#         default_factory=list["ResponseHandlerProtocol"]
+#     )
+#     """App level handlers to process the response. These are run before any request level handlers."""
+#     user_handlers: list["ResponseHandlerProtocol"] = field(
+#         default_factory=list["ResponseHandlerProtocol"]
+#     )
+#     """Request level handlers to process the response. These are run after any app level handlers."""
+#     headers: dict[str, str] = field(default_factory=dict[str, str])
+#     """App level headers to include in the request. These are merged with any request level headers."""
+#     timeout: int = 10
+#     page_number: int = 0
+#     """The page number for paged requests."""
+
+
+# class HttpResponse(BaseModel):
+#     status_code: int
+#     reason: str | None
+#     url: str
+#     headers: tuple[tuple[str, str | None], ...]
+#     json_data: Any = None
+#     etag: str = ""
+#     last_modified: str = ""
+#     expires: str = ""
+#     completed_on: Instant = Field(default_factory=_get_current_instant)
+
+
+# ############################################################################
+# # Protocols
+# ############################################################################
+# class ResponseHandlerProtocol:
+#     """Protocol for handling ESI responses."""
+
+#     async def handle_response(
+#         self,
+#         ctx: ResponseContext,
+#         http_response: HttpResponse,
+#         request: EsiRequest,
+#     ) -> Any:
+#         """Handle the response from an ESI request.
+
+#         Args:
+#             ctx: The response context.
+#             http_response: The HttpResponse object.
+#             request: The original EsiRequest object.
+
+#         Returns:
+#             The processed response data.
+#         """
+#         ...
+
+#     @classmethod
+#     def from_config(cls, config: HandlerConfig) -> "ResponseHandlerProtocol":
+#         """Create an instance of the handler from a configuration.
+
+#         Args:
+#             config: The HandlerConfig instance containing the configuration.
+
+#         Returns:
+#             An instance of the handler.
+
+#         Raises:
+#             InvalidHandlerError: If the handler cannot be instantiated.
+#         """
+#         ...
+
+#     @classmethod
+#     def example_config(cls) -> tuple[HandlerConfig, str]:
+#         """Return an example configuration for this handler, with a text description.
+
+#         Example does not have to be a valid config, but should illustrate the main options.
+#         """
+#         ...
+
+#     @classmethod
+#     def validate_config(cls, config: HandlerConfig) -> None:
+#         """Validate the handler configuration.
+
+#         Args:
+#             config: The HandlerConfig instance containing the configuration.
+
+#         Raises:
+#             InvalidHandlerError: If the configuration is invalid.
+#         """
+#         ...
+
+
+# class HandlerManagerProtocol:
+#     def get_handler(self, config: HandlerConfig) -> ResponseHandlerProtocol:
+#         """Get a handler by config.
+
+#         Args:
+#             config: The HandlerConfig instance containing the configuration.
+#         Returns:
+#             An instance of the handler.
+
+#         Raises:
+#             HandlerNotFoundError: If the handler is not found.
+#         """
+#         ...
+
+#     def register_handler(
+#         self, name: str, handler_cls: type[ResponseHandlerProtocol]
+#     ) -> None:
+#         """Register a handler class with a name.
+
+#         Args:
+#             name: The name of the handler.
+#             handler_cls: The handler class to register.
+
+#         Raises:
+#             InvalidHandlerError: If the handler class is invalid.
+#         """
+#         ...
+
+
+# class CacheProtocol:
+#     def generate_cache_key(
+#         self, esi_request: EsiRequest, esi_schema: EsiSchema
+#     ) -> UUID | None:
+#         """Generate a cache key for the given ESI request.
+
+#         Args:
+#             request: The EsiRequest instance for which to generate the cache key.
+#             esi_schema: The EsiSchema instance representing the ESI OpenAPI schema.
+#         Returns:
+#             A UUID representing the cache key, or None if caching is not applicable.
+
+#         ...
+#         """
+#         ...
+
+#     def is_cached(self, cache_key: UUID) -> bool:
+#         """Check if a response is cached for the given cache key.
+#         Args:
+#             cache_key: The UUID cache key to check.
+#         Returns:
+#             True if a cached response exists for the cache key, False otherwise.
+#         ...
+#         """
+#         ...
+
+#     def get_cached_response(self, cache_key: UUID) -> Optional[CachedResponse]:
+#         """Retrieve a cached response by its cache key.
+
+#         Args:
+#             cache_key: The UUID cache key of the cached response.
+
+#         Returns:
+#             The CachedResponse instance if found, otherwise None.
+
+#         ...
+#         """
+#         ...
+
+#     def store_cached_response(self, cached_response: CachedResponse) -> None:
+#         """Store a cached response.
+
+#         Args:
+#             cached_response: The CachedResponse instance to store.
+
+#         ...
+#         """
+#         ...
+
+#     def update_cached_response(
+#         self, cache_key: UUID, http_response: HttpResponse
+#     ) -> None:
+#         """Update an existing cached response.
+
+#         Args:
+#             cached_response: The CachedResponse instance to update.
+
+#         ...
+#         """
+#         ...
+
+
+# class EsiLinkProtocol:
+#     """Protocol for ESI Link implementations."""
+
+#     esi_schema: EsiSchema
+#     """The ESI OpenAPI schema."""
+#     esi_http: "EsiHttpProtocol"
+#     """The ESI HTTP client implementation."""
+#     handler_manager: HandlerManagerProtocol
+#     """The handler manager for response handlers."""
+
+#     async def execute_requests(
+#         self,
+#         ctx: ResponseContext,
+#         requests: EsiRequests,
+#     ) -> None:
+#         """Execute a batch of ESI requests.
+
+#         Args:
+#             requests: The EsiRequests instance containing the requests to execute.
+#             session: An optional aiohttp ClientSession to use for the requests.
+#             response_handler: An optional ResponseHandlerProtocol to process responses.
+
+#         Returns:
+#             A dictionary mapping request UUIDs to their responses.
+#         """
+#         ...
+
+
+# class EsiHttpProtocol:
+#     """Protocol for ESI HTTP client implementations."""
+
+#     session: aiohttp.ClientSession | None
+#     cache: CacheProtocol
+#     esi_schema: EsiSchema
+
+#     async def __aenter__(self) -> "EsiHttpRateLimited": ...
+
+#     async def __aexit__(
+#         self,
+#         exc_type: type[BaseException] | None,
+#         exc: BaseException | None,
+#         tb: TracebackType | None,
+#     ) -> None: ...
+
+#     async def execute_requests(
+#         self,
+#         requests: list[HttpRequest],
+#     ) -> list[tuple[HttpRequest, None | BaseException]]:
+#         """Execute a list of HTTP requests.
+
+#         Args:
+#             requests: A list of HttpRequest instances to execute.
+
+#         Returns:
+#             A list of tuples containing the HttpRequest and either None or an exception if one occurred.
+#         """
+#         ...
 
 
 ###########################################################################
@@ -611,11 +631,13 @@ class EsiHttpRateLimited(EsiHttpProtocol):
     def __init__(
         self,
         cache: CacheProtocol,
+        esi_schema: EsiSchema,
         max_rate: int = 100,
         time_period: int = 60,
     ) -> None:
         self.session: aiohttp.ClientSession | None = None
         self.cache = cache
+        self.esi_schema = esi_schema
         self.max_rate = max_rate
         self.time_period = time_period
 
@@ -631,6 +653,7 @@ class EsiHttpRateLimited(EsiHttpProtocol):
         exc: BaseException | None,
         tb: TracebackType | None,
     ) -> None:
+        assert self.session is not None, "Session is not initialized."
         await self.session.close()
 
     async def _do_handlers(
@@ -647,42 +670,57 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                 request.ctx, http_response, request.esi_request
             )
 
-    async def _worker(self, request: HttpRequest) -> None:
-        """Worker to process a single HTTP request."""
-        if request.cache_key is not None:
-            cached_response = self.cache.get_cached_response(request.cache_key)
-            if cached_response is not None and not cached_response.is_stale():
-                await self._do_handlers(request, cached_response.response)
-                return
-            if cached_response is not None and cached_response.is_stale():
-                # Add conditional headers to the request
-                # Use ETag and Last-Modified from the cached response
-                if cached_response.response.etag:
-                    request.headers["If-None-Match"] = cached_response.response.etag
-                if cached_response.response.last_modified:
-                    request.headers["If-Modified-Since"] = (
-                        cached_response.response.last_modified
-                    )
-        async with self.limiter:
-            timeout = aiohttp.ClientTimeout(total=request.timeout)
-            merged_headers = {**request.esi_request.headers, **request.headers}
-            async with self.session.request(
-                method=request.method,
-                url=request.url,
-                headers=merged_headers,
-                timeout=timeout,
-            ) as response:
-                http_response = HttpResponse(
-                    status_code=response.status,
-                    reason=response.reason,
-                    url=str(response.url),
-                    headers=dict(response.headers),
-                    json_data=await response.json(),
-                    etag=response.headers.get("ETag", ""),
-                    last_modified=response.headers.get("Last-Modified", ""),
-                    expires=response.headers.get("Expires", ""),
-                )
-                if response.status == 304:
+    async def _worker(
+        self, request: HttpRequest
+    ) -> tuple[HttpRequest, BaseException | None]:
+        """Worker to process a single HTTP request.
+
+        Args:
+            request: The HttpRequest instance to process.
+
+        Returns:
+            A tuple of the HttpRequest and either None or an exception if one occurred.
+        """
+        try:
+            if not self.session:
+                raise EsiLinkError("HTTP session is not initialized.")
+            if request.cache_key is not None:
+                cached_response = self.cache.get_cached_response(request.cache_key)
+                if cached_response is not None and not cached_response.is_stale():
+                    await self._do_handlers(request, cached_response.response)
+                    return (request, None)
+                if cached_response is not None and cached_response.is_stale():
+                    # Add conditional headers to the request
+                    # Use ETag and Last-Modified from the cached response
+                    if cached_response.response.etag:
+                        request.headers["If-None-Match"] = cached_response.response.etag
+                    if cached_response.response.last_modified:
+                        request.headers["If-Modified-Since"] = (
+                            cached_response.response.last_modified
+                        )
+            _, http_response = await self.get_response(request=request)
+            match http_response.status_code:
+                case 200:
+                    if request.is_paged:
+                        await self.get_paged_data(
+                            request=request, first_page=http_response
+                        )
+                    if request.cache_key is not None:
+                        cached_response = CachedResponse(
+                            cache_key=request.cache_key, response=http_response
+                        )
+                        self.cache.store_cached_response(cached_response)
+                    await self._do_handlers(request, http_response)
+                    return (request, None)
+                case 201:  # Created Successful
+                    # TODO handle 201 Created responses if needed
+                    await self._do_handlers(request, http_response)
+                    return (request, None)
+                case 204:  # No Content Successful
+                    # TODO handle 204 No Content responses if needed
+                    await self._do_handlers(request, http_response)
+                    return (request, None)
+                case 304:
                     if request.cache_key is None:
                         raise EsiLinkError("Received 304 but no cache is configured.")
                     self.cache.update_cached_response(request.cache_key, http_response)
@@ -690,34 +728,136 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                     if cached_response is None:
                         raise EsiLinkError("Received 304 but no cached response found.")
                     await self._do_handlers(request, cached_response.response)
-                    return
-                if response.status == 200:
-                    if request.is_paged:
-                        # TODO implement paged request handling
-                        # asyncio.gather ok inside running task.
-                        ...
-                    if request.cache_key is not None:
-                        cached_response = CachedResponse(
-                            cache_key=request.cache_key, response=http_response
-                        )
-                        self.cache.store_cached_response(cached_response)
-                    await self._do_handlers(request, http_response)
-                    return
+                    return (request, None)
+                case 429:  # Rate Limited
+                    # TODO consider retry logic here.
+                    retry_after = HF.retry_after(http_response.headers)
+                    raise EsiLinkError(
+                        f"Rate limited on request to {http_response.url}. Retry after {retry_after} seconds."
+                    )
+
                 # TODO handle other status codes
+                case _:
+                    logger.warning(
+                        f"Unhandled status code {http_response.status_code} for URL {http_response.url}"
+                    )
+                    # TODO more specific error with code and reason as fields.
+                    raise EsiLinkError(
+                        f"Unhandled status code {http_response.status_code}, {http_response.reason} for URL {http_response.url}"
+                    )
+        except Exception as e:
+            logger.error(f"Error processing request for URL {request.url}: {e}")
+            return (request, e)
+
+    async def get_paged_data(
+        self, request: HttpRequest, first_page: HttpResponse
+    ) -> None:
+        """Complete a paged request by fetching all pages."""
+        paged_requests = self.build_paged_requests(request, first_page)
+        tasks = [self.get_response(req) for req in paged_requests]
+        results = await asyncio.gather(*tasks)
+        for result in results:
+            _, http_response = result
+            if http_response.status_code != 200:
+                raise EsiLinkError(
+                    f"Failed to fetch paged data for URL {http_response.url} with status code {http_response.status_code}"
+                )
+            if first_page.etag and http_response.etag != first_page.etag:
+                raise EsiLinkError(
+                    f"ETag mismatch for paged response at URL {http_response.url}"
+                )
+            # Merge the JSON data from the paged response into the first page
+            if isinstance(first_page.json_data, list) and isinstance(  # pyright: ignore[reportUnknownMemberType]
+                http_response.json_data, list
+            ):
+                first_page.json_data.extend(http_response.json_data)  # pyright: ignore[reportUnknownMemberType]
+            elif isinstance(first_page.json_data, dict) and isinstance(  # pyright: ignore[reportUnknownMemberType]
+                http_response.json_data, dict
+            ):
+                first_page.json_data.update(http_response.json_data)  # pyright: ignore[reportUnknownMemberType]
+            else:
+                logger.warning(
+                    f"Cannot merge paged response data for URL {http_response.url}"
+                )
+        # After all pages are fetched and merged, run handlers on the combined response
+        await self._do_handlers(request, first_page)
+        return None
+
+    def build_paged_requests(
+        self, request: HttpRequest, first_page: HttpResponse
+    ) -> list[HttpRequest]:
+        """Build a list of paged requests based on the first page response."""
+
+        if not request.is_paged:
+            raise EsiLinkError("Request is not marked as paged.")
+        page_count = HF.pages_available(first_page.headers)
+        if page_count < 1:
+            raise EsiLinkError("Invalid page count retrieved from headers.")
+        http_requests: list[HttpRequest] = []
+        if page_count == 1:
+            return http_requests
+        for page_number in range(2, page_count + 1):
+            paged_request = deepcopy(request)
+            # Clear any user defined handlers for paged requests
+            paged_request.esi_request.handlers = []
+            paged_request.page_number = page_number
+            # Update the URL to include the page parameter
+            paged_request.esi_request.query_parameters["page"] = page_number
+            paged_request.url = build_url(
+                paged_request.esi_request,
+                esi_schema=self.esi_schema,
+            )
+            http_requests.append(paged_request)
+        return http_requests
+
+    async def get_response(
+        self, request: HttpRequest
+    ) -> tuple[HttpRequest, HttpResponse]:
+        """Get a single HTTP response.
+
+        Args:
+            request: The HttpRequest instance to execute.
+
+        Returns:
+            A tuple of the HttpRequest and HttpResponse.
+        """
+        if not self.session:
+            raise EsiLinkError("HTTP session is not initialized.")
+        async with self.limiter:
+            timeout_obj = aiohttp.ClientTimeout(total=request.timeout)
+            async with self.session.request(
+                method=request.method,
+                url=request.url,
+                headers=request.headers,
+                timeout=timeout_obj,
+            ) as response:
+                http_response = HttpResponse(
+                    status_code=response.status,
+                    reason=response.reason,
+                    url=str(response.url),
+                    headers=tuple(response.headers.items()),
+                    json_data=await response.json(),
+                    etag=response.headers.get("ETag", ""),
+                    last_modified=response.headers.get("Last-Modified", ""),
+                    expires=response.headers.get("Expires", ""),
+                )
+                return (request, http_response)
 
     async def execute_requests(
         self,
         requests: list[HttpRequest],
-    ) -> None:
+    ) -> list[tuple[HttpRequest, BaseException | None]]:
         """Execute a list of HTTP requests.
 
         Args:
             requests: A list of HttpRequest instances to execute.
+        Returns:
+            A list of tuples containing the HttpRequest and either None or an exception if one occurred.
         """
 
         tasks = [self._worker(req) for req in requests]
-        await asyncio.gather(*tasks)
-        return None
+        results = await asyncio.gather(*tasks)
+        return results
 
 
 ###########################################################################
@@ -899,7 +1039,7 @@ class HandlerManager(HandlerManagerProtocol):
     def register_handler(
         self, name: str, handler_cls: type[ResponseHandlerProtocol]
     ) -> None:
-        if not issubclass(handler_cls, ResponseHandlerProtocol):
+        if not issubclass(handler_cls, ResponseHandlerProtocol):  # pyright: ignore[reportUnnecessaryIsInstance]
             raise InvalidHandlerError(
                 f"Handler class must implement ResponseHandlerProtocol: {name}"
             )
@@ -928,7 +1068,7 @@ class LinkManager:
 
     def esi_link_factory(self) -> EsiLinkProtocol:
         cache = InMemoryCache()
-        esi_http = EsiHttpRateLimited(cache=cache)
+        esi_http = EsiHttpRateLimited(cache=cache, esi_schema=self.esi_schema)
         esi_link = EsiLink(
             esi_schema=self.esi_schema,
             esi_http=esi_http,

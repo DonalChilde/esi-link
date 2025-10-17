@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from esi_link.esi_schema.esi_api_protocol import IndexedOperation, IndexedOperations
+from esi_link.models import IndexedOperation
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
