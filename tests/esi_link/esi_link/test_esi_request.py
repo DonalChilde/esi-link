@@ -7,7 +7,17 @@ from uuid import uuid4
 
 from whenever import Instant
 
-from esi_link import esi_link as EL
+from esi_link.cache_p import InMemoryCache
+from esi_link.esi_http import EsiHttpRateLimited
+from esi_link.esi_link import EsiLink
+from esi_link.models import (
+    EsiRequest,
+    EsiRequests,
+    EsiSchema,
+    HandlerConfig,
+    ResponseContext,
+)
+from esi_link.response_handlers import HandlerManager, JsonFileResponseHandler
 
 logger = logging.getLogger(__name__)
 
@@ -18,34 +28,34 @@ def test_simple_request(esi_schema: dict[str, Any], test_output_dir: Path) -> No
     output_path_str = str(
         test_output_dir / "test_simple_request" / "{operation_id}-response.json"
     )
-    response_handler = EL.HandlerConfig(
+    response_handler = HandlerConfig(
         name="esi-link.json_data_file",
         config={
             "file_path": output_path_str,
         },
     )
 
-    esi_request = EL.EsiRequest(
+    esi_request = EsiRequest(
         query_id=uuid4(),
         operation_id=operation_id,
         handlers=[response_handler],
     )
-    esi_schema_data = EL.EsiSchema.from_schema(
+    esi_schema_data = EsiSchema.from_schema(
         schema=esi_schema, download_date=Instant.now()
     )
-    cache = EL.InMemoryCache()
-    http_client = EL.EsiHttpRateLimited(cache=cache, esi_schema=esi_schema_data)
-    handler_manager = EL.HandlerManager()
+    cache = InMemoryCache()
+    http_client = EsiHttpRateLimited(cache=cache, esi_schema=esi_schema_data)
+    handler_manager = HandlerManager()
     handler_manager.register_handler(
-        EL.JsonFileResponseHandler.name, EL.JsonFileResponseHandler
+        JsonFileResponseHandler.name, JsonFileResponseHandler
     )
-    esi_link = EL.EsiLink(
+    esi_link = EsiLink(
         esi_schema=esi_schema_data,
         esi_http=http_client,
         handler_manager=handler_manager,
     )
-    ctx = EL.ResponseContext()
-    esi_requests = EL.EsiRequests(
+    ctx = ResponseContext()
+    esi_requests = EsiRequests(
         requests={x.query_id: x for x in [esi_request]},
     )
     asyncio.run(esi_link.execute_requests(ctx=ctx, requests=esi_requests))
@@ -64,34 +74,34 @@ def test_paged_request(esi_schema: dict[str, Any], test_output_dir: Path) -> Non
     output_path_str = str(
         test_output_dir / "test_simple_request" / "{operation_id}-response.json"
     )
-    response_handler = EL.HandlerConfig(
+    response_handler = HandlerConfig(
         name="esi-link.json_data_file",
         config={
             "file_path": output_path_str,
         },
     )
 
-    esi_request = EL.EsiRequest(
+    esi_request = EsiRequest(
         query_id=uuid4(),
         operation_id=operation_id,
         handlers=[response_handler],
     )
-    esi_schema_data = EL.EsiSchema.from_schema(
+    esi_schema_data = EsiSchema.from_schema(
         schema=esi_schema, download_date=Instant.now()
     )
-    cache = EL.InMemoryCache()
-    http_client = EL.EsiHttpRateLimited(cache=cache, esi_schema=esi_schema_data)
-    handler_manager = EL.HandlerManager()
+    cache = InMemoryCache()
+    http_client = EsiHttpRateLimited(cache=cache, esi_schema=esi_schema_data)
+    handler_manager = HandlerManager()
     handler_manager.register_handler(
-        EL.JsonFileResponseHandler.name, EL.JsonFileResponseHandler
+        JsonFileResponseHandler.name, JsonFileResponseHandler
     )
-    esi_link = EL.EsiLink(
+    esi_link = EsiLink(
         esi_schema=esi_schema_data,
         esi_http=http_client,
         handler_manager=handler_manager,
     )
-    ctx = EL.ResponseContext()
-    esi_requests = EL.EsiRequests(
+    ctx = ResponseContext()
+    esi_requests = EsiRequests(
         requests={x.query_id: x for x in [esi_request]},
     )
     asyncio.run(esi_link.execute_requests(ctx=ctx, requests=esi_requests))
@@ -116,34 +126,34 @@ def test_cached_request(esi_schema: dict[str, Any], test_output_dir: Path) -> No
     output_path_str = str(
         test_output_dir / "test_simple_request" / "{operation_id}-response.json"
     )
-    response_handler = EL.HandlerConfig(
+    response_handler = HandlerConfig(
         name="esi-link.json_data_file",
         config={
             "file_path": output_path_str,
         },
     )
 
-    esi_request = EL.EsiRequest(
+    esi_request = EsiRequest(
         query_id=uuid4(),
         operation_id=operation_id,
         handlers=[response_handler],
     )
-    esi_schema_data = EL.EsiSchema.from_schema(
+    esi_schema_data = EsiSchema.from_schema(
         schema=esi_schema, download_date=Instant.now()
     )
-    cache = EL.InMemoryCache()
-    http_client = EL.EsiHttpRateLimited(cache=cache, esi_schema=esi_schema_data)
-    handler_manager = EL.HandlerManager()
+    cache = InMemoryCache()
+    http_client = EsiHttpRateLimited(cache=cache, esi_schema=esi_schema_data)
+    handler_manager = HandlerManager()
     handler_manager.register_handler(
-        EL.JsonFileResponseHandler.name, EL.JsonFileResponseHandler
+        JsonFileResponseHandler.name, JsonFileResponseHandler
     )
-    esi_link = EL.EsiLink(
+    esi_link = EsiLink(
         esi_schema=esi_schema_data,
         esi_http=http_client,
         handler_manager=handler_manager,
     )
-    ctx = EL.ResponseContext()
-    esi_requests = EL.EsiRequests(
+    ctx = ResponseContext()
+    esi_requests = EsiRequests(
         requests={x.query_id: x for x in [esi_request]},
     )
     asyncio.run(esi_link.execute_requests(ctx=ctx, requests=esi_requests))
