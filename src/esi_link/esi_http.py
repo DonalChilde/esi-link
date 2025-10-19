@@ -1,11 +1,11 @@
 import asyncio
 import logging
 from copy import deepcopy
-from time import perf_counter
 from types import TracebackType
 
 import aiohttp
 from aiolimiter import AsyncLimiter
+from whenever import Instant
 
 from esi_link import header_funcs as HF
 from esi_link.build_url import build_url
@@ -82,7 +82,8 @@ class EsiHttpRateLimited(EsiHttpProtocol):
         Returns:
             A tuple of the HttpRequest and either None or an exception if one occurred.
         """
-        start = perf_counter()
+        # TODO log rate limit info
+        worker_start = Instant.now()
         try:
             if not self.session:
                 raise EsiLinkError("HTTP session is not initialized.")
@@ -100,7 +101,12 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                         request.headers["If-Modified-Since"] = (
                             cached_response.response.last_modified
                         )
+            request_start = Instant.now()
             _, http_response = await self.get_response(request=request)
+            request_end = Instant.now()
+            logger.info(
+                f"Processed http request for URL {request.url} in {(request_end - request_start).in_seconds():.2f} seconds."
+            )
             match http_response.status_code:
                 case 200:
                     if request.is_paged:
@@ -153,19 +159,36 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                     )
         except Exception as e:
             logger.error(f"Error processing request for URL {request.url}: {e}")
+            request.ctx.response_data.exceptions[request.esi_request.query_id] = (  # pyright: ignore[reportArgumentType]
+                request,
+                e,
+            )
             return (request, e)
         finally:
+            worker_end = Instant.now()
             logger.info(
-                f"Processed request for URL {request.url} in {perf_counter() - start:.2f} seconds."
+                f"Request for URL {request.url} started at {worker_start.format_iso()} and ended at {worker_end.format_iso()}. Took {(worker_end - worker_start).in_seconds():.2f} seconds."
             )
 
     async def get_paged_data(
         self, request: HttpRequest, first_page: HttpResponse
     ) -> None:
-        """Complete a paged request by fetching all pages."""
+        """Complete a paged request by fetching all pages.
+
+        Paged data is combined into the first_page HttpResponse instance,
+        which is modified in place. Finally, handlers are run on the combined response.
+        """
         paged_requests = self.build_paged_requests(request, first_page)
+        paged_start = Instant.now()
+        logger.info(
+            f"Fetching {len(paged_requests)} additional pages for paged request to URL {request.url} at {paged_start.format_iso()}."
+        )
         tasks = [self.get_response(req) for req in paged_requests]
         results = await asyncio.gather(*tasks)
+        paged_end = Instant.now()
+        logger.info(
+            f"Completed fetching paged data for URL {request.url} at {paged_end.format_iso()} in {(paged_end - paged_start).in_seconds():.2f} seconds."
+        )
         for result in results:
             _, http_response = result
             if http_response.status_code != 200:

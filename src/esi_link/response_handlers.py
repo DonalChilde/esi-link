@@ -19,6 +19,44 @@ from esi_link.models import (
 )
 
 
+class KeepHttpResponseHandler(ResponseHandlerProtocol):
+    """A response handler that keeps the full HTTP response in the response context."""
+
+    name: str = "esi-link.keep_http_response"
+
+    async def handle_response(
+        self,
+        ctx: ResponseContext,
+        http_response: HttpResponse,
+        request: EsiRequest,
+    ) -> None:
+        ctx.response_data.http_responses[request.query_id] = (request, http_response)
+
+    @classmethod
+    def from_config(cls, config: HandlerConfig) -> "KeepHttpResponseHandler":
+        return cls()
+
+    @classmethod
+    def example_config(cls) -> tuple[HandlerConfig, str]:
+        """Return an example configuration for this handler, with a text description.
+
+        Example does not have to be a valid config, but should illustrate the main options.
+        """
+        example = HandlerConfig(name=cls.name, config={})
+        description = (
+            "Keeps the full HTTP response in the response context under "
+            "http_responses[query_id]. No configuration options are needed."
+        )
+        return example, description
+
+    @classmethod
+    def validate_config(cls, config: HandlerConfig) -> None:
+        if not config.name.startswith("esi-link."):
+            raise InvalidHandlerError(
+                "Handler name must be in the 'esi-link.' namespace."
+            )
+
+
 class JsonFileResponseHandler(ResponseHandlerProtocol):
     """A response handler that saves the JSON response to a file."""
 
@@ -42,6 +80,7 @@ class JsonFileResponseHandler(ResponseHandlerProtocol):
                 json.dump(http_response.json_data, file, indent=2)
 
     def tokens(self, request: EsiRequest) -> dict[str, str]:
+        """Return a dict of tokens for str.format replacement in file paths."""
         token_values = {
             "operation_id": request.operation_id,
             "query_id": str(request.query_id),

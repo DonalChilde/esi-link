@@ -9,7 +9,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Optional, Self
+from typing import Any, Optional, Self, Type, TypedDict
 from uuid import UUID
 
 import aiohttp
@@ -105,8 +105,32 @@ class EsiRequests(BaseModel):
         return result
 
 
-class ResponseContext:
-    obj: dict[str, Any]
+class Metrics(TypedDict):
+    request_start: Instant
+    request_end: Instant
+    response_start: Instant
+    response_end: Instant
+    handlers_start: Instant
+    handlers_end: Instant
+    pages_fetched: int
+    pages_start: Instant
+    pages_end: Instant
+    ratelimit_group: str
+    ratelimit_limit: str
+    ratelimit_remaining: int
+    ratelimit_used: int
+    ratelimit_retry_after: float
+
+
+class ResponseData(BaseModel):
+    exceptions: dict[UUID, tuple[EsiRequest, Type[BaseException]]] = {}
+    metrics: dict[UUID, tuple[EsiRequest, Metrics]] = {}
+    http_responses: dict[UUID, tuple[EsiRequest, "HttpResponse"]] = {}
+
+
+class ResponseContext(BaseModel):
+    obj: dict[str, Any] = {}
+    response_data: ResponseData = Field(default_factory=ResponseData)
 
 
 class CachedResponse(BaseModel):
