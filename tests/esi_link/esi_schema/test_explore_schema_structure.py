@@ -1,12 +1,9 @@
 from dataclasses import dataclass, field
-from pprint import pprint
 from typing import Any
 
 import pytest
 from rich.pretty import pprint as rpprint
 
-from esi_link.esi_schema.esi_api import EsiApi
-from esi_link.esi_schema.schema_pydantic import Content
 from esi_link.esi_schema.schema_store import SchemaStore
 
 

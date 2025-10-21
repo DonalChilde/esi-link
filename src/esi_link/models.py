@@ -42,7 +42,7 @@ class HandlerConfig(BaseModel):
 
 class AuthParams(BaseModel):
     character_id: int
-    client_id: str
+    # client_id: str
     client_alias: str
 
 
