@@ -262,6 +262,90 @@ class HttpResponse(BaseModel):
     completed_on: Instant = Field(default_factory=_get_current_instant)
 
 
+class EsiLinkConfig(BaseModel):
+    """Application data for Esi Link."""
+
+    esi_schema_url: str = "https://esi.evetech.net/meta/openapi.json"
+    """URL to download the ESI OpenAPI schema."""
+    esi_schema: EsiSchema | None = None
+    """The ESI OpenAPI schema."""
+    application_response_handlers: list[HandlerConfig] = []
+    """List of application level response handler configurations."""
+    cache_connection_string: str = "esi-link-memory://"
+    """Connection string for the cache backend.
+
+    Format: [cache_type]://[path_or_connection_info]
+
+    Examples:
+        File-based cache: esi-link-json:///path/to/cache/dir
+        In-memory cache: esi-link-memory://"""
+    connection_max_rate: int = 100
+    """Maximum number of concurrent connections per period to ESI."""
+    connection_period: float = 60.0
+    """Time period in seconds for the maximum connection rate."""
+    esi_auth_connection_string: str | None = None
+    """Connection string for the ESI authentication store.
+
+    #TODO support multiple auth store types. For now use JSON file store.
+    Format: [auth_store_type]://[path_or_connection_info]
+
+    Examples:
+        JSON file store: esi-link-auth-json:///path/to/auth_store.json
+    """
+
+    @classmethod
+    def load_config(cls, file_path: Path) -> Self:
+        """Load the EsiLinkConfig from a JSON file.
+
+        Args:
+            file_path: Path to the JSON configuration file.
+        """
+        if not file_path.is_file():
+            raise EsiLinkError(f"{file_path} does not exist or is not a file.")
+        try:
+            data = file_path.read_text()
+            loaded_config = cls.model_validate_json(data)
+            return loaded_config
+        except Exception as e:
+            raise EsiLinkError(
+                f"Failed to load EsiLinkConfig from {file_path}: {e}"
+            ) from e
+
+    def save_config(self, file_path: Path, overwrite: bool = False) -> None:
+        """Save the EsiLinkConfig to a JSON file.
+
+        Args:
+            file_path: Path to the JSON configuration file.
+            overwrite: Whether to overwrite the file if it exists. Defaults to False.
+        """
+        if file_path.is_dir():
+            raise EsiLinkError(f"{file_path} is a directory.")
+        if file_path.is_file() and not overwrite:
+            raise EsiLinkError(
+                f"{file_path} already exists. Use overwrite=True to overwrite."
+            )
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            data = self.model_dump_json(indent=2)
+            with open(file_path, "w") as file:
+                file.write(data)
+        except Exception as e:
+            raise EsiLinkError(
+                f"Failed to save EsiLinkConfig to {file_path}: {e}"
+            ) from e
+
+    def update_schema(self, schema: dict[str, Any], download_date: Instant) -> None:
+        """Update the ESI schema in the configuration.
+
+        Args:
+            schema: The new OpenAPI schema as a dictionary.
+            download_date: The date the schema was downloaded.
+        """
+        self.esi_schema = EsiSchema.from_schema(
+            schema=schema, download_date=download_date
+        )
+
+
 ############################################################################
 # Protocols
 ############################################################################

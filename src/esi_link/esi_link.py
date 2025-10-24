@@ -27,7 +27,7 @@ from esi_link.response_handlers import HandlerManager, JsonFileResponseHandler
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
-
+USER_AGENT = "esi-link/0.1.0"
 
 ###########################################################################
 # EsiLinkProtocol Implementations
@@ -46,29 +46,20 @@ class EsiLink(EsiLinkProtocol):
         esi_http: EsiHttpProtocol,
         handler_manager: HandlerManagerProtocol,
         token_manager: TokenManager | None = None,
+        application_handlers_config: list[HandlerConfig] | None = None,
     ) -> None:
         self.esi_schema = esi_schema
         self.esi_http = esi_http
         self.handler_manager = handler_manager
         self.token_manager = token_manager
-        app_handler_configs = self.app_handler_configs()
-        self.app_handlers: list[ResponseHandlerProtocol] = self.init_handlers(
-            app_handler_configs
+        self.application_handlers_config = (
+            application_handlers_config if application_handlers_config else []
+        )
+        self.app_handlers: list[ResponseHandlerProtocol] = self._init_handlers(
+            self.application_handlers_config
         )
 
-    def app_handler_configs(self) -> list[HandlerConfig]:
-        """Get the application-level handler configurations.
-
-        This method should be implemented to return the list of HandlerConfig
-        instances that define the application-level response handlers.
-
-        Returns:
-            A list of HandlerConfig instances.
-        """
-        # TODO define a list of app handler configs.
-        return []
-
-    def init_handlers(
+    def _init_handlers(
         self, handler_configs: list[HandlerConfig]
     ) -> list[ResponseHandlerProtocol]:
         """Initialize application-level response handlers."""
@@ -83,29 +74,7 @@ class EsiLink(EsiLinkProtocol):
         ctx: ResponseContext,
         requests: EsiRequests,
     ) -> None:
-        # Build HttpRequest objects from EsiRequest objects
-        # http_requests: list[HttpRequest] = []
-        # for req in requests.requests.values():
-        #     url = build_url(req, self.esi_schema)
-        #     indexed_operation = self.esi_schema.operations.get(req.operation_id)
-        #     if not indexed_operation:
-        #         raise EsiLinkError(f"Operation ID not found: {req.operation_id}")
-        #     user_handlers = self.init_handlers(req.handlers)
-        #     is_paged = OA.is_paged(indexed_operation)
-        #     http_request = HttpRequest(
-        #         method=indexed_operation.method,
-        #         url=url,
-        #         ctx=ctx,
-        #         esi_request=req,
-        #         cache_key=self.esi_http.cache.generate_cache_key(
-        #             esi_request=req, esi_schema=self.esi_schema
-        #         ),
-        #         app_handlers=self.app_handlers,
-        #         user_handlers=user_handlers,
-        #         headers=req.headers,
-        #         is_paged=is_paged,
-        #     )
-        #     http_requests.append(http_request)
+        """Execute the given EsiRequests asynchronously."""
         http_requests = self.build_http_requests(ctx=ctx, requests=requests)
         async with self.esi_http as http_client:
             await http_client.execute_requests(http_requests)
@@ -178,6 +147,7 @@ class EsiLink(EsiLinkProtocol):
                     f"and character_id={character_id}"
                 )
             http_request_headers["Authorization"] = f"Bearer {token.access_token}"
+            http_request_headers["User-Agent"] = USER_AGENT
         return http_request_headers
 
     def build_http_requests(
@@ -193,7 +163,7 @@ class EsiLink(EsiLinkProtocol):
             indexed_operation = self.esi_schema.operations.get(req.operation_id)
             if not indexed_operation:
                 raise EsiLinkError(f"Operation ID not found: {req.operation_id}")
-            user_handlers = self.init_handlers(req.handlers)
+            user_handlers = self._init_handlers(req.handlers)
             is_paged = OA.is_paged(indexed_operation)
             http_request_headers = self._collect_http_request_headers(
                 esi_request=req, token_dict=token_dict

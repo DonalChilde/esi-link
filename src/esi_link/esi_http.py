@@ -33,7 +33,7 @@ class EsiHttpRateLimited(EsiHttpProtocol):
         cache: CacheProtocol,
         esi_schema: EsiSchema,
         max_rate: int = 100,
-        time_period: int = 60,
+        time_period: float = 60.0,
     ) -> None:
         self.session: aiohttp.ClientSession | None = None
         self.cache = cache

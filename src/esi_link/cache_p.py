@@ -99,3 +99,23 @@ def generate_cache_key(esi_request: EsiRequest, esi_schema: EsiSchema) -> UUID |
     # Generate a UUID based on the key string within the ESI_LINK_NAMESPACE
     cache_key = uuid5(ESI_LINK_NAMESPACE, key_string)
     return cache_key
+
+
+def cache_factory(cache_connection_string: str | None) -> CacheProtocol:
+    """Factory function to create a cache instance.
+
+    Returns:
+        An instance of CacheProtocol.
+    """
+    if cache_connection_string is None:
+        return NoOpCache()
+    cache_specifier, cache_str = cache_connection_string.split("://", 1)
+    _ = cache_str  # Currently unused, but may be used in future implementations
+    match cache_specifier:
+        case "esi-link-memory":
+            return InMemoryCache()
+        case "esi-link-json:":
+            pass
+        case _:
+            raise EsiLinkError(f"Unknown cache specifier: {cache_specifier}")
+    raise EsiLinkError(f"Cache type not implemented: {cache_connection_string}")
