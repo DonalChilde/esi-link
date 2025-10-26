@@ -159,7 +159,7 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                     )
         except Exception as e:
             logger.error(f"Error processing request for URL {request.url}: {e}")
-            request.ctx.response_data.exceptions[request.esi_request.query_id] = (  # pyright: ignore[reportArgumentType]
+            request.ctx.response_data.exceptions[request.esi_request.request_id] = (  # pyright: ignore[reportArgumentType]
                 request,
                 e,
             )

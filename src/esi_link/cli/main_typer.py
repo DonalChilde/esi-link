@@ -1,7 +1,6 @@
 """Command-line interface."""
 
 import logging
-from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter, perf_counter_ns
 from typing import Annotated
@@ -10,11 +9,15 @@ import typer
 from rich.console import Console
 from typer import get_app_dir
 
+from esi_link.cli.esi_request import app as esi_request_app
+from esi_link.cli.esi_schema import app as esi_schema_app
+from esi_link.cli.models import CliConfig
 from esi_link.download_esi_schema import download_esi_schema
-from esi_link.esi_link import USER_AGENT, EsiLink
+from esi_link.esi_link import USER_AGENT
 from esi_link.esi_link_factory import esi_link_factory
 from esi_link.models import EsiLinkConfig, EsiSchema
 
+logger = logging.getLogger(__name__)
 APP_NAMESPACE = "pfmsoft"
 APP_NAME = "Esi Link"
 
@@ -22,44 +25,8 @@ _app_dir = get_app_dir(app_name=f"{APP_NAMESPACE}-{APP_NAME}")
 ESI_LINK_CONFIG_PATH = Path(_app_dir) / "esi_link_config.json"
 
 app = typer.Typer(no_args_is_help=True)
-
-
-logger = logging.getLogger(__name__)
-
-
-@dataclass
-class CliConfig:
-    start_time: int = perf_counter_ns()
-    debug: bool = False
-    verbosity: int = 1
-    silent: bool = False
-    auth_store_connection_string: str | None = None
-    esi_link_config_path: Path | None = None
-    esi_link_config: EsiLinkConfig | None = None
-    esi_link: EsiLink | None = None
-
-    def __repr__(self) -> str:
-        return (
-            f"CliConfig(start_time={self.start_time}, "
-            f"debug={self.debug}, "
-            f"verbosity={self.verbosity}, "
-            f"silent={self.silent}, "
-            f"auth_store_connection_string={self.auth_store_connection_string}, "
-            f"esi_link_config_path={self.esi_link_config_path}, "
-            f"esi_link={self.esi_link!r}"
-            f")"
-        )
-
-    def __str__(self) -> str:
-        return (
-            f" start_time={self.start_time}\n"
-            f" debug={self.debug}\n"
-            f" verbosity={self.verbosity}\n"
-            f" silent={self.silent}\n"
-            f" auth_store_connection_string={self.auth_store_connection_string}\n"
-            f" esi_link_config_path={self.esi_link_config_path}\n"
-            f" esi_link={self.esi_link}\n"
-        )
+app.add_typer(esi_schema_app, name="schema")
+app.add_typer(esi_request_app, name="requests")
 
 
 @app.callback(invoke_without_command=True)
@@ -84,7 +51,7 @@ def default_options(
     esi_schema_url: Annotated[
         str | None,
         typer.Option(
-            help="URL to download ESI schema from if not present in configuration.",
+            help="Non-standard URL to download ESI schema from.",
         ),
     ] = None,
     force_schema_update: Annotated[
@@ -126,10 +93,10 @@ def default_options(
 
 
 @app.command()
-def reset_config(
+def remove_config(
     ctx: typer.Context,
 ):
-    """Reset the Esi Link configuration to defaults."""
+    """Remove the Esi Link configuration. A new configuration will be created on next run."""
     console = Console()
     cli_config: CliConfig = ctx.obj
     config_path = cli_config.esi_link_config_path
@@ -147,8 +114,11 @@ def reset_config(
         try:
             config_path.unlink()
             console.print("[green]Configuration file removed.[/green]")
+            console.print(
+                "[yellow]Re-initialize the configuration by running `esi_link status`.[/yellow]"
+            )
         except Exception as e:
-            logger.error(f"Error removing configuration file: {e}")
+            logger.error(f"Error removing configuration file at {config_path}: {e}")
             console.print(f"[red]Error removing configuration file: {e}[/red]")
             raise typer.Exit(code=1) from e
     else:
@@ -186,7 +156,7 @@ def _init_config(
     """Initialize the CLI configuration with cache and client."""
     start = perf_counter()
     console = Console()
-    console.log(f"Loading Esi Link configuration from {config_path}")
+    logger.info(f"Loading Esi Link configuration from {config_path}")
     cli_config: CliConfig = ctx.obj
     config_dirty = False
     # Load or create Esi Link configuration

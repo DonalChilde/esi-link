@@ -15,6 +15,7 @@ from uuid import UUID
 import aiohttp
 from pydantic import BaseModel, Field
 from whenever import Instant
+from yaml import safe_dump, safe_load
 
 from esi_link.helpers.resolve_json_ref import resolve_internal_refs
 
@@ -49,7 +50,7 @@ class AuthParams(BaseModel):
 class EsiRequest(BaseModel):
     """Represents a single ESI request to be executed."""
 
-    query_id: UUID
+    request_id: UUID
     operation_id: str
     path_parameters: dict[str, str | int | float] = {}
     query_parameters: dict[str, str | int | float] = {}
@@ -63,14 +64,16 @@ class EsiRequest(BaseModel):
 class EsiRequests(BaseModel):
     """Represents a batch of ESI requests to be executed."""
 
-    requests: dict[UUID, EsiRequest]
     created_on: Instant = Field(default_factory=_get_current_instant)
+    requests_id: UUID
+    description: str = ""
+    requests: dict[UUID, EsiRequest]
 
     def save_to_file(self, file_path: Path, overwrite: bool = False) -> None:
-        """Save the EsiRequests instance to a JSON file.
+        """Save the EsiRequests instance to a YAML file.
 
         Args:
-            file_path: Path to the file where the JSON representation will be saved.
+            file_path: Path to the file where the YAML representation will be saved.
             overwrite: Whether to overwrite the file if it exists. Defaults to False.
         """
         if file_path.is_dir():
@@ -80,15 +83,16 @@ class EsiRequests(BaseModel):
                 f"{file_path} already exists. Use overwrite=True to overwrite."
             )
         file_path.parent.mkdir(parents=True, exist_ok=True)
+
         with open(file_path, "w") as file:
-            file.write(self.model_dump_json(indent=2))
+            safe_dump(self.model_dump(mode="json"), file, sort_keys=False)
 
     @classmethod
     def load_from_file(cls, file_path: Path) -> "EsiRequests":
-        """Load an EsiRequests instance from a JSON file.
+        """Load an EsiRequests instance from a YAML file.
 
         Args:
-            file_path: Path to the JSON file to load.
+            file_path: Path to the YAML file to load.
 
         Returns:
             An instance of EsiRequests.
@@ -96,8 +100,8 @@ class EsiRequests(BaseModel):
         if not file_path.is_file():
             raise EsiLinkError(f"{file_path} does not exist or is not a file.")
         try:
-            data = file_path.read_text()
-            result = cls.model_validate_json(data)
+            data = safe_load(file_path.read_text())
+            result = cls.model_validate(data)
         except Exception as e:
             raise EsiLinkError(
                 f"Failed to load EsiRequests from {file_path}: {e}"
@@ -511,7 +515,7 @@ class EsiLinkProtocol:
         self,
         ctx: ResponseContext,
         requests: EsiRequests,
-    ) -> None:
+    ) -> list[tuple[HttpRequest, BaseException | None]]:
         """Execute a batch of ESI requests.
 
         Args:
@@ -520,7 +524,7 @@ class EsiLinkProtocol:
             response_handler: An optional ResponseHandlerProtocol to process responses.
 
         Returns:
-            A dictionary mapping request UUIDs to their responses.
+            A list of tuples containing the HttpRequest and either None or an exception if one occurred.
         """
         ...
 
@@ -567,13 +571,30 @@ class EsiLinkError(Exception):
     pass
 
 
-class HandlerNotFoundError(EsiLinkError):
-    """Raised when a specified handler is not found."""
+class HandlerConfigError(EsiLinkError):
+    """Raised when there is an error in handler configuration."""
+
+    def __init__(self, message: str, handler_config: HandlerConfig) -> None:
+        super().__init__(message)
+        self.handler_config = handler_config
 
     pass
 
 
-class InvalidHandlerError(EsiLinkError):
+class ResponseHandlerError(EsiLinkError):
+    """Raised when a response handler encounters an error."""
+
+    def __init__(
+        self, message: str, handler_name: str, response: HttpResponse | None
+    ) -> None:
+        super().__init__(message)
+        self.handler_name = handler_name
+        self.response = response
+
+    pass
+
+
+class InvalidHandlerError(ResponseHandlerError):
     """Raised when a handler is invalid or cannot be instantiated."""
 
     pass

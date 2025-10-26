@@ -23,7 +23,7 @@ from esi_link.models import (
     ResponseContext,
     ResponseHandlerProtocol,
 )
-from esi_link.response_handlers import HandlerManager, JsonFileResponseHandler
+from esi_link.response_handlers import HandlerManager
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -73,12 +73,12 @@ class EsiLink(EsiLinkProtocol):
         self,
         ctx: ResponseContext,
         requests: EsiRequests,
-    ) -> None:
+    ) -> list[tuple[HttpRequest, BaseException | None]]:
         """Execute the given EsiRequests asynchronously."""
         http_requests = self.build_http_requests(ctx=ctx, requests=requests)
         async with self.esi_http as http_client:
-            await http_client.execute_requests(http_requests)
-        return None
+            results = await http_client.execute_requests(http_requests)
+        return results
 
     def get_auth_tokens_for_requests(
         self,
@@ -202,10 +202,10 @@ class LinkManager:
 
     def _get_handler_manager(self) -> HandlerManagerProtocol:
         handler_manager = HandlerManager()
-        # Register built-in handlers
-        handler_manager.register_handler(
-            JsonFileResponseHandler.name, JsonFileResponseHandler
-        )
+        # # Register built-in handlers
+        # handler_manager.register_handler(
+        #     JsonFileResponseDataHandler.name, JsonFileResponseDataHandler
+        # )
         return handler_manager
 
     def _get_token_manager(

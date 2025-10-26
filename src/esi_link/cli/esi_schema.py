@@ -1,15 +1,13 @@
-from pathlib import Path
 from typing import Annotated
 
 import typer
+from rich.console import Console, Group
+from rich.panel import Panel
 
-from esi_link import CONFIG
-from esi_link.cli.helpers import filter_if_silent
-from esi_link.esi_schema.esi_api import EsiApi
-from esi_link.esi_schema.operation_formatters.format_operations_by_tag import (
-    operations_by_tag_table,
+from esi_link.cli.models import CliConfig
+from esi_link.format_operations_by_tag import (
+    operations_by_tag_panels,
 )
-from esi_link.esi_schema.schema_store import SchemaStore
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -17,67 +15,41 @@ app = typer.Typer(no_args_is_help=True)
 
 
 @app.command()
-def update(
-    ctx: typer.Context,
-    file_path: Annotated[
-        Path | None, typer.Option(help="Non-standard save path for the Schema Store.")
-    ] = None,
-):
-    """Update an existing ESI schema, or download a new one."""
-    msg = filter_if_silent(is_silent=False)
-    try:
-        if file_path is None:
-            # work with app schema store
-            store: SchemaStore | None = ctx.obj.schema_store
-            if store is None:
-                msg("No existing schema store found, downloading new schema.")
-                store_path = CONFIG.schema_dir / "schema_store.json"
-                msg(f"Downloading schema to {store_path}")
-                store = SchemaStore.from_download(store_path=store_path)
-                msg("Download complete.")
-            else:
-                msg(f"Updating existing schema store at {store._store_path}.")  # type: ignore
-                store.update()
-                msg("Download complete.")
-        else:
-            # work with a schema store outside of the app
-            store_path = file_path
-            if store_path.is_file():
-                msg(f"Attempting to update existing schema store at {store_path}.")
-                store = SchemaStore(store_path=store_path)
-                msg(f"Downloading schema to {store_path}")
-                store.update()
-                msg("Download complete.")
-            else:
-                if store_path.is_dir():
-                    raise ValueError(
-                        f"Provided schema store path {store_path} is a directory."
-                    )
-                msg(f"Downloading schema to {store_path}")
-                store = SchemaStore.from_download(store_path=store_path)
-                msg("Download complete.")
-    except Exception as e:
-        typer.echo(f"Error updating schema: {e}")
-        raise typer.Exit(code=1) from e
-    msg("Schema updated successfully.")
-
-
-@app.command()
-def status(ctx: typer.Context):
-    """Show the current status of the ESI schema."""
-    msg = filter_if_silent(is_silent=False)
-    msg("Current status of the ESI schema:")
-    if ctx.obj.schema_store:
-        store = ctx.obj.schema_store
-        msg(f"  Schema ID: {store._store_data.id_}")
-        msg(f"  Download Date: {store._store_data.download_date}")
-    else:
-        msg("No schema store found.")
-
-
-@app.command()
 def operations(ctx: typer.Context):
     """Show available operations for the ESI schema."""
-    store = ctx.obj.schema_store
-    eve_api = EsiApi.from_schema_store(store)
-    typer.echo(operations_by_tag_table(eve_api))
+    console = Console()
+    cli_config: CliConfig = ctx.obj
+    if (
+        cli_config.esi_link_config is None
+        or cli_config.esi_link_config.esi_schema is None
+    ):
+        console.print("[red]ESI schema is not loaded in the configuration.")
+        raise typer.Exit(code=1)
+    operation_panels = operations_by_tag_panels(cli_config.esi_link_config.esi_schema)
+    ops_group = Group(*operation_panels)
+    ops = Panel(ops_group, title="ESI Operations by Tag")
+
+    console.print(ops)
+
+
+@app.command()
+def operation_raw(
+    ctx: typer.Context,
+    operation_id: Annotated[str, typer.Argument(help="The operation ID to show.")],
+):
+    """Show the raw JSON for a specific operation by its ID."""
+    console = Console()
+    console.rule(f"Fetching raw JSON for operation ID: [bold]{operation_id}[/bold]")
+    cli_config: CliConfig = ctx.obj
+    if (
+        cli_config.esi_link_config is None
+        or cli_config.esi_link_config.esi_schema is None
+    ):
+        console.print("[red]ESI schema is not loaded in the configuration.")
+        raise typer.Exit(code=1)
+    esi_schema = cli_config.esi_link_config.esi_schema
+    indexed_operation = esi_schema.operations.get(operation_id)
+    if indexed_operation is None:
+        console.print(f"[red]Operation ID '{operation_id}' not found in the schema.")
+        raise typer.Exit(code=1)
+    console.print_json(data=indexed_operation.operation)

@@ -14,6 +14,7 @@ logger.addHandler(logging.NullHandler())
 async def _download_text(
     url: str, *, headers: dict[str, str], session: aiohttp.ClientSession | None
 ) -> str:
+    """Download a text file from a URL and return its content as a string."""
     logger.info(f"Downloading text from {url}")
     start = perf_counter()
     if session is None:
@@ -62,5 +63,5 @@ async def _download_json(
 def download_json(
     url: str, *, headers: dict[str, str], session: aiohttp.ClientSession | None = None
 ) -> Any:
-    """Download a JSON file from a URL and return its content as a dictionary."""
+    """Download a JSON file from a URL."""
     return asyncio.run(_download_json(url, headers=headers, session=session))
