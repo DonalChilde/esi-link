@@ -6,6 +6,7 @@
 import json
 import logging
 from pathlib import Path
+from string import Template
 from typing import Any, Self
 
 from whenever import Instant
@@ -23,6 +24,17 @@ from esi_link.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+# TODO: improve response handler descriptions, esp re: tokens available for file paths
+# Available tokens:
+# - OPERATION_ID: The operation ID of the request
+# - REQUEST_ID: The request ID of the request
+# - NOW: The current timestamp in ISO 8601 format
+# - HOME: The user's home directory
+# - PATH_PARAMETERS: All path parameters from the request (uppercase)
+# - QUERY_PARAMETERS: All query parameters from the request (uppercase)
+# - CHARACTER_ID: The character ID from the auth parameters (if present)
+# - CLIENT_ALIAS: The client alias from the auth parameters (if present)
 
 
 class KeepHttpResponseHandler(ResponseHandlerProtocol):
@@ -101,7 +113,10 @@ class FileOutMixin:
         tokens = self.tokens(request)
         if extra_tokens:
             tokens.update(extra_tokens)
-        path_out = Path(path_template.format(**tokens))
+        str_template = Template(path_template)
+        resolved_template = str_template.safe_substitute(**tokens)
+        path_out = Path(resolved_template).resolve()
+        path_out.parent.mkdir(parents=True, exist_ok=True)
         return path_out
 
 
@@ -122,9 +137,7 @@ class JsonFileResponseDataHandler(ResponseHandlerProtocol, FileOutMixin):
     ) -> None:
         if http_response.json_data is not None:
             path_out = self.format_path(self._file_path, request)
-            path_out.parent.mkdir(parents=True, exist_ok=True)
             if not self._overwrite and path_out.exists():
-                # TODO more specific exception for handlers with name of ahndleer and
                 raise ResponseHandlerError(
                     f"File {path_out} already exists. Use overwrite=True to overwrite.",
                     handler_name=self.name,
@@ -133,37 +146,19 @@ class JsonFileResponseDataHandler(ResponseHandlerProtocol, FileOutMixin):
             with open(path_out, "w") as file:
                 json.dump(http_response.json_data, file, indent=2)
 
-    # def tokens(self, request: EsiRequest) -> dict[str, Any]:
-    #     """Return a dict of tokens for str.format replacement in file paths."""
-    #     token_values: dict[str, Any] = {
-    #         "OPERATION_ID": request.operation_id,
-    #         "REQUEST_ID": request.request_id,
-    #         "NOW": FileSafeInstantNowIso(),
-    #         "HOME": Path.home(),
-    #     }
-    #     token_values.update(
-    #         {key.upper(): value for key, value in request.path_parameters.items()}
-    #     )
-    #     token_values.update(
-    #         {key.upper(): value for key, value in request.query_parameters.items()}
-    #     )
-    #     if request.auth_parameters:
-    #         token_values.update(
-    #             {
-    #                 "CHARACTER_ID": request.auth_parameters.character_id,
-    #                 "CLIENT_ALIAS": request.auth_parameters.client_alias,
-    #             }
-    #         )
-    #     return token_values
-
     @classmethod
     def from_config(cls, config: HandlerConfig) -> Self:
-        file_path_str = config.config.get("file_path")
-        if not file_path_str:
-            raise HandlerConfigError(
-                "file_path is required in handler config.", handler_config=config
+        cls.validate_config(config)
+        try:
+            result = cls(
+                file_path=config.config.get("file_path"),  # type: ignore
+                overwrite=config.config.get("overwrite", False),
             )
-        return cls(file_path=file_path_str)
+            return result
+        except Exception as e:
+            raise HandlerConfigError(
+                f"Error creating handler from config: {e}", handler_config=config
+            )
 
     @classmethod
     def example_config(cls) -> tuple[HandlerConfig, str]:
@@ -174,26 +169,128 @@ class JsonFileResponseDataHandler(ResponseHandlerProtocol, FileOutMixin):
         example = HandlerConfig(
             name=cls.name,
             config={
-                "file_path": "{HOME}/tmp/esi-link-data/responses/{NOW}-{OPERATION_ID}-data.json",
+                "file_path": "${HOME}/tmp/esi-link-data/responses/${NOW}-${OPERATION_ID}-data.json",
                 "overwrite": False,
             },
         )
         description = (
-            "Saves the JSON response to the specified file path. "
-            "The file_path option is required. file_path supports str.format replacement "
-            "with tokens for operation_id, request_id, now, and any path, query or auth parameters."
+            "Saves the JSON data from an html response to the specified file path. "
+            "The file_path string is required. file_path supports ${KEY} replacement, "
+            "with the following tokens available:\n\n"
+            "OPERATION_ID: The operation ID of the request\n"
+            "REQUEST_ID: The request ID of the request\n"
+            "NOW: The current timestamp in ISO 8601 format\n"
+            "HOME: The user's home directory\n"
+            "PATH_PARAMETERS: All path parameters from the request (uppercase)\n"
+            "QUERY_PARAMETERS: All query parameters from the request (uppercase)\n"
+            "CHARACTER_ID: The character ID from the auth parameters (if present)\n"
+            "CLIENT_ALIAS: The client alias from the auth parameters (if present)\n"
         )
         return example, description
 
     @classmethod
     def validate_config(cls, config: HandlerConfig) -> None:
-        if "file_path" not in config.config:
+        file_path = config.config.get("file_path")
+        if file_path is None or not isinstance(file_path, str):
             raise HandlerConfigError(
-                "file_path is required in handler config.", handler_config=config
+                "file_path is required to exist and be a string in handler config.",
+                handler_config=config,
             )
-        if not config.name.startswith("esi-link."):
+        overwrite = config.config.get("overwrite", None)
+        if overwrite is None or not isinstance(overwrite, bool):
             raise HandlerConfigError(
-                "Handler name must be in the 'esi-link.' namespace.",
+                "overwrite must be a boolean in handler config.", handler_config=config
+            )
+        if not config.name == cls.name:
+            raise HandlerConfigError(
+                "Handler name must match the Handler being created.",
+                handler_config=config,
+            )
+
+
+class JsonFileResponseHandler(ResponseHandlerProtocol, FileOutMixin):
+    """A response handler that saves the html response to a JSON file."""
+
+    name: str = "esi-link.json_response_file"
+
+    def __init__(self, file_path: str, overwrite: bool = False) -> None:
+        self._file_path = file_path
+        self._overwrite = overwrite
+
+    async def handle_response(
+        self,
+        ctx: ResponseContext,
+        http_response: HttpResponse,
+        request: EsiRequest,
+    ) -> None:
+        if http_response.json_data is not None:
+            path_out = self.format_path(self._file_path, request)
+            if not self._overwrite and path_out.exists():
+                raise ResponseHandlerError(
+                    f"File {path_out} already exists. Use overwrite=True to overwrite.",
+                    handler_name=self.name,
+                    response=http_response,
+                )
+            path_out.write_text(http_response.model_dump_json(indent=2))
+
+    @classmethod
+    def from_config(cls, config: HandlerConfig) -> Self:
+        cls.validate_config(config)
+        try:
+            result = cls(
+                file_path=config.config.get("file_path"),  # type: ignore
+                overwrite=config.config.get("overwrite", False),
+            )
+            return result
+        except Exception as e:
+            raise HandlerConfigError(
+                f"Error creating handler from config: {e}", handler_config=config
+            )
+
+    @classmethod
+    def example_config(cls) -> tuple[HandlerConfig, str]:
+        """Return an example configuration for this handler, with a text description.
+
+        Example does not have to be a valid config, but should illustrate the main options.
+        """
+        example = HandlerConfig(
+            name=cls.name,
+            config={
+                "file_path": "${HOME}/tmp/esi-link-data/responses/${NOW}-${OPERATION_ID}-response.json",
+                "overwrite": False,
+            },
+        )
+        description = (
+            "Saves the html response to the specified file path. "
+            "The file_path string is required. file_path supports ${KEY} replacement, "
+            "with the following tokens available:\n\n"
+            "OPERATION_ID: The operation ID of the request\n"
+            "REQUEST_ID: The request ID of the request\n"
+            "NOW: The current timestamp in ISO 8601 format\n"
+            "HOME: The user's home directory\n"
+            "PATH_PARAMETERS: All path parameters from the request (uppercase)\n"
+            "QUERY_PARAMETERS: All query parameters from the request (uppercase)\n"
+            "CHARACTER_ID: The character ID from the auth parameters (if present)\n"
+            "CLIENT_ALIAS: The client alias from the auth parameters (if present)\n"
+        )
+        return example, description
+
+    @classmethod
+    def validate_config(cls, config: HandlerConfig) -> None:
+        file_path = config.config.get("file_path")
+        if file_path is None or not isinstance(file_path, str):
+            raise HandlerConfigError(
+                "file_path is required to exist and be a string in handler config.",
+                handler_config=config,
+            )
+        overwrite = config.config.get("overwrite", None)
+        if overwrite is None or not isinstance(overwrite, bool):
+            raise HandlerConfigError(
+                "overwrite must be a boolean in handler config.", handler_config=config
+            )
+        if not config.name == cls.name:
+            raise HandlerConfigError(
+                "Handler name must match the Handler being created.",
                 handler_config=config,
             )
 
@@ -227,11 +324,15 @@ class HandlerManager(HandlerManagerProtocol):
             )
         self.handlers[name] = handler_cls
 
+    def get_all_handlers(self) -> list[type[ResponseHandlerProtocol]]:
+        return list(self.handlers.values())
+
     def _register_builtin_handlers(self) -> None:
         self.register_handler(KeepHttpResponseHandler.name, KeepHttpResponseHandler)
         self.register_handler(
             JsonFileResponseDataHandler.name, JsonFileResponseDataHandler
         )
+        self.register_handler(JsonFileResponseHandler.name, JsonFileResponseHandler)
 
 
 class FileSafeInstantNowIso:

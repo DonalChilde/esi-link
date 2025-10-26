@@ -6,6 +6,7 @@ from uuid import uuid4
 import typer
 from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
 from whenever import Instant
 from yaml import safe_dump
 
@@ -17,6 +18,7 @@ from esi_link.models import (
     EsiRequests,
     HandlerConfig,
     ResponseContext,
+    ResponseHandlerProtocol,
 )
 
 app = typer.Typer(no_args_is_help=True)
@@ -134,6 +136,49 @@ def execute(
         raise typer.Exit(code=1) from e
 
 
+@app.command(name="handlers")
+def handlers_(ctx: typer.Context):
+    """Display available response handlers."""
+    console = Console()
+    console.rule("[bold green]Available Response Handlers[/bold green]")
+    cli_config: CliConfig = ctx.obj
+    esi_link = cli_config.esi_link
+    if esi_link is None:
+        console.print(
+            "[bold red]Esi Link is not initialized in the CLI configuration.[/bold red]"
+        )
+        raise typer.Exit(code=1)
+    handlers = esi_link.handler_manager.get_all_handlers()
+    table = create_handlers_table(handlers)
+    console.print(table)
+
+
+def create_handlers_table(handlers: list[type[ResponseHandlerProtocol]]) -> Table:
+    table = Table(show_lines=True, expand=True, show_header=False)
+    # table.add_column("Name", style="bold blue", vertical="middle")
+    # table.add_column("Description", style="bold green", ratio=2, overflow="fold")
+    # table.add_column("Example Config", style="bold yellow", overflow="fold")
+    table.add_column()
+    table.add_column()
+
+    for handler in handlers:
+        config, description = handler.example_config()
+        table.add_row("Name", f"[bold blue]{handler.name}[/bold blue]")
+        table.add_row("Description", f"[green]{description}[/green]")
+        table.add_row(
+            "Example Config",
+            f"[yellow]{safe_dump(config.model_dump(mode='json'), sort_keys=False)}[/yellow]",
+        )
+        table.add_row("", "")  # Empty row for spacing
+        # table.add_row(
+        #     handler.name,
+        #     description,
+        #     safe_dump(config.model_dump(mode="json"), sort_keys=False),
+        # )
+
+    return table
+
+
 def create_blank_request() -> EsiRequest:
     return EsiRequest(
         request_id=uuid4(),
@@ -165,10 +210,17 @@ def get_status_example() -> EsiRequest:
             HandlerConfig(
                 name="esi-link.json_data_file",
                 config={
-                    "file_path": "{HOME}/tmp/esi-link-data/responses/{NOW}-{OPERATION_ID}.json",
+                    "file_path": "${HOME}/tmp/esi-link-data/responses/${NOW}-${OPERATION_ID}.json",
                     "overwrite": False,
                 },
-            )
+            ),
+            HandlerConfig(
+                name="esi-link.json_response_file",
+                config={
+                    "file_path": "${HOME}/tmp/esi-link-data/responses/${NOW}-${OPERATION_ID}-response.json",
+                    "overwrite": False,
+                },
+            ),
         ],
     )
 
@@ -186,9 +238,16 @@ def get_market_orders_example() -> EsiRequest:
             HandlerConfig(
                 name="esi-link.json_data_file",
                 config={
-                    "file_path": "{HOME}/tmp/esi-link-data/responses/{NOW}-{OPERATION_ID}-{REGION_ID}-{TYPE_ID}.json",
+                    "file_path": "${HOME}/tmp/esi-link-data/responses/${NOW}-${OPERATION_ID}-${REGION_ID}-${TYPE_ID}.json",
                     "overwrite": False,
                 },
-            )
+            ),
+            HandlerConfig(
+                name="esi-link.json_response_file",
+                config={
+                    "file_path": "${HOME}/tmp/esi-link-data/responses/${NOW}-${OPERATION_ID}-response.json",
+                    "overwrite": False,
+                },
+            ),
         ],
     )

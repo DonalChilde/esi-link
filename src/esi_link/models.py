@@ -356,6 +356,8 @@ class EsiLinkConfig(BaseModel):
 class ResponseHandlerProtocol:
     """Protocol for handling ESI responses."""
 
+    name: str
+
     async def handle_response(
         self,
         ctx: ResponseContext,
@@ -435,6 +437,14 @@ class HandlerManagerProtocol:
 
         Raises:
             InvalidHandlerError: If the handler class is invalid.
+        """
+        ...
+
+    def get_all_handlers(self) -> list[type[ResponseHandlerProtocol]]:
+        """Get a list of all registered handlers.
+
+        Returns:
+            A list of all registered handler instances.
         """
         ...
 
