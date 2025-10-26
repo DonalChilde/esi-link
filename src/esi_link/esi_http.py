@@ -10,7 +10,6 @@ from whenever import Instant
 from esi_link import header_funcs as HF
 from esi_link.build_url import build_url
 from esi_link.models import (
-    CachedResponse,
     CacheProtocol,
     EsiHttpProtocol,
     EsiLinkError,
@@ -114,10 +113,9 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                             request=request, first_page=http_response
                         )
                     if request.cache_key is not None:
-                        cached_response = CachedResponse(
-                            cache_key=request.cache_key, response=http_response
+                        self.cache.store_http_response(
+                            cache_key=request.cache_key, http_response=http_response
                         )
-                        self.cache.store_cached_response(cached_response)
                     await self._do_handlers(request, http_response)
                     return (request, None)
                 case 201:  # Created Successful
@@ -131,7 +129,9 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                 case 304:
                     if request.cache_key is None:
                         raise EsiLinkError("Received 304 but no cache is configured.")
-                    self.cache.update_cached_response(request.cache_key, http_response)
+                    self.cache.store_http_response(
+                        cache_key=request.cache_key, http_response=http_response
+                    )
                     cached_response = self.cache.get_cached_response(request.cache_key)
                     if cached_response is None:
                         raise EsiLinkError("Received 304 but no cached response found.")

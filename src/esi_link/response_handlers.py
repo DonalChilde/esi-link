@@ -304,11 +304,6 @@ class HandlerManager(HandlerManagerProtocol):
 
     def get_handler(self, config: HandlerConfig) -> ResponseHandlerProtocol:
         handler_cls = self.handlers.get(config.name)
-        logger.info(
-            "Available handlers: {handlers}".format(
-                handlers="".join(self.handlers.keys())
-            )
-        )
         if not handler_cls:
             raise HandlerConfigError(
                 f"Handler not found in registry: {config.name}", handler_config=config

@@ -15,6 +15,7 @@ from esi_link.cli.models import CliConfig
 from esi_link.download_esi_schema import download_esi_schema
 from esi_link.esi_link import USER_AGENT
 from esi_link.esi_link_factory import esi_link_factory
+from esi_link.logging_config import setup_logging
 from esi_link.models import EsiLinkConfig, EsiSchema
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,8 @@ APP_NAMESPACE = "pfmsoft"
 APP_NAME = "Esi Link"
 
 _app_dir = get_app_dir(app_name=f"{APP_NAMESPACE}-{APP_NAME}")
+_log_dir = Path(_app_dir) / "logs"
+setup_logging(log_dir=_log_dir)
 ESI_LINK_CONFIG_PATH = Path(_app_dir) / "esi_link_config.json"
 
 app = typer.Typer(no_args_is_help=True)

@@ -488,23 +488,12 @@ class CacheProtocol:
         """
         ...
 
-    def store_cached_response(self, cached_response: CachedResponse) -> None:
-        """Store a cached response.
+    def store_http_response(self, cache_key: UUID, http_response: HttpResponse) -> None:
+        """Store an http response.
 
         Args:
-            cached_response: The CachedResponse instance to store.
-
-        ...
-        """
-        ...
-
-    def update_cached_response(
-        self, cache_key: UUID, http_response: HttpResponse
-    ) -> None:
-        """Update an existing cached response.
-
-        Args:
-            cached_response: The CachedResponse instance to update.
+            cache_key: The UUID cache key for the cached response.
+            http_response: The HttpResponse instance to cache.
 
         ...
         """
