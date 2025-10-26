@@ -155,9 +155,6 @@ def handlers_(ctx: typer.Context):
 
 def create_handlers_table(handlers: list[type[ResponseHandlerProtocol]]) -> Table:
     table = Table(show_lines=True, expand=True, show_header=False)
-    # table.add_column("Name", style="bold blue", vertical="middle")
-    # table.add_column("Description", style="bold green", ratio=2, overflow="fold")
-    # table.add_column("Example Config", style="bold yellow", overflow="fold")
     table.add_column()
     table.add_column()
 
@@ -170,11 +167,6 @@ def create_handlers_table(handlers: list[type[ResponseHandlerProtocol]]) -> Tabl
             f"[yellow]{safe_dump(config.model_dump(mode='json'), sort_keys=False)}[/yellow]",
         )
         table.add_row("", "")  # Empty row for spacing
-        # table.add_row(
-        #     handler.name,
-        #     description,
-        #     safe_dump(config.model_dump(mode="json"), sort_keys=False),
-        # )
 
     return table
 
