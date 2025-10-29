@@ -46,6 +46,7 @@ dev = ["pytest>=8.4.1", "pytest-cov>=6.2.1", "ruff>=0.12.11", "scriv>=1.7.0"]
 
 [tool.uv.sources]
 esi-auth = { git = "https://github.com/DonalChilde/esi-auth", branch = "main" }
+
 [tool.pytest.ini_options]
 pythonpath = "src"
 log_file = "logs/tests.log"
@@ -56,3 +57,25 @@ log_file_level = "INFO"
 [tool.coverage.run]
 branch = true
 parallel = true
+
+[tool.ruff.lint]
+select = ["B", "UP", "D", "DOC", "FIX", "I", "F401"]
+# non-imperative-mood (D401)
+ignore = ["D401", "D101"]
+# extend-select = ["I"]
+
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = 88
+
+[tool.scriv]
+#version = "literal: pyproject.toml: project.version"
+version = "literal: src/PROJECT_NAME/__init__.py: __version__"
+format = "md"
+md_header_level = "2"
+entry_title_template = "file: changelog.d/templates/entry_title_template.md.j2"
+new_fragment_template = "file: changelog.d/templates/new_fragment.${config:format}.j2"
