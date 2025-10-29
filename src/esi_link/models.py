@@ -189,6 +189,13 @@ class EsiSchema(BaseModel):
     tags: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
     """The tags section of the OpenAPI schema."""
 
+    def __str__(self) -> str:
+        """String representation of the EsiSchema instance."""
+        return (
+            f"EsiSchema(openapi={self.openapi}, operations={len(self.operations)}, "
+            f"download_date={self.download_date})"
+        )
+
     @classmethod
     def from_schema(cls, schema: dict[str, Any], download_date: Instant) -> "EsiSchema":
         """Create an EsiSchema instance from a raw OpenAPI schema dictionary.
@@ -229,6 +236,40 @@ class EsiSchema(BaseModel):
             tags=dereferenced_schema.get("tags", []),
         )
 
+    def save_to_file(self, file_path: Path, overwrite: bool = False) -> None:
+        """Save the EsiSchema instance to a JSON file.
+
+        Args:
+            file_path: Path to the file where the JSON representation will be saved.
+            overwrite: Whether to overwrite the file if it exists. Defaults to False.
+        """
+        if file_path.is_dir():
+            raise EsiLinkError(
+                f"Error trying to save EsiSchema to {file_path}: its a directory."
+            )
+        if file_path.is_file() and not overwrite:
+            raise EsiLinkError(
+                f"Error trying to save EsiSchema to {file_path}: File already exists. Use overwrite=True to overwrite."
+            )
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(file_path, "w") as file:
+            file.write(self.model_dump_json(indent=2))
+
+    @classmethod
+    def load_from_file(cls, file_path: Path) -> "EsiSchema":
+        """Load an EsiSchema instance from a JSON file.
+
+        Args:
+            file_path: Path to the JSON file to load.
+
+        Returns:
+            An instance of EsiSchema.
+        """
+        with open(file_path) as file:
+            esi_schema = cls.model_validate_json(file.read())
+        return esi_schema
+
 
 @dataclass(slots=True)
 class HttpRequest:
@@ -265,37 +306,36 @@ class HttpResponse(BaseModel):
     expires: str = ""
     completed_on: Instant = Field(default_factory=_get_current_instant)
 
+    # class EsiLinkConfig(BaseModel):
+    #     """Application data for Esi Link."""
 
-class EsiLinkConfig(BaseModel):
-    """Application data for Esi Link."""
+    # esi_schema_url: str = "https://esi.evetech.net/meta/openapi.json"
+    # """URL to download the ESI OpenAPI schema."""
+    # esi_schema: EsiSchema | None = None
+    # """The ESI OpenAPI schema."""
+    # application_response_handlers: list[HandlerConfig] = []
+    # """List of application level response handler configurations."""
+    # cache_connection_string: str = "esi-link-memory://"
+    # """Connection string for the cache backend.
 
-    esi_schema_url: str = "https://esi.evetech.net/meta/openapi.json"
-    """URL to download the ESI OpenAPI schema."""
-    esi_schema: EsiSchema | None = None
-    """The ESI OpenAPI schema."""
-    application_response_handlers: list[HandlerConfig] = []
-    """List of application level response handler configurations."""
-    cache_connection_string: str = "esi-link-memory://"
-    """Connection string for the cache backend.
+    # Format: [cache_type]://[path_or_connection_info]
 
-    Format: [cache_type]://[path_or_connection_info]
+    # Examples:
+    #     File-based cache: esi-link-json:///path/to/cache/dir
+    #     In-memory cache: esi-link-memory://"""
+    # connection_max_rate: int = 100
+    # """Maximum number of concurrent connections per period to ESI."""
+    # connection_period: float = 60.0
+    # """Time period in seconds for the maximum connection rate."""
+    # esi_auth_connection_string: str | None = None
+    # """Connection string for the ESI authentication store.
 
-    Examples:
-        File-based cache: esi-link-json:///path/to/cache/dir
-        In-memory cache: esi-link-memory://"""
-    connection_max_rate: int = 100
-    """Maximum number of concurrent connections per period to ESI."""
-    connection_period: float = 60.0
-    """Time period in seconds for the maximum connection rate."""
-    esi_auth_connection_string: str | None = None
-    """Connection string for the ESI authentication store.
+    # #TODO support multiple auth store types. For now use JSON file store.
+    # Format: [auth_store_type]://[path_or_connection_info]
 
-    #TODO support multiple auth store types. For now use JSON file store.
-    Format: [auth_store_type]://[path_or_connection_info]
-
-    Examples:
-        JSON file store: esi-link-auth-json:///path/to/auth_store.json
-    """
+    # Examples:
+    #     JSON file store: esi-link-auth-json:///path/to/auth_store.json
+    # """
 
     @classmethod
     def load_config(cls, file_path: Path) -> Self:

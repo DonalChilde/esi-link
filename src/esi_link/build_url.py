@@ -1,3 +1,5 @@
+"""Build full URLs for ESI requests based on the ESI schema."""
+
 from esi_link.models import EsiLinkError, EsiRequest, EsiSchema
 
 
@@ -11,6 +13,7 @@ def build_url(
     Args:
         esi_request: The EsiRequest instance containing the operation ID and parameters.
         esi_schema: The EsiSchema instance containing the OpenAPI schema.
+        base_url: Optional base URL to override the schema's server URL.
 
     Returns:
         The full URL as a string.

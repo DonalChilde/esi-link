@@ -1,41 +1,45 @@
+"""CLI configuration model for ESI Link."""
+
 from dataclasses import dataclass
-from pathlib import Path
 from time import perf_counter_ns
 
 from esi_link.esi_link import EsiLink
-from esi_link.models import EsiLinkConfig
+from esi_link.models import EsiSchema
+from esi_link.settings import EsiLinkSettings
 
 
 @dataclass
 class CliConfig:
+    settings: EsiLinkSettings
     start_time: int = perf_counter_ns()
     debug: bool = False
     verbosity: int = 1
     silent: bool = False
-    auth_store_connection_string: str | None = None
-    esi_link_config_path: Path | None = None
-    esi_link_config: EsiLinkConfig | None = None
+
+    esi_schema: EsiSchema | None = None
     esi_link: EsiLink | None = None
 
     def __repr__(self) -> str:
+        """Represent the CLI configuration."""
         return (
             f"CliConfig(start_time={self.start_time}, "
             f"debug={self.debug}, "
             f"verbosity={self.verbosity}, "
             f"silent={self.silent}, "
-            f"auth_store_connection_string={self.auth_store_connection_string}, "
-            f"esi_link_config_path={self.esi_link_config_path}, "
+            f"settings={self.settings!r}, "
+            f"esi_schema={self.esi_schema!s}, "
             f"esi_link={self.esi_link!r}"
             f")"
         )
 
     def __str__(self) -> str:
+        """String representation of the CLI configuration."""
         return (
             f" start_time={self.start_time}\n"
             f" debug={self.debug}\n"
             f" verbosity={self.verbosity}\n"
             f" silent={self.silent}\n"
-            f" auth_store_connection_string={self.auth_store_connection_string}\n"
-            f" esi_link_config_path={self.esi_link_config_path}\n"
+            f" settings={self.settings}\n"
+            f" esi_schema={self.esi_schema}\n"
             f" esi_link={self.esi_link}\n"
         )

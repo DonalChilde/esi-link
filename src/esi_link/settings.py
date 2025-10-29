@@ -1,10 +1,12 @@
 """Settings for the ESI Link application."""
 
+from os import getenv
 from pathlib import Path
 
 from esi_auth import APPLICATION_NAME, DEFAULT_APP_DIR, NAMESPACE
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from whenever import Instant
 
 from esi_link.helpers.make_safe_env_name import make_safe_env_name
 
@@ -30,14 +32,38 @@ class EsiLinkSettings(BaseSettings):
         default="https://esi.evetech.net/meta/openapi.json",
         description="The URL to download the ESI schema from.",
     )
+    esi_schema_path: Path = Field(
+        default=DEFAULT_APP_DIR / "esi_schema.json",
+        description="The path to the ESI schema file.",
+    )
     cache_connection_string: str = Field(
         default=f"esi-link-file:{DEFAULT_APP_DIR.resolve()}/esi-link-cache.json",
         description="The connection string for ESI Link cache.",
     )
-    auth_connection_string: str = Field(
-        default=f"esi-auth-file:{DEFAULT_APP_DIR.resolve()}/esi-auth-store.json",
-        description="The connection string for ESI Link authentication data.",
+    """Connection string for the cache backend.
+
+    Format: [cache_type]://[path_or_connection_info]
+
+    Examples:
+        File-based cache: esi-link-json:///path/to/cache/dir
+        In-memory cache: esi-link-memory://"""
+
+    connection_period: int = Field(
+        default=60,
+        description="Period (in seconds) for ESI Link connection rate limiting.",
     )
+    """Period (in seconds) for ESI Link connection rate limiting."""
+    connection_max_rate: int = Field(
+        default=100,
+        description="Maximum number of requests per period for ESI Link connections.",
+    )
+    """Maximum number of concurrent connections to ESI per period."""
+
+    def auth_connection_string(self) -> str:
+        """Get the auth connection string for esi-auth integration."""
+        env_var_name = f"PFMSOFT_ESI_AUTH_AUTH_CONNECTION_STRING"
+        # GET from environment variable if set
+        return getenv(env_var_name, "")
 
     model_config = SettingsConfigDict(
         env_file=(
@@ -55,8 +81,13 @@ def get_settings() -> EsiLinkSettings:
 
 def env_example() -> str:
     """Get an example of environment variables for ESI Link settings."""
-
     env_example_str = f"""# ESI Link Environment Variables
+    # File generated at {Instant.now().format_iso()}\n
+
+    # Env variable load order:
+    # 1. .env files in application directory
+    # 2. .env files in current working directory
+    # 3. System environment variables
 
     # Uncomment and set the following environment variables to override default settings.
 

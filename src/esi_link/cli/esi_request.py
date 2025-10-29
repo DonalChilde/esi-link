@@ -1,3 +1,5 @@
+"""CLI commands for ESI requests."""
+
 import asyncio
 from pathlib import Path
 from typing import Annotated

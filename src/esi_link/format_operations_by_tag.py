@@ -1,3 +1,5 @@
+"""Functions to format ESI operations grouped by tag."""
+
 from textwrap import fill
 
 from rich.panel import Panel
@@ -8,8 +10,8 @@ from esi_link.models import EsiSchema
 
 
 def operations_by_tag_table(esi_schema: EsiSchema, max_width: int = 120) -> str:
-    """
-    NOT CURRENTLY USED, KEEP FOR REFERENCE.
+    """NOT CURRENTLY USED, KEEP FOR REFERENCE.
+
     Return available operations grouped by tag, sorted alphabetically inside each tag,
     and indicate if authorization is required (flag after operation id).
 

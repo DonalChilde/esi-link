@@ -1,11 +1,13 @@
+"""ESI Link main module implementation."""
+
 import logging
 from copy import deepcopy
-from pathlib import Path
 from typing import Any
 
 from esi_auth import CharacterToken, TokenManager
 from whenever import Instant
 
+from esi_link import USER_AGENT
 from esi_link import operation_accessors as OA
 from esi_link.build_url import build_url
 from esi_link.cache_p import InMemoryCache
@@ -27,7 +29,8 @@ from esi_link.response_handlers import HandlerManager
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
-USER_AGENT = "esi-link/0.1.0"
+
+APPLICATION_RESPONSE_HANDLERS: list[HandlerConfig] = []
 
 ###########################################################################
 # EsiLinkProtocol Implementations
@@ -48,22 +51,32 @@ class EsiLink(EsiLinkProtocol):
         token_manager: TokenManager | None = None,
         application_handlers_config: list[HandlerConfig] | None = None,
     ) -> None:
+        """Initialize the EsiLink instance.
+
+        Args:
+            esi_schema: The ESI schema to use for building requests.
+            esi_http: The ESI HTTP client to use for executing requests.
+            handler_manager: The handler manager to use for response handlers.
+            token_manager: The token manager to use for authentication.
+            application_handlers_config: The application-level response handlers configuration.
+        """
         self.esi_schema = esi_schema
         self.esi_http = esi_http
         self.handler_manager = handler_manager
         self.token_manager = token_manager
         self.application_handlers_config = (
-            application_handlers_config if application_handlers_config else []
+            application_handlers_config
+            if application_handlers_config
+            else APPLICATION_RESPONSE_HANDLERS
         )
-        self.app_handlers: list[ResponseHandlerProtocol] = self._init_handlers(
-            self.application_handlers_config
+        self.app_handlers: list[ResponseHandlerProtocol] = (
+            self._init_app_level_handlers(self.application_handlers_config)
         )
 
-    def _init_handlers(
+    def _init_app_level_handlers(
         self, handler_configs: list[HandlerConfig]
     ) -> list[ResponseHandlerProtocol]:
         """Initialize application-level response handlers."""
-
         app_handlers = [
             self.handler_manager.get_handler(config) for config in handler_configs
         ]
@@ -90,10 +103,11 @@ class EsiLink(EsiLinkProtocol):
         CharacterTokens needed by the requests.
 
         Args:
-            esi_request: The EsiRequest for which to get the auth token.
+            esi_requests: The EsiRequests for which to get the auth token.
 
         Returns:
             The CharacterToken if found, otherwise None.
+
         Raises:
             EsiLinkError: If no TokenManager is configured or if the token
                 cannot be found.
@@ -163,7 +177,7 @@ class EsiLink(EsiLinkProtocol):
             indexed_operation = self.esi_schema.operations.get(req.operation_id)
             if not indexed_operation:
                 raise EsiLinkError(f"Operation ID not found: {req.operation_id}")
-            user_handlers = self._init_handlers(req.handlers)
+            user_handlers = self._init_app_level_handlers(req.handlers)
             is_paged = OA.is_paged(indexed_operation)
             http_request_headers = self._collect_http_request_headers(
                 esi_request=req, token_dict=token_dict
@@ -192,13 +206,16 @@ class LinkManager:
         self,
         esi_schema: dict[str, Any],
         schema_download_date: Instant,
-        token_file_path: Path | None = None,
+        auth_connection_string: str,
     ) -> None:
+        # FIXME should this be a raw schema or an EsiSchema?
         self.esi_schema = EsiSchema.from_schema(
             schema=esi_schema, download_date=schema_download_date
         )
         self._handler_manager = self._get_handler_manager()
-        self._token_manager = self._get_token_manager(token_file_path=token_file_path)
+        self._token_manager = self._get_token_manager(
+            auth_connection_string=auth_connection_string
+        )
 
     def _get_handler_manager(self) -> HandlerManagerProtocol:
         handler_manager = HandlerManager()
@@ -208,12 +225,8 @@ class LinkManager:
         # )
         return handler_manager
 
-    def _get_token_manager(
-        self, token_file_path: Path | None = None
-    ) -> TokenManager | None:
-        if token_file_path is None:
-            return None
-        token_manager = TokenManager(store_path=token_file_path)
+    def _get_token_manager(self, auth_connection_string: str) -> TokenManager:
+        token_manager = TokenManager(connection_string=auth_connection_string)
         return token_manager
 
     def esi_link_factory(self) -> EsiLinkProtocol:

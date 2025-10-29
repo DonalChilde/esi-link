@@ -1,3 +1,5 @@
+"""Functions to download the ESI schema."""
+
 from whenever import Instant
 
 from esi_link.helpers.download_file import download_json

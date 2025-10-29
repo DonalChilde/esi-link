@@ -6,7 +6,11 @@ import typer
 
 __author__ = "Chad Lowe"
 __email__ = "pfmsoft.dev@gmail.com"
-__app_name__ = "Esi Link"
+__app_name__ = "esi-link"
+__version__ = "0.1.0"
+__description__ = "A command line first interface to the Eve Online API"
+__license__ = "MIT"
+__url__ = "https://github.com/DonalChilde/esi-link"
 
 #######################################################################################
 # Update in pyproject.toml, as uv build backend does not yet support dynamic metadata #
@@ -21,6 +25,7 @@ __release__ = __version__
 NAMESPACE = "pfmsoft"
 APPLICATION_NAME = "esi-auth"
 DEFAULT_APP_DIR = Path(typer.get_app_dir(f"{NAMESPACE}-{APPLICATION_NAME}"))
+USER_AGENT = "esi-link/0.1.0"
 
 # CONFIG = AppConfig(name=__app_name__)
 # CONFIG.log_dir.mkdir(parents=True, exist_ok=True)

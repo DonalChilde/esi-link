@@ -1,3 +1,5 @@
+"""Cache implementations for ESI Link."""
+
 import logging
 from pathlib import Path
 from typing import Optional
@@ -134,6 +136,7 @@ def generate_cache_key(esi_request: EsiRequest, esi_schema: EsiSchema) -> UUID |
     Args:
         esi_request: The EsiRequest instance for which to generate the cache key.
         esi_schema: The EsiSchema instance containing the OpenAPI schema.
+
     Returns:
         A UUID representing the cache key, or None if caching is not applicable.
     """
@@ -165,7 +168,7 @@ def cache_factory(cache_connection_string: str | None) -> CacheProtocol:
     """
     if cache_connection_string is None:
         return NoOpCache()
-    cache_specifier, cache_str = cache_connection_string.split("://", 1)
+    cache_specifier, cache_str = cache_connection_string.split(":", 1)
 
     match cache_specifier:
         case "esi-link-noop":
@@ -174,7 +177,7 @@ def cache_factory(cache_connection_string: str | None) -> CacheProtocol:
         case "esi-link-memory":
             logger.info("Using InMemoryCache for ESI Link caching.")
             return InMemoryCache()
-        case "esi-link-json":
+        case "esi-link-file":
             logger.info(f"Using JsonFileCache for ESI Link caching at {cache_str}")
             return JsonFileCache(file_path=Path(cache_str))
         case _:

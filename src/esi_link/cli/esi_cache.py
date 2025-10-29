@@ -1,3 +1,7 @@
+"""CLI commands for ESI cache management."""
+
+# FIXME: Implement cache statistics and clearing functionality
+
 import typer
 from rich import print as rich_print
 
@@ -7,15 +11,10 @@ app = typer.Typer(no_args_is_help=True)
 @app.command()
 def clear(ctx: typer.Context):
     """Clear the ESI cache file."""
-    with ctx.obj.cache as cache:
-        cache.clear()
-    typer.echo("ESI cache cleared.")
+    raise NotImplementedError("Cache clearing not yet implemented.")
 
 
 @app.command()
 def stats(ctx: typer.Context):
     """Show statistics about the ESI cache."""
-    with ctx.obj.cache as cache:
-        stats = cache.stats()
-    typer.echo("ESI Cache Statistics:")
-    rich_print(stats)
+    raise NotImplementedError("Cache statistics not yet implemented.")
