@@ -1,6 +1,8 @@
+"""Helpers for creating safe environment variable names."""
+
+
 def make_safe_env_name(name: str) -> str:
-    """
-    Convert a string into a shell-safe environment variable name.
+    """Convert a string into a shell-safe environment variable name.
 
     The transformation performs the following steps:
     - Strips leading and trailing whitespace
@@ -25,7 +27,6 @@ def make_safe_env_name(name: str) -> str:
         >>> make_safe_for_env("User ID #42")
         'USER_ID__42'
     """
-    """Convert a name to a safe environment variable name."""
     env_var_name = name.strip().upper()
     for char in env_var_name:
         if char not in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_":

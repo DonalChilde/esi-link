@@ -1,0 +1,83 @@
+"""Settings for the ESI Link application."""
+
+from pathlib import Path
+
+from esi_auth import APPLICATION_NAME, DEFAULT_APP_DIR, NAMESPACE
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from esi_link.helpers.make_safe_env_name import make_safe_env_name
+
+_app_env_prefix = make_safe_env_name(f"{NAMESPACE}_{APPLICATION_NAME}_")
+
+
+class EsiLinkSettings(BaseSettings):
+    """Settings for the ESI Link application."""
+
+    app_dir: Path = Field(
+        default=DEFAULT_APP_DIR,
+        description="The application directory for ESI Link.",
+    )
+    log_dir: Path = Field(
+        default=DEFAULT_APP_DIR / "logs",
+        description="The log directory for ESI Link.",
+    )
+    config_file: Path = Field(
+        default=DEFAULT_APP_DIR / "esi_link_config.json",
+        description="The configuration file for ESI Link.",
+    )
+    esi_schema_url: str = Field(
+        default="https://esi.evetech.net/meta/openapi.json",
+        description="The URL to download the ESI schema from.",
+    )
+    cache_connection_string: str = Field(
+        default=f"esi-link-file:{DEFAULT_APP_DIR.resolve()}/esi-link-cache.json",
+        description="The connection string for ESI Link cache.",
+    )
+    auth_connection_string: str = Field(
+        default=f"esi-auth-file:{DEFAULT_APP_DIR.resolve()}/esi-auth-store.json",
+        description="The connection string for ESI Link authentication data.",
+    )
+
+    model_config = SettingsConfigDict(
+        env_file=(
+            f"{DEFAULT_APP_DIR}/.env",
+            ".env",
+        ),
+        env_prefix=_app_env_prefix,
+    )
+
+
+def get_settings() -> EsiLinkSettings:
+    """Get the ESI Link settings."""
+    return EsiLinkSettings()
+
+
+def env_example() -> str:
+    """Get an example of environment variables for ESI Link settings."""
+
+    env_example_str = f"""# ESI Link Environment Variables
+
+    # Uncomment and set the following environment variables to override default settings.
+
+    # Application Directory
+    #{_app_env_prefix}APP_DIR={DEFAULT_APP_DIR}
+
+    # Log Directory
+    #{_app_env_prefix}LOG_DIR={DEFAULT_APP_DIR / "logs"}
+
+    # Configuration File
+    #{_app_env_prefix}CONFIG_FILE={DEFAULT_APP_DIR / "esi_link_config.json"}
+
+    # Esi Schema Url
+    #{_app_env_prefix}ESI_SCHEMA_URL=https://esi.evetech.net/meta/openapi.json
+
+    # Cache Connection String
+    #{_app_env_prefix}CACHE_CONNECTION_STRING=esi-link-cache-file:{DEFAULT_APP_DIR / "esi-link-cache.json"}
+
+    # Auth Connection String
+    # NOTE: The following connection strings must be the same to avoid data corruption
+    #{_app_env_prefix}AUTH_CONNECTION_STRING=esi-auth-file:{DEFAULT_APP_DIR / "esi-auth-store.json"}
+    PFMSOFT_ESI_AUTH_AUTH_CONNECTION_STRING=esi-auth-file:{DEFAULT_APP_DIR / "esi-auth-store.json"}
+    """
+    return env_example_str

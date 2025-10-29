@@ -7,25 +7,26 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
-from typer import get_app_dir
+from rich.text import Text
 
+from esi_link import DEFAULT_APP_DIR, __app_name__, __version__
+from esi_link.cli import STYLE_INFO
 from esi_link.cli.esi_request import app as esi_request_app
 from esi_link.cli.esi_schema import app as esi_schema_app
+from esi_link.cli.helpers import ensure_env_example
 from esi_link.cli.models import CliConfig
 from esi_link.download_esi_schema import download_esi_schema
 from esi_link.esi_link import USER_AGENT
 from esi_link.esi_link_factory import esi_link_factory
 from esi_link.logging_config import setup_logging
 from esi_link.models import EsiLinkConfig, EsiSchema
+from esi_link.settings import EsiLinkSettings, env_example, get_settings
 
 logger = logging.getLogger(__name__)
-APP_NAMESPACE = "pfmsoft"
-APP_NAME = "Esi Link"
 
-_app_dir = get_app_dir(app_name=f"{APP_NAMESPACE}-{APP_NAME}")
-_log_dir = Path(_app_dir) / "logs"
-setup_logging(log_dir=_log_dir)
-ESI_LINK_CONFIG_PATH = Path(_app_dir) / "esi_link_config.json"
+
+_log_dir = Path(DEFAULT_APP_DIR) / "logs"
+
 
 app = typer.Typer(no_args_is_help=True)
 app.add_typer(esi_schema_app, name="schema")
@@ -41,16 +42,6 @@ def default_options(
         bool,
         typer.Option(help="Enable silent mode. Only results and errors will be shown."),
     ] = False,
-    config_path: Annotated[
-        Path,
-        typer.Option(
-            help="Path to Esi Link configuration file.",
-            exists=False,
-            dir_okay=False,
-            writable=True,
-            readable=True,
-        ),
-    ] = ESI_LINK_CONFIG_PATH,
     esi_schema_url: Annotated[
         str | None,
         typer.Option(
@@ -69,6 +60,8 @@ def default_options(
 
     Insert pithy saying here
     """
+    settings = get_settings()
+    setup_logging(log_dir=settings.log_dir)
     console = Console()
     ctx.ensure_object(CliConfig)
     cli_config: CliConfig = ctx.obj
@@ -76,13 +69,12 @@ def default_options(
     cli_config.debug = debug
     cli_config.verbosity = verbosity
     cli_config.silent = silent
-    cli_config.esi_link_config_path = config_path
+    cli_config.esi_link_config_path = settings.config_file
 
     # Complete the initialization of the configuration
     _init_config(
         ctx,
-        config_path=config_path,
-        esi_schema_url=esi_schema_url,
+        settings=settings,
         force_schema_update=force_schema_update,
     )
 
@@ -135,63 +127,85 @@ def remove_config(
 def status(ctx: typer.Context):
     """Show the status of the Esi Link configuration."""
     console = Console()
+    console.rule(Text("esi-link Cli Configuration Information", style=STYLE_INFO))
     cli_config: CliConfig = ctx.obj
-    if cli_config.esi_link_config is None:
-        console.print("[red]Esi Link configuration is not initialized.[/red]")
-        raise typer.Exit(code=1)
-    console.print("[green]Esi Link configuration status:[/green]")
-    console.print(f"  Debug: {cli_config.debug}")
-    console.print(f"  Verbosity: {cli_config.verbosity}")
-    console.print(f"  Silent: {cli_config.silent}")
-    console.print(f"  Config Path: {cli_config.esi_link_config_path}")
-    console.print(f"  Schema URL: {cli_config.esi_link_config.esi_schema_url}")
-    console.print(
-        f"  Schema Loaded: {cli_config.esi_link_config.esi_schema is not None}"
-    )
+    console.print(cli_config)
+    settings = get_settings()
+    console.rule(Text("esi-link Cli Configuration Information", style=STYLE_INFO))
+    console.print(settings)
+
+
+@app.command()
+def version(ctx: typer.Context):
+    """Display version information."""
+    console = Console()
+    console.rule(Text("esi-link Version Information", style=STYLE_INFO))
+
+    console.print(f"{__app_name__} version {__version__}")
+
+
+@app.command()
+def example_env(
+    file_path: Annotated[
+        Path,
+        typer.Argument(
+            help="Path to create the example .env file.",
+        ),
+    ],
+):
+    """Create an example .env file for esi-link configuration."""
+    console = Console()
+    exists = ensure_env_example(file_path=file_path)
+    if exists:
+        console.print(
+            f"[bold yellow]File already exists at {file_path}. No changes made.[/bold yellow]"
+        )
+    else:
+        console.print(
+            f"[bold green]Example .env file created at {file_path}.[/bold green]"
+        )
+        console.print(
+            "[bold green]You can edit this file to configure your settings before using esi-link.[/bold green]"
+        )
 
 
 def _init_config(
     ctx: typer.Context,
-    config_path: Path,
-    esi_schema_url: str | None,
+    settings: EsiLinkSettings,
     force_schema_update: bool = False,
 ) -> None:
     """Initialize the CLI configuration with cache and client."""
     start = perf_counter()
     console = Console()
-    logger.info(f"Loading Esi Link configuration from {config_path}")
+    logger.info(f"Loading Esi Link configuration from {settings.config_file}")
     cli_config: CliConfig = ctx.obj
     config_dirty = False
     # Load or create Esi Link configuration
-    if config_path.exists():
+    if settings.config_file.exists():
         try:
-            esi_link_config = EsiLinkConfig.load_config(file_path=config_path)
+            esi_link_config = EsiLinkConfig.load_config(file_path=settings.config_file)
         except Exception as e:
             logger.error(
-                f"Error loading Esi Link configuration from {config_path}: {e}"
+                f"Error loading Esi Link configuration from {settings.config_file}: {e}"
             )
             raise typer.Exit(code=1) from e
     else:
         console.print(
-            f"[yellow]Esi Link configuration file not found at {config_path}, creating new configuration.[/yellow]"
+            f"[yellow]Esi Link configuration file not found at {settings.config_file}, creating new configuration.[/yellow]"
         )
         esi_link_config = EsiLinkConfig()
         config_dirty = True
-    # Override ESI schema URL if provided, and download schema.
-    if esi_schema_url is not None:
-        logger.info(f"Overriding ESI schema URL to {esi_schema_url}.")
-        console.print(
-            f"[yellow]Overriding ESI schema URL to {esi_schema_url}.[/yellow]"
-        )
-        config_dirty = True
-        esi_link_config.esi_schema_url = esi_schema_url
-        esi_schema = _download_esi_schema(
-            url=esi_link_config.esi_schema_url,
-            headers={"User-Agent": USER_AGENT},
-        )
-        esi_link_config.esi_schema = esi_schema
+    # FIXME schema url should not live in config, but in settings only
+    # TODO refactor later, check flow of this function after sleep. sleeeeeep. go to sleeeeeeeeepppp.
+    config_dirty = True
+    esi_link_config.esi_schema_url = settings.esi_schema_url
+    esi_schema = _download_esi_schema(
+        url=esi_link_config.esi_schema_url,
+        headers={"User-Agent": USER_AGENT},
+    )
+    esi_link_config.esi_schema = esi_schema
 
-    if esi_link_config.esi_schema is None or force_schema_update:
+    if esi_link_config.esi_schema is None or force_schema_update:  # pyright: ignore[reportUnnecessaryComparison]
         console.print(
             f"[yellow]ESI schema not found in configuration, and/or force update is enabled, downloading from {esi_link_config.esi_schema_url}...[/yellow]"
         )
@@ -204,13 +218,15 @@ def _init_config(
 
     if config_dirty:
         console.print(
-            f"[yellow]Saving updated Esi Link configuration to {config_path}...[/yellow]"
+            f"[yellow]Saving updated Esi Link configuration to {settings.config_file}...[/yellow]"
         )
         try:
-            esi_link_config.save_config(file_path=config_path, overwrite=True)
+            esi_link_config.save_config(file_path=settings.config_file, overwrite=True)
             console.print("[green]Configuration save complete.[/green]")
         except Exception as e:
-            logger.error(f"Error saving Esi Link configuration to {config_path}: {e}")
+            logger.error(
+                f"Error saving Esi Link configuration to {settings.config_file}: {e}"
+            )
             console.print(f"[red]Error saving configuration: {e}[/red]")
             raise typer.Exit(code=1) from e
 
