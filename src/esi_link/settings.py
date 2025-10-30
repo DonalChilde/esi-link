@@ -92,23 +92,22 @@ def env_example() -> str:
     # Uncomment and set the following environment variables to override default settings.
 
     # Application Directory
-    #{_app_env_prefix}APP_DIR={DEFAULT_APP_DIR}
+    #{_app_env_prefix}APP_DIR="{DEFAULT_APP_DIR.resolve()}"
 
     # Log Directory
-    #{_app_env_prefix}LOG_DIR={DEFAULT_APP_DIR / "logs"}
+    #{_app_env_prefix}LOG_DIR="${{{_app_env_prefix}APP_DIR}}/logs"
 
     # Configuration File
-    #{_app_env_prefix}CONFIG_FILE={DEFAULT_APP_DIR / "esi_link_config.json"}
+    #{_app_env_prefix}CONFIG_FILE="${{{_app_env_prefix}APP_DIR}}/esi_link_config.json"
 
     # Esi Schema Url
-    #{_app_env_prefix}ESI_SCHEMA_URL=https://esi.evetech.net/meta/openapi.json
+    #{_app_env_prefix}ESI_SCHEMA_URL="https://esi.evetech.net/meta/openapi.json"
 
     # Cache Connection String
-    #{_app_env_prefix}CACHE_CONNECTION_STRING=esi-link-cache-file:{DEFAULT_APP_DIR / "esi-link-cache.json"}
+    #{_app_env_prefix}CACHE_CONNECTION_STRING="esi-link-cache-file:${{{_app_env_prefix}APP_DIR}}/esi-link-cache.json"
 
-    # Auth Connection String
-    # NOTE: The following connection strings must be the same to avoid data corruption
-    #{_app_env_prefix}AUTH_CONNECTION_STRING=esi-auth-file:{DEFAULT_APP_DIR / "esi-auth-store.json"}
-    #PFMSOFT_ESI_AUTH_AUTH_CONNECTION_STRING=esi-auth-file:{DEFAULT_APP_DIR / "esi-auth-store.json"}
+    # Connection Rate Limiting
+    #{_app_env_prefix}CONNECTION_PERIOD=60
+    #{_app_env_prefix}CONNECTION_MAX_RATE=100
     """
     return env_example_str
