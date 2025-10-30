@@ -23,7 +23,7 @@ __version__ = "0.1.0"
 __release__ = __version__
 #######################################################################################
 NAMESPACE = "pfmsoft"
-APPLICATION_NAME = "esi-auth"
+APPLICATION_NAME = "esi-link"
 DEFAULT_APP_DIR = Path(typer.get_app_dir(f"{NAMESPACE}-{APPLICATION_NAME}"))
 USER_AGENT = "esi-link/0.1.0"
 

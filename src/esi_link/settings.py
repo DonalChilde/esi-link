@@ -3,14 +3,13 @@
 from os import getenv
 from pathlib import Path
 
-from esi_auth import APPLICATION_NAME, DEFAULT_APP_DIR, NAMESPACE
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from whenever import Instant
 
-from esi_link.helpers.make_safe_env_name import make_safe_env_name
+from esi_link import DEFAULT_APP_DIR
 
-_app_env_prefix = make_safe_env_name(f"{NAMESPACE}_{APPLICATION_NAME}_")
+_app_env_prefix = "PFMSOFT_ESI_LINK_"
 
 
 class EsiLinkSettings(BaseSettings):
@@ -67,8 +66,8 @@ class EsiLinkSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_file=(
-            f"{DEFAULT_APP_DIR}/.env",
-            ".env",
+            f"{DEFAULT_APP_DIR}/.esi-link.env",
+            ".esi-link.env",
         ),
         env_prefix=_app_env_prefix,
     )
@@ -81,12 +80,13 @@ def get_settings() -> EsiLinkSettings:
 
 def env_example() -> str:
     """Get an example of environment variables for ESI Link settings."""
+    # TODO include instructions on how to set up esi-auth env vars too
     env_example_str = f"""# ESI Link Environment Variables
     # File generated at {Instant.now().format_iso()}\n
 
     # Env variable load order:
-    # 1. .env files in application directory
-    # 2. .env files in current working directory
+    # 1. .esi-link.env files in application directory
+    # 2. .esi-link.env files in current working directory
     # 3. System environment variables
 
     # Uncomment and set the following environment variables to override default settings.
@@ -109,6 +109,6 @@ def env_example() -> str:
     # Auth Connection String
     # NOTE: The following connection strings must be the same to avoid data corruption
     #{_app_env_prefix}AUTH_CONNECTION_STRING=esi-auth-file:{DEFAULT_APP_DIR / "esi-auth-store.json"}
-    PFMSOFT_ESI_AUTH_AUTH_CONNECTION_STRING=esi-auth-file:{DEFAULT_APP_DIR / "esi-auth-store.json"}
+    #PFMSOFT_ESI_AUTH_AUTH_CONNECTION_STRING=esi-auth-file:{DEFAULT_APP_DIR / "esi-auth-store.json"}
     """
     return env_example_str
