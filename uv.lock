@@ -366,7 +366,7 @@ wheels = [
 [[package]]
 name = "esi-auth"
 version = "0.2.0"
-source = { git = "https://github.com/DonalChilde/esi-auth?branch=main#173824796df00838a18e4be28c7dc69e7cb4c2e7" }
+source = { git = "https://github.com/DonalChilde/esi-auth?branch=main#b564c2973a86100a8f5d734cb819c7e8ddac9ea4" }
 dependencies = [
     { name = "aiohttp" },
     { name = "jinja2" },
