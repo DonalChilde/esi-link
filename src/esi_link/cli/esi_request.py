@@ -46,25 +46,54 @@ def created_on_():
     console.print_json(data={"created_on": now.format_iso()})
 
 
-@app.command()
-def blank_request():
-    """Display a blank ESI request template."""
-    console = Console()
-    blank_request = create_blank_request()
-    console.print(Panel.fit(str(blank_request), title="Blank ESI Request Template"))
-    console.print(safe_dump(blank_request.model_dump(mode="json"), sort_keys=False))
-
-
-@app.command()
-def examples(
+@app.command(name="blank")
+def blank_request(
     file_out: Annotated[
         Path,
         typer.Option(
             "-f",
-            "--file-path",
-            help="Path to save example ESI requests to.",
+            "--file-out",
+            help="Path to save the blank ESI request template.",
+            writable=True,
+            dir_okay=False,
         ),
-    ] = Path("example_esi_requests.yaml"),
+    ],
+    overwrite: Annotated[
+        bool,
+        typer.Option(
+            "--overwrite",
+            "-o",
+            help="Whether to overwrite the file if it exists.",
+        ),
+    ] = False,
+):
+    """Display a blank ESI request template."""
+    console = Console()
+    blank_request = create_blank_request()
+    requests = EsiRequests(
+        requests_id=uuid4(),
+        description="Blank ESI Request Template",
+        requests={blank_request.request_id: blank_request},
+    )
+    console.rule("[bold green]Blank ESI Request Template[/bold green]")
+    console.print(safe_dump(requests.model_dump(mode="json"), sort_keys=False))
+    if file_out:
+        requests.save_to_file(file_out, overwrite=overwrite)
+        console.print(
+            f"[bold green]Blank ESI request template saved to:[/bold green] {file_out.resolve()}"
+        )
+
+
+@app.command()
+def examples(
+    dir_out: Annotated[
+        Path,
+        typer.Argument(
+            help="Directory to save example ESI requests to.",
+            file_okay=False,
+            writable=True,
+        ),
+    ],
     overwrite: Annotated[
         bool,
         typer.Option(
@@ -83,6 +112,7 @@ def examples(
         description="Example ESI requests",
         requests={req.request_id: req for req in blank_requests},
     )
+    file_out = dir_out / "example-esi-requests.yaml"
     esi_requests.save_to_file(file_out, overwrite=overwrite)
     console.print(
         f"[bold green]Example ESI requests saved to:[/bold green] {file_out.resolve()}"
@@ -174,6 +204,7 @@ def create_handlers_table(handlers: list[type[ResponseHandlerProtocol]]) -> Tabl
 
 
 def create_blank_request() -> EsiRequest:
+    """Create a blank ESI request template."""
     return EsiRequest(
         request_id=uuid4(),
         operation_id="your_operation_id_here",

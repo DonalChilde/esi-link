@@ -195,9 +195,12 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                 raise EsiLinkError(
                     f"Failed to fetch paged data for URL {http_response.url} with status code {http_response.status_code}"
                 )
-            if first_page.etag and http_response.etag != first_page.etag:
+            if (
+                first_page.last_modified
+                and http_response.last_modified != first_page.last_modified
+            ):
                 raise EsiLinkError(
-                    f"ETag mismatch for paged response at URL {http_response.url}"
+                    f"Last-Modified mismatch for paged response at URL {http_response.url}, expected {first_page.last_modified}, got {http_response.last_modified}"
                 )
             # Merge the JSON data from the paged response into the first page
             if isinstance(first_page.json_data, list) and isinstance(  # pyright: ignore[reportUnknownMemberType]
@@ -212,8 +215,8 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                 logger.warning(
                     f"Cannot merge paged response data for URL {http_response.url}"
                 )
-        # After all pages are fetched and merged, run handlers on the combined response
-        await self._do_handlers(request, first_page)
+        # # After all pages are fetched and merged, run handlers on the combined response
+        # await self._do_handlers(request, first_page)
         return None
 
     def build_paged_requests(
@@ -286,10 +289,10 @@ class EsiHttpRateLimited(EsiHttpProtocol):
 
         Args:
             requests: A list of HttpRequest instances to execute.
+
         Returns:
             A list of tuples containing the HttpRequest and either None or an exception if one occurred.
         """
-
         tasks = [self._worker(req) for req in requests]
         results = await asyncio.gather(*tasks)
         return results

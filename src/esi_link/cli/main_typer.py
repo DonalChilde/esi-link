@@ -24,8 +24,12 @@ from esi_link.settings import get_settings
 logger = logging.getLogger(__name__)
 
 app = typer.Typer(no_args_is_help=True)
-app.add_typer(esi_schema_app, name="schema")
-app.add_typer(esi_request_app, name="requests")
+app.add_typer(
+    esi_schema_app,
+    name="schema",
+    help="Information about the operations available in the ESI schema.",
+)
+app.add_typer(esi_request_app, name="requests", help="Make ESI requests.")
 
 
 @app.callback(invoke_without_command=True)

@@ -127,7 +127,7 @@ class Metrics(TypedDict):
 
 
 class ResponseData(BaseModel):
-    exceptions: dict[UUID, tuple[EsiRequest, Type[BaseException]]] = {}
+    exceptions: dict[UUID, tuple[EsiRequest, type[BaseException]]] = {}
     metrics: dict[UUID, tuple[EsiRequest, Metrics]] = {}
     http_responses: dict[UUID, tuple[EsiRequest, "HttpResponse"]] = {}
 
@@ -156,7 +156,9 @@ class CachedResponse(BaseModel):
         Returns:
             True if the cached response is stale, False otherwise.
         """
-        # Placeholder implementation; actual logic will depend on caching strategy.
+        expires_at = self.response.expires_at()
+        if expires_at is not None:
+            return expires_at < Instant.now()
         return False
 
 
@@ -305,6 +307,27 @@ class HttpResponse(BaseModel):
     last_modified: str = ""
     expires: str = ""
     completed_on: Instant = Field(default_factory=_get_current_instant)
+
+    def expires_at(self) -> Instant | None:
+        """Get the expiration instant from the Expires header, if present.
+
+        Returns:
+            The Instant when the response expires, or None if not present.
+        """
+        if self.expires:
+            try:
+                return Instant.parse_rfc2822(self.expires)
+            except Exception:
+                return None
+        return None
+
+    def has_cache_info(self) -> bool:
+        """Check if the response has caching information.
+
+        Returns:
+            True if the response has ETag or Expires headers, False otherwise.
+        """
+        return bool(self.etag and self.expires)
 
     # class EsiLinkConfig(BaseModel):
     #     """Application data for Esi Link."""
