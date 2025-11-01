@@ -9,7 +9,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Optional, Self, Type, TypedDict
+from typing import Any, Literal, Optional, Self, Type, TypedDict
 from uuid import UUID
 
 import aiohttp
@@ -109,21 +109,35 @@ class EsiRequests(BaseModel):
         return result
 
 
-class Metrics(TypedDict):
-    request_start: Instant
-    request_end: Instant
-    response_start: Instant
-    response_end: Instant
-    handlers_start: Instant
-    handlers_end: Instant
-    pages_fetched: int
-    pages_start: Instant
-    pages_end: Instant
-    ratelimit_group: str
-    ratelimit_limit: str
-    ratelimit_remaining: int
-    ratelimit_used: int
-    ratelimit_retry_after: float
+class Metrics(BaseModel):
+    request_start: Instant | None = None
+    request_end: Instant | None = None
+    response_start: Instant | None = None
+    response_end: Instant | None = None
+    handlers_start: Instant | None = None
+    handlers_end: Instant | None = None
+    pages_required: int | None = None
+    pages_fetched: int | None = None
+    pages_start: Instant | None = None
+    pages_end: Instant | None = None
+    cache_check_start: Instant | None = None
+    cache_check_end: Instant | None = None
+    cache_update_start: Instant | None = None
+    cache_update_end: Instant | None = None
+    cache_check: Literal["HIT", "MISS", "STALE"] | None = None
+    rate_limit_group: str | None = None
+    rate_limit_limit: str | None = None
+    rate_limit_remaining: str | None = None
+    rate_limit_used: str | None = None
+    rate_limit_retry_after: str | None = None
+    response_source: Literal[
+        "CACHE",
+        "NETWORK_STALE_CACHE_OK",
+        "NETWORK_STALE_CACHE_UPDATED",
+        "NETWORK_CACHE_MISS",
+        "NETWORK",
+        "NOT_SET",
+    ] = "NOT_SET"
 
 
 class ResponseData(BaseModel):
@@ -135,6 +149,14 @@ class ResponseData(BaseModel):
 class ResponseContext(BaseModel):
     obj: dict[str, Any] = {}
     response_data: ResponseData = Field(default_factory=ResponseData)
+
+
+class EsiResponse(BaseModel):
+    """Represents the response for a single ESI request."""
+
+    request: EsiRequest
+    http_response: "HttpResponse | Exception"
+    metrics: Metrics
 
 
 class CachedResponse(BaseModel):
@@ -280,7 +302,7 @@ class HttpRequest:
     is_paged: bool
     ctx: ResponseContext
     esi_request: EsiRequest
-    cache_key: Optional[UUID] = None
+    cache_key: UUID | None = None
     """The cache key UUID, built from the EsiRequest. None if caching is not used."""
     app_handlers: list["ResponseHandlerProtocol"] = field(
         default_factory=list["ResponseHandlerProtocol"]
@@ -610,7 +632,7 @@ class EsiHttpProtocol:
     async def execute_requests(
         self,
         requests: list[HttpRequest],
-    ) -> list[tuple[HttpRequest, None | BaseException]]:
+    ) -> list[EsiResponse]:
         """Execute a list of HTTP requests.
 
         Args:
