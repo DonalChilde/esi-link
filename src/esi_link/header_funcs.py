@@ -3,12 +3,12 @@
 type HeadersType = tuple[tuple[str, str | None], ...]
 
 
-def pages_available(headers: HeadersType) -> int:
+def pages_available(headers: HeadersType) -> str:
     """Get the page count from the response headers."""
     for header in headers:
         if header[0].lower() == "x-pages":
-            return int(header[1] or 1)
-    return 1
+            return header[1] or "1"
+    return "1"
 
 
 def last_modified(headers: HeadersType) -> str:
@@ -19,21 +19,20 @@ def last_modified(headers: HeadersType) -> str:
     return ""
 
 
-def limit_reset(headers: HeadersType) -> int:
+def limit_reset(headers: HeadersType) -> str:
     """Get the seconds until the error limit resets from the response headers."""
-    default: int = -1
     for header in headers:
         if header[0].lower() == "x-esi-error-limit-reset":
-            return int(header[1] or default)
-    return default
+            return header[1] or ""
+    return ""
 
 
-def limit_remain(headers: HeadersType) -> int:
+def limit_remain(headers: HeadersType) -> str:
     """Get the errors remaining from the response headers."""
-    default: int = 100
+    default = "100"
     for header in headers:
         if header[0].lower() == "x-esi-error-limit-remain":
-            return int(header[1] or default)
+            return header[1] or default
     return default
 
 
@@ -61,13 +60,12 @@ def inject_compatibility_date(headers: dict[str, str], compatibility_date: str) 
 # FIXME: return strings over ints.
 
 
-def retry_after(headers: HeadersType) -> int:
+def retry_after(headers: HeadersType) -> str:
     """Get the retry-after seconds from the response headers."""
-    default: int = -1
     for header in headers:
         if header[0].lower() == "retry-after":
-            return int(header[1] or default)
-    return default
+            return header[1] if header[1] else ""
+    return ""
 
 
 def rate_limit_group(headers: HeadersType) -> str:
