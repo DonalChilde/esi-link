@@ -7,7 +7,6 @@ from uuid import uuid4
 
 import typer
 from rich.console import Console
-from rich.panel import Panel
 from rich.table import Table
 from whenever import Instant
 from yaml import safe_dump
@@ -154,14 +153,14 @@ def execute(
         result = asyncio.run(
             esi_link.execute_requests(ctx=response_context, requests=requests)
         )
-        for http_request, exception in result:
-            if exception:
+        for esi_response in result:
+            if isinstance(esi_response.http_response, Exception):
                 console.print(
-                    f"[bold red]Error executing ESI request {http_request.esi_request.request_id}:[/bold red] {exception}"
+                    f"[bold red]Error executing ESI request {esi_response.request.request_id}:[/bold red] {esi_response.http_response}"
                 )
             else:
                 console.print(
-                    f"[bold green]ESI request {http_request.esi_request.request_id} executed successfully[/bold green]"
+                    f"[bold green]ESI request {esi_response.request.request_id} executed successfully[/bold green]"
                 )
     except Exception as e:
         console.print(f"[bold red]Error executing ESI requests:[/bold red] {e}")

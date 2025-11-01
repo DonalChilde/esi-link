@@ -1,7 +1,9 @@
 """ESI Link main module implementation."""
 
+import asyncio
 import logging
 from copy import deepcopy
+from types import CoroutineType
 from typing import Any
 
 from esi_auth import CharacterToken, TokenManager
@@ -10,14 +12,13 @@ from whenever import Instant
 from esi_link import USER_AGENT
 from esi_link import operation_accessors as OA
 from esi_link.build_url import build_url
-from esi_link.cache_p import InMemoryCache
-from esi_link.esi_http import EsiHttpRateLimited
 from esi_link.models import (
     EsiHttpProtocol,
     EsiLinkError,
     EsiLinkProtocol,
     EsiRequest,
     EsiRequests,
+    EsiResponse,
     EsiSchema,
     HandlerConfig,
     HandlerManagerProtocol,
@@ -25,7 +26,6 @@ from esi_link.models import (
     ResponseContext,
     ResponseHandlerProtocol,
 )
-from esi_link.response_handlers import HandlerManager
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -69,9 +69,6 @@ class EsiLink(EsiLinkProtocol):
             if application_handlers_config
             else APPLICATION_RESPONSE_HANDLERS
         )
-        self.app_handlers: list[ResponseHandlerProtocol] = self._init_handlers(
-            self.application_handlers_config
-        )
 
     def _init_handlers(
         self, handler_configs: list[HandlerConfig]
@@ -86,27 +83,46 @@ class EsiLink(EsiLinkProtocol):
         self,
         ctx: ResponseContext,
         requests: EsiRequests,
-    ) -> list[tuple[HttpRequest, BaseException | None]]:
+    ) -> list[EsiResponse]:
         """Execute the given EsiRequests asynchronously."""
-        http_requests = self.build_http_requests(ctx=ctx, requests=requests)
         async with self.esi_http as http_client:
-            # update esi http protocol to use new methods - see three entry points below.
-            # - only one will be used here, but all three should be available.
-            # update esi link protocol to use new methods - see three entry points below.
-            # Update handlers to use EsiResponse instead of raw responses
-            # - remember to check for exceptions in responses
-            # get list of response coros
-            response_coros = http_client.collect_request_coros(http_requests)
-            # wrap coros in another coro that runs handlers
-            # async.gather the wrapped coros - Do this here, or let caller do it?
-            # for now, just gather here and return results, but add functions to protocol that allow it.
-            # Three entry points:
-            # 1. collect_request_coros - returns list of wrapped coros to be executed here or by caller.
-            # 2. execute_requests - async.run execute_requests_async - does everything sync here.
-            # 3. execute_requests_async - one stop shop that does everything as async def.
+            http_requests = self.build_http_requests(ctx=ctx, requests=requests)
+            response_coros = await http_client.collect_request_coros(http_requests)
+            request_coros = [self._handler_wrapper(ctx, r) for r in response_coros]
+            results = await asyncio.gather(*request_coros)
+            return results
 
-            results = await http_client.execute_requests(http_requests)
-        return results
+    # async def collect_request_coros(
+    #     self, ctx: ResponseContext, requests: EsiRequests
+    # ) -> list[CoroutineType[Any, Any, EsiResponse]]:
+    #     """Collect coroutines for the given EsiRequests.
+
+    #     Note: This method returns coroutines that must be executed while the
+    #     esi_http context manager is still active. Consider using execute_requests()
+    #     instead for proper session lifecycle management.
+    #     """
+    #     http_requests = self.build_http_requests(ctx=ctx, requests=requests)
+    #     async with self.esi_http as http_client:
+    #         response_coros = await http_client.collect_request_coros(http_requests)
+    #         request_coros = [self._handler_wrapper(ctx, r) for r in response_coros]
+    #         return request_coros
+
+    async def _handler_wrapper(
+        self,
+        ctx: ResponseContext,
+        response_coro: CoroutineType[Any, Any, EsiResponse],
+    ) -> EsiResponse:
+        """Wrap the response coroutine to run response handlers."""
+        response = await response_coro
+        response.metrics.handlers_start = Instant.now()
+        app_handlers = self._init_handlers(self.application_handlers_config)
+        for handler in app_handlers:
+            await handler.handle_response(ctx=ctx, esi_response=response)
+        request_handlers = self._init_handlers(response.request.handlers)
+        for handler in request_handlers:
+            await handler.handle_response(ctx=ctx, esi_response=response)
+        response.metrics.handlers_end = Instant.now()
+        return response
 
     def get_auth_tokens_for_requests(
         self,
@@ -192,7 +208,6 @@ class EsiLink(EsiLinkProtocol):
             indexed_operation = self.esi_schema.operations.get(req.operation_id)
             if not indexed_operation:
                 raise EsiLinkError(f"Operation ID not found: {req.operation_id}")
-            user_handlers = self._init_handlers(req.handlers)
             is_paged = OA.is_paged(indexed_operation)
             http_request_headers = self._collect_http_request_headers(
                 esi_request=req, token_dict=token_dict
@@ -205,8 +220,6 @@ class EsiLink(EsiLinkProtocol):
                 cache_key=self.esi_http.cache.generate_cache_key(
                     esi_request=req, esi_schema=self.esi_schema
                 ),
-                app_handlers=self.app_handlers,
-                user_handlers=user_handlers,
                 headers=http_request_headers,
                 is_paged=is_paged,
             )
@@ -214,44 +227,44 @@ class EsiLink(EsiLinkProtocol):
         return http_requests
 
 
-class LinkManager:
-    """Handles the initialization and management of EsiLink instances."""
+# class LinkManager:
+#     """Handles the initialization and management of EsiLink instances."""
 
-    def __init__(
-        self,
-        esi_schema: dict[str, Any],
-        schema_download_date: Instant,
-        auth_connection_string: str,
-    ) -> None:
-        # FIXME should this be a raw schema or an EsiSchema?
-        self.esi_schema = EsiSchema.from_schema(
-            schema=esi_schema, download_date=schema_download_date
-        )
-        self._handler_manager = self._get_handler_manager()
-        self._token_manager = self._get_token_manager(
-            auth_connection_string=auth_connection_string
-        )
+#     def __init__(
+#         self,
+#         esi_schema: dict[str, Any],
+#         schema_download_date: Instant,
+#         auth_connection_string: str,
+#     ) -> None:
+#         # FIXME should this be a raw schema or an EsiSchema?
+#         self.esi_schema = EsiSchema.from_schema(
+#             schema=esi_schema, download_date=schema_download_date
+#         )
+#         self._handler_manager = self._get_handler_manager()
+#         self._token_manager = self._get_token_manager(
+#             auth_connection_string=auth_connection_string
+#         )
 
-    def _get_handler_manager(self) -> HandlerManagerProtocol:
-        handler_manager = HandlerManager()
-        # # Register built-in handlers
-        # handler_manager.register_handler(
-        #     JsonFileResponseDataHandler.name, JsonFileResponseDataHandler
-        # )
-        return handler_manager
+#     def _get_handler_manager(self) -> HandlerManagerProtocol:
+#         handler_manager = HandlerManager()
+#         # # Register built-in handlers
+#         # handler_manager.register_handler(
+#         #     JsonFileResponseDataHandler.name, JsonFileResponseDataHandler
+#         # )
+#         return handler_manager
 
-    def _get_token_manager(self, auth_connection_string: str) -> TokenManager:
-        token_manager = TokenManager(connection_string=auth_connection_string)
-        return token_manager
+#     def _get_token_manager(self, auth_connection_string: str) -> TokenManager:
+#         token_manager = TokenManager(connection_string=auth_connection_string)
+#         return token_manager
 
-    def esi_link_factory(self) -> EsiLinkProtocol:
-        # TODO allow configuration of cache and HTTP client
-        cache = InMemoryCache()
-        esi_http = EsiHttpRateLimited(cache=cache, esi_schema=self.esi_schema)
-        esi_link = EsiLink(
-            esi_schema=self.esi_schema,
-            esi_http=esi_http,
-            handler_manager=self._handler_manager,
-            token_manager=self._token_manager,
-        )
-        return esi_link
+#     def esi_link_factory(self) -> EsiLinkProtocol:
+#         # TODO allow configuration of cache and HTTP client
+#         cache = InMemoryCache()
+#         esi_http = EsiHttpRateLimited(cache=cache, esi_schema=self.esi_schema)
+#         esi_link = EsiLink(
+#             esi_schema=self.esi_schema,
+#             esi_http=esi_http,
+#             handler_manager=self._handler_manager,
+#             token_manager=self._token_manager,
+#         )
+#         return esi_link

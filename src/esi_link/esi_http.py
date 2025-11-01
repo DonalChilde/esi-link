@@ -46,13 +46,11 @@ class EsiHttpRateLimited(EsiHttpProtocol):
         self.max_rate = max_rate
         self.time_period = time_period
         self._error_count: int = 0
-        self._external_session: bool = bool(self.session)
 
     async def __aenter__(self) -> "EsiHttpRateLimited":
         """Enter the async context manager, initializing the HTTP session and rate limiter."""
         if not self.session:
             self.session = aiohttp.ClientSession()
-            self._external_session = False
         self.limiter = AsyncLimiter(self.max_rate, self.time_period)
         return self
 
@@ -64,22 +62,21 @@ class EsiHttpRateLimited(EsiHttpProtocol):
     ) -> None:
         """Exit the async context manager, closing the HTTP session."""
         assert self.session is not None, "Session is not initialized."
-        if not self._external_session:
-            await self.session.close()
+        await self.session.close()
 
-    async def _do_handlers(
-        self, request: HttpRequest, http_response: HttpResponse
-    ) -> None:
-        # Process app level handlers
-        for handler in request.app_handlers:
-            await handler.handle_response(
-                request.ctx, http_response, request.esi_request
-            )
-        # Process user level handlers
-        for handler in request.user_handlers:
-            await handler.handle_response(
-                request.ctx, http_response, request.esi_request
-            )
+    # async def _do_handlers(
+    #     self, request: HttpRequest, http_response: HttpResponse
+    # ) -> None:
+    #     # Process app level handlers
+    #     for handler in request.app_handlers:
+    #         await handler.handle_response(
+    #             request.ctx, http_response, request.esi_request
+    #         )
+    #     # Process user level handlers
+    #     for handler in request.user_handlers:
+    #         await handler.handle_response(
+    #             request.ctx, http_response, request.esi_request
+    #         )
 
     async def _worker(self, request: HttpRequest) -> EsiResponse:
         """Worker to process a single HTTP request.
@@ -93,6 +90,7 @@ class EsiHttpRateLimited(EsiHttpProtocol):
         metrics = Metrics()
         metrics.request_start = Instant.now()
         cache_status: Literal["HIT", "MISS", "STALE", "NA"] | None = None
+        http_response: HttpResponse | None = None
         try:
             if not self.session:
                 raise EsiLinkError("HTTP session is not initialized.")
@@ -220,15 +218,17 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                         f"Unhandled status code {http_response.status_code}, {http_response.reason} for URL {http_response.url}"
                     )
         except Exception as e:
-            logger.error(f"Error processing request for URL {request.url}: {e}")
+            error_msg = f"Error processing request for URL {request.url}: {e}"
+            logger.error(error_msg)
             request.ctx.response_data.exceptions[request.esi_request.request_id] = (  # pyright: ignore[reportArgumentType]
                 request,
                 e,
             )
             return EsiResponse(
                 request=request.esi_request,
-                http_response=e,
+                http_response=http_response,
                 metrics=metrics,
+                error_messages=[error_msg],
             )
         finally:
             metrics.request_end = Instant.now()
@@ -390,20 +390,24 @@ class EsiHttpRateLimited(EsiHttpProtocol):
     ) -> list[EsiResponse]:
         """Execute a list of HTTP requests.
 
+        Gathers all request coroutines and executes them concurrently.
+
         Args:
             requests: A list of HttpRequest instances to execute.
 
         Returns:
             A list of EsiResponse instances.
         """
-        request_coros = self.collect_request_coros(requests)
+        request_coros = await self.collect_request_coros(requests)
         results = await asyncio.gather(*request_coros)
         return results
 
-    def collect_request_coros(
+    async def collect_request_coros(
         self, requests: list[HttpRequest]
     ) -> list[CoroutineType[Any, Any, EsiResponse]]:
-        """Collect and execute the given HTTP requests asynchronously.
+        """Collect coroutines for executing HTTP requests.
+
+        Gathers all request coroutines. Can be used to execute requests in a custom manner.
 
         Args:
             requests: A list of HttpRequest instances to execute.

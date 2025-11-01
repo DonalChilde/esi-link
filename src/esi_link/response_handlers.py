@@ -13,6 +13,7 @@ from whenever import Instant
 
 from esi_link.models import (
     EsiRequest,
+    EsiResponse,
     HandlerConfig,
     HandlerConfigError,
     HandlerManagerProtocol,
@@ -37,44 +38,44 @@ logger = logging.getLogger(__name__)
 # - CLIENT_ALIAS: The client alias from the auth parameters (if present)
 
 
-class KeepHttpResponseHandler(ResponseHandlerProtocol):
-    """A response handler that keeps the full HTTP response in the response context."""
+# class KeepHttpResponseHandler(ResponseHandlerProtocol):
+#     """A response handler that keeps the full HTTP response in the response context."""
 
-    name: str = "esi-link.keep_http_response"
+#     name: str = "esi-link.keep_http_response"
 
-    async def handle_response(
-        self,
-        ctx: ResponseContext,
-        http_response: HttpResponse,
-        request: EsiRequest,
-    ) -> None:
-        ctx.response_data.http_responses[request.request_id] = (request, http_response)
+#     async def handle_response(
+#         self,
+#         ctx: ResponseContext,
+#         http_response: HttpResponse,
+#         request: EsiRequest,
+#     ) -> None:
+#         ctx.response_data.http_responses[request.request_id] = (request, http_response)
 
-    @classmethod
-    def from_config(cls, config: HandlerConfig) -> "KeepHttpResponseHandler":
-        return cls()
+#     @classmethod
+#     def from_config(cls, config: HandlerConfig) -> "KeepHttpResponseHandler":
+#         return cls()
 
-    @classmethod
-    def example_config(cls) -> tuple[HandlerConfig, str]:
-        """Return an example configuration for this handler, with a text description.
+#     @classmethod
+#     def example_config(cls) -> tuple[HandlerConfig, str]:
+#         """Return an example configuration for this handler, with a text description.
 
-        Example does not have to be a valid config, but should illustrate the main options.
-        """
-        example = HandlerConfig(name=cls.name, config={})
-        description = (
-            "Keeps the full HTTP response in the response context under "
-            "http_responses[query_id]. No configuration options are needed."
-        )
-        return example, description
+#         Example does not have to be a valid config, but should illustrate the main options.
+#         """
+#         example = HandlerConfig(name=cls.name, config={})
+#         description = (
+#             "Keeps the full HTTP response in the response context under "
+#             "http_responses[query_id]. No configuration options are needed."
+#         )
+#         return example, description
 
-    @classmethod
-    def validate_config(cls, config: HandlerConfig) -> None:
-        if not config.name.startswith("esi-link."):
-            raise InvalidHandlerError(
-                "Handler name must be in the 'esi-link.' namespace.",
-                handler_name=config.name,
-                response=None,
-            )
+#     @classmethod
+#     def validate_config(cls, config: HandlerConfig) -> None:
+#         if not config.name.startswith("esi-link."):
+#             raise InvalidHandlerError(
+#                 "Handler name must be in the 'esi-link.' namespace.",
+#                 handler_name=config.name,
+#                 response=None,
+#             )
 
 
 class FileOutMixin:
@@ -132,11 +133,14 @@ class JsonFileResponseDataHandler(ResponseHandlerProtocol, FileOutMixin):
     async def handle_response(
         self,
         ctx: ResponseContext,
-        http_response: HttpResponse,
-        request: EsiRequest,
+        esi_response: EsiResponse,
     ) -> None:
-        if http_response.json_data is not None:
-            path_out = self.format_path(self._file_path, request)
+        http_response = esi_response.http_response
+        if (
+            isinstance(http_response, HttpResponse)
+            and http_response.json_data is not None
+        ):
+            path_out = self.format_path(self._file_path, esi_response.request)
             if not self._overwrite and path_out.exists():
                 raise ResponseHandlerError(
                     f"File {path_out} already exists. Use overwrite=True to overwrite.",
@@ -158,7 +162,7 @@ class JsonFileResponseDataHandler(ResponseHandlerProtocol, FileOutMixin):
         except Exception as e:
             raise HandlerConfigError(
                 f"Error creating handler from config: {e}", handler_config=config
-            )
+            ) from e
 
     @classmethod
     def example_config(cls) -> tuple[HandlerConfig, str]:
@@ -220,11 +224,14 @@ class JsonFileResponseHandler(ResponseHandlerProtocol, FileOutMixin):
     async def handle_response(
         self,
         ctx: ResponseContext,
-        http_response: HttpResponse,
-        request: EsiRequest,
+        esi_response: EsiResponse,
     ) -> None:
-        if http_response.json_data is not None:
-            path_out = self.format_path(self._file_path, request)
+        http_response = esi_response.http_response
+        if (
+            isinstance(http_response, HttpResponse)
+            and http_response.json_data is not None
+        ):
+            path_out = self.format_path(self._file_path, esi_response.request)
             if not self._overwrite and path_out.exists():
                 raise ResponseHandlerError(
                     f"File {path_out} already exists. Use overwrite=True to overwrite.",
@@ -245,7 +252,7 @@ class JsonFileResponseHandler(ResponseHandlerProtocol, FileOutMixin):
         except Exception as e:
             raise HandlerConfigError(
                 f"Error creating handler from config: {e}", handler_config=config
-            )
+            ) from e
 
     @classmethod
     def example_config(cls) -> tuple[HandlerConfig, str]:
@@ -323,7 +330,7 @@ class HandlerManager(HandlerManagerProtocol):
         return list(self.handlers.values())
 
     def _register_builtin_handlers(self) -> None:
-        self.register_handler(KeepHttpResponseHandler.name, KeepHttpResponseHandler)
+        # self.register_handler(KeepHttpResponseHandler.name, KeepHttpResponseHandler)
         self.register_handler(
             JsonFileResponseDataHandler.name, JsonFileResponseDataHandler
         )

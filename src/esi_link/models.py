@@ -1,15 +1,13 @@
+"""ESI Link Models."""
 ###########################################################################
 # Models
 ###########################################################################
 
-# TODO make utility commands in cli to output UUID and Instant in iso format to support hand crafting Esi Requests.
-
-
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
-from types import TracebackType
-from typing import Any, Literal, Optional, Self, Type, TypedDict
+from types import CoroutineType, TracebackType
+from typing import Any, Literal, Self
 from uuid import UUID
 
 import aiohttp
@@ -54,7 +52,7 @@ class EsiRequest(BaseModel):
     operation_id: str
     path_parameters: dict[str, str | int | float] = {}
     query_parameters: dict[str, str | int | float] = {}
-    auth_parameters: Optional[AuthParams] = None
+    auth_parameters: AuthParams | None = None
     request_body: Any = None
     headers: dict[str, str] = {}
     handlers: list[HandlerConfig] = []
@@ -155,8 +153,13 @@ class EsiResponse(BaseModel):
     """Represents the response for a single ESI request."""
 
     request: EsiRequest
-    http_response: "HttpResponse | Exception"
+    http_response: "HttpResponse | None"
     metrics: Metrics
+    error_messages: list[str] = []
+
+    model_config = {
+        "arbitrary_types_allowed": True,
+    }
 
 
 class CachedResponse(BaseModel):
@@ -304,13 +307,13 @@ class HttpRequest:
     esi_request: EsiRequest
     cache_key: UUID | None = None
     """The cache key UUID, built from the EsiRequest. None if caching is not used."""
-    app_handlers: list["ResponseHandlerProtocol"] = field(
-        default_factory=list["ResponseHandlerProtocol"]
-    )
-    """App level handlers to process the response. These are run before any request level handlers."""
-    user_handlers: list["ResponseHandlerProtocol"] = field(
-        default_factory=list["ResponseHandlerProtocol"]
-    )
+    # app_handlers: list["ResponseHandlerProtocol"] = field(
+    #     default_factory=list["ResponseHandlerProtocol"]
+    # )
+    # """App level handlers to process the response. These are run before any request level handlers."""
+    # user_handlers: list["ResponseHandlerProtocol"] = field(
+    #     default_factory=list["ResponseHandlerProtocol"]
+    # )
     """Request level handlers to process the response. These are run after any app level handlers."""
     headers: dict[str, str] = field(default_factory=dict[str, str])
     """App level headers to include in the request. These are merged with any request level headers."""
@@ -446,15 +449,13 @@ class ResponseHandlerProtocol:
     async def handle_response(
         self,
         ctx: ResponseContext,
-        http_response: HttpResponse,
-        request: EsiRequest,
+        esi_response: EsiResponse,
     ) -> Any:
         """Handle the response from an ESI request.
 
         Args:
             ctx: The response context.
-            http_response: The HttpResponse object.
-            request: The original EsiRequest object.
+            esi_response: The EsiResponse object.
 
         Returns:
             The processed response data.
@@ -503,6 +504,7 @@ class HandlerManagerProtocol:
 
         Args:
             config: The HandlerConfig instance containing the configuration.
+
         Returns:
             An instance of the handler.
 
@@ -541,8 +543,9 @@ class CacheProtocol:
         """Generate a cache key for the given ESI request.
 
         Args:
-            request: The EsiRequest instance for which to generate the cache key.
+            esi_request: The EsiRequest instance for which to generate the cache key.
             esi_schema: The EsiSchema instance representing the ESI OpenAPI schema.
+
         Returns:
             A UUID representing the cache key, or None if caching is not applicable.
 
@@ -552,15 +555,17 @@ class CacheProtocol:
 
     def is_cached(self, cache_key: UUID) -> bool:
         """Check if a response is cached for the given cache key.
+
         Args:
             cache_key: The UUID cache key to check.
+
         Returns:
             True if a cached response exists for the cache key, False otherwise.
         ...
         """
         ...
 
-    def get_cached_response(self, cache_key: UUID) -> Optional[CachedResponse]:
+    def get_cached_response(self, cache_key: UUID) -> CachedResponse | None:
         """Retrieve a cached response by its cache key.
 
         Args:
@@ -599,13 +604,12 @@ class EsiLinkProtocol:
         self,
         ctx: ResponseContext,
         requests: EsiRequests,
-    ) -> list[tuple[HttpRequest, BaseException | None]]:
+    ) -> list[EsiResponse]:
         """Execute a batch of ESI requests.
 
         Args:
+            ctx: The ResponseContext instance.
             requests: The EsiRequests instance containing the requests to execute.
-            session: An optional aiohttp ClientSession to use for the requests.
-            response_handler: An optional ResponseHandlerProtocol to process responses.
 
         Returns:
             A list of tuples containing the HttpRequest and either None or an exception if one occurred.
@@ -620,14 +624,18 @@ class EsiHttpProtocol:
     cache: CacheProtocol
     esi_schema: EsiSchema
 
-    async def __aenter__(self) -> Self: ...
+    async def __aenter__(self) -> Self:
+        """Enter the async context manager."""
+        ...
 
     async def __aexit__(
         self,
         exc_type: type[BaseException] | None,
         exc: BaseException | None,
         tb: TracebackType | None,
-    ) -> None: ...
+    ) -> None:
+        """Exit the async context manager."""
+        ...
 
     async def execute_requests(
         self,
@@ -640,6 +648,20 @@ class EsiHttpProtocol:
 
         Returns:
             A list of tuples containing the HttpRequest and either None or an exception if one occurred.
+        """
+        ...
+
+    async def collect_request_coros(
+        self,
+        requests: list[HttpRequest],
+    ) -> list[CoroutineType[Any, Any, EsiResponse]]:
+        """Collect coroutines for executing HTTP requests.
+
+        Args:
+            requests: A list of HttpRequest instances to execute.
+
+        Returns:
+            A list of coroutines for executing the requests.
         """
         ...
 
@@ -659,6 +681,7 @@ class HandlerConfigError(EsiLinkError):
     """Raised when there is an error in handler configuration."""
 
     def __init__(self, message: str, handler_config: HandlerConfig) -> None:
+        """Initialize the HandlerConfigError."""
         super().__init__(message)
         self.handler_config = handler_config
 
@@ -671,6 +694,7 @@ class ResponseHandlerError(EsiLinkError):
     def __init__(
         self, message: str, handler_name: str, response: HttpResponse | None
     ) -> None:
+        """Initialize the ResponseHandlerError."""
         super().__init__(message)
         self.handler_name = handler_name
         self.response = response
