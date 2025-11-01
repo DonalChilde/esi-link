@@ -1,7 +1,10 @@
+"""ESI HTTP Client Implementations."""
+
 import asyncio
 import logging
 from copy import deepcopy
-from types import TracebackType
+from types import CoroutineType, TracebackType
+from typing import Any, Literal
 
 import aiohttp
 from aiolimiter import AsyncLimiter
@@ -13,9 +16,11 @@ from esi_link.models import (
     CacheProtocol,
     EsiHttpProtocol,
     EsiLinkError,
+    EsiResponse,
     EsiSchema,
     HttpRequest,
     HttpResponse,
+    Metrics,
 )
 
 logger = logging.getLogger(__name__)
@@ -34,16 +39,20 @@ class EsiHttpRateLimited(EsiHttpProtocol):
         max_rate: int = 100,
         time_period: float = 60.0,
     ) -> None:
+        """Initialize the EsiHttpRateLimited instance."""
         self.session: aiohttp.ClientSession | None = None
         self.cache = cache
         self.esi_schema = esi_schema
         self.max_rate = max_rate
         self.time_period = time_period
         self._error_count: int = 0
+        self._external_session: bool = bool(self.session)
 
     async def __aenter__(self) -> "EsiHttpRateLimited":
+        """Enter the async context manager, initializing the HTTP session and rate limiter."""
         if not self.session:
             self.session = aiohttp.ClientSession()
+            self._external_session = False
         self.limiter = AsyncLimiter(self.max_rate, self.time_period)
         return self
 
@@ -53,8 +62,10 @@ class EsiHttpRateLimited(EsiHttpProtocol):
         exc: BaseException | None,
         tb: TracebackType | None,
     ) -> None:
+        """Exit the async context manager, closing the HTTP session."""
         assert self.session is not None, "Session is not initialized."
-        await self.session.close()
+        if not self._external_session:
+            await self.session.close()
 
     async def _do_handlers(
         self, request: HttpRequest, http_response: HttpResponse
@@ -70,9 +81,7 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                 request.ctx, http_response, request.esi_request
             )
 
-    async def _worker(
-        self, request: HttpRequest
-    ) -> tuple[HttpRequest, BaseException | None]:
+    async def _worker(self, request: HttpRequest) -> EsiResponse:
         """Worker to process a single HTTP request.
 
         Args:
@@ -81,68 +90,121 @@ class EsiHttpRateLimited(EsiHttpProtocol):
         Returns:
             A tuple of the HttpRequest and either None or an exception if one occurred.
         """
-        # TODO log rate limit info
-        worker_start = Instant.now()
+        metrics = Metrics()
+        metrics.request_start = Instant.now()
+        cache_status: Literal["HIT", "MISS", "STALE", "NA"] | None = None
         try:
             if not self.session:
                 raise EsiLinkError("HTTP session is not initialized.")
-            if request.cache_key is not None:
+            # cache key should be None if resource is not cached.
+            if request.cache_key is None:
+                cache_status = "NA"
+            else:
+                metrics.cache_check_start = Instant.now()
                 cached_response = self.cache.get_cached_response(request.cache_key)
-                if cached_response is not None and not cached_response.is_stale():
-                    await self._do_handlers(request, cached_response.response)
-                    return (request, None)
-                if cached_response is not None and cached_response.is_stale():
-                    # Add conditional headers to the request
-                    # Use ETag and Last-Modified from the cached response
-                    if cached_response.response.etag:
-                        request.headers["If-None-Match"] = cached_response.response.etag
-                    if cached_response.response.last_modified:
-                        request.headers["If-Modified-Since"] = (
-                            cached_response.response.last_modified
+                metrics.cache_check_end = Instant.now()
+                if cached_response is None:
+                    cache_status = "MISS"
+                    metrics.cache_check = "MISS"
+                else:
+                    if cached_response.is_stale():
+                        cache_status = "STALE"
+                        metrics.cache_check = "STALE"
+                        # Add conditional headers to the request
+                        # Use ETag and Last-Modified from the cached response
+                        if cached_response.response.etag:
+                            request.headers["If-None-Match"] = (
+                                cached_response.response.etag
+                            )
+                        if cached_response.response.last_modified:
+                            request.headers["If-Modified-Since"] = (
+                                cached_response.response.last_modified
+                            )
+                    else:
+                        cache_status = "HIT"
+                        metrics.cache_check = "HIT"
+                        metrics.response_source = "CACHE"
+                        metrics.request_end = Instant.now()
+                        # await self._do_handlers(request, cached_response.response)
+                        return EsiResponse(
+                            request=request.esi_request,
+                            http_response=cached_response.response,
+                            metrics=metrics,
                         )
-            request_start = Instant.now()
-            _, http_response = await self.get_response(request=request)
-            request_end = Instant.now()
-            logger.info(
-                f"Processed http request for URL {request.url} in {(request_end - request_start).in_seconds():.2f} seconds."
-            )
+            http_response = await self.get_response(request, metrics=metrics)
+            if metrics.response_start and metrics.response_end:
+                logger.info(
+                    f"Processed http request for URL {request.url} in "
+                    f"{(metrics.response_end - metrics.response_start).in_seconds():.2f} seconds."
+                )
+            # Update metrics with rate limit information from response headers
+            metrics_rate_limits(metrics, http_response)
             match http_response.status_code:
                 case 200:
                     if request.is_paged:
                         await self.get_paged_data(
-                            request=request, first_page=http_response
+                            request=request, first_page=http_response, metrics=metrics
                         )
+                    metrics.response_source = "NETWORK"
                     if request.cache_key is not None:
+                        metrics.cache_update_start = Instant.now()
                         self.cache.store_http_response(
                             cache_key=request.cache_key, http_response=http_response
                         )
-                    await self._do_handlers(request, http_response)
-                    return (request, None)
+                        metrics.cache_update_end = Instant.now()
+                        if cache_status == "STALE":
+                            metrics.response_source = "NETWORK_STALE_CACHE_UPDATED"
+                    # await self._do_handlers(request, http_response)
+                    metrics.request_end = Instant.now()
+                    return EsiResponse(
+                        request=request.esi_request,
+                        http_response=http_response,
+                        metrics=metrics,
+                    )
                 case 201:  # Created Successful
                     # TODO handle 201 Created responses if needed
-                    await self._do_handlers(request, http_response)
-                    return (request, None)
+                    # await self._do_handlers(request, http_response)
+                    metrics.request_end = Instant.now()
+                    metrics.response_source = "NETWORK"
+                    return EsiResponse(
+                        request=request.esi_request,
+                        http_response=http_response,
+                        metrics=metrics,
+                    )
                 case 204:  # No Content Successful
                     # TODO handle 204 No Content responses if needed
-                    await self._do_handlers(request, http_response)
-                    return (request, None)
+                    # await self._do_handlers(request, http_response)
+                    metrics.request_end = Instant.now()
+                    metrics.response_source = "NETWORK"
+                    return EsiResponse(
+                        request=request.esi_request,
+                        http_response=http_response,
+                        metrics=metrics,
+                    )
                 case 304:
                     if request.cache_key is None:
                         raise EsiLinkError("Received 304 but no cache is configured.")
+                    metrics.cache_update_start = Instant.now()
                     self.cache.store_http_response(
                         cache_key=request.cache_key, http_response=http_response
                     )
+                    metrics.cache_update_end = Instant.now()
                     cached_response = self.cache.get_cached_response(request.cache_key)
                     if cached_response is None:
                         raise EsiLinkError("Received 304 but no cached response found.")
-                    await self._do_handlers(request, cached_response.response)
-                    return (request, None)
+                    metrics.request_end = Instant.now()
+                    metrics.response_source = "NETWORK_STALE_CACHE_OK"
+                    return EsiResponse(
+                        request=request.esi_request,
+                        http_response=http_response,
+                        metrics=metrics,
+                    )
                 case 429:  # Rate Limited
                     # TODO consider retry logic here.
-                    retry_after = HF.retry_after(http_response.headers)
                     raise EsiLinkError(
-                        f"Rate limited on request to {http_response.url}. Retry after {retry_after} seconds."
+                        f"Rate limited on request to {http_response.url}. Retry after {metrics.rate_limit_retry_after} seconds."
                     )
+
                 # FIXME limit the number of 400 errors before failing.
                 case 400 | 401 | 403 | 404 | 500 | 502 | 503 | 504:
                     self._error_count += 1
@@ -163,45 +225,74 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                 request,
                 e,
             )
-            return (request, e)
-        finally:
-            worker_end = Instant.now()
-            logger.info(
-                f"Request for URL {request.url} started at {worker_start.format_iso()} and ended at {worker_end.format_iso()}. Took {(worker_end - worker_start).in_seconds():.2f} seconds."
+            return EsiResponse(
+                request=request.esi_request,
+                http_response=e,
+                metrics=metrics,
             )
+        finally:
+            metrics.request_end = Instant.now()
+            logger.info(
+                f"Request for URL {request.url} started at {metrics.request_start.format_iso()} "
+                f"and ended at {metrics.request_end.format_iso()}. Took "
+                f"{(metrics.request_end - metrics.request_start).in_seconds():.2f} seconds."
+            )
+            logger.info(f"Metrics: {metrics.model_dump_json()}")
+
+    async def get_paged_response(
+        self, request: HttpRequest, *, last_modified: str
+    ) -> HttpResponse:
+        """Fetch a single page of a multi page request and check for consistency."""
+        try:
+            http_response = await self.get_response(
+                request, metrics=None, raise_for_status=True
+            )
+        except Exception as e:
+            raise EsiLinkError(
+                f"Failed to fetch paged data for URL {request.url}: {e}"
+            ) from e
+        if last_modified and http_response.last_modified != last_modified:
+            raise EsiLinkError(
+                f"Last-Modified mismatch for paged response at URL {http_response.url}, expected {last_modified}, got {http_response.last_modified}"
+            )
+        return http_response
 
     async def get_paged_data(
-        self, request: HttpRequest, first_page: HttpResponse
+        self, *, request: HttpRequest, first_page: HttpResponse, metrics: Metrics
     ) -> None:
-        """Complete a paged request by fetching all pages.
+        """Complete a paged request by fetching 2->n pages.
 
         Paged data is combined into the first_page HttpResponse instance,
-        which is modified in place. Finally, handlers are run on the combined response.
+        which is modified in place. Paged requests are run in a TaskGroup,
+        which allows for concurrent fetching of pages, and one failure will
+        cause the entire group to fail.
         """
+        metrics.pages_start = Instant.now()
         paged_requests = self.build_paged_requests(request, first_page)
-        paged_start = Instant.now()
+        metrics.pages_required = len(paged_requests) + 1  # +1 for the first page
         logger.info(
-            f"Fetching {len(paged_requests)} additional pages for paged request to URL {request.url} at {paged_start.format_iso()}."
+            f"Fetching {len(paged_requests)} additional pages for paged request to URL {request.url} at {metrics.pages_start.format_iso()}."
         )
-        tasks = [self.get_response(req) for req in paged_requests]
-        results = await asyncio.gather(*tasks)
-        paged_end = Instant.now()
+        coros = [
+            self.get_paged_response(request, last_modified=first_page.last_modified)
+            for request in paged_requests
+        ]
+        tasks: list[asyncio.Task[HttpResponse]] = []
+        try:
+            async with asyncio.TaskGroup() as tg:
+                for coro in coros:
+                    tasks.append(tg.create_task(coro))
+        except* Exception as eg:
+            raise EsiLinkError(
+                f"Error fetching paged data for URL {request.url}: {eg}"
+            ) from eg
+
+        metrics.pages_end = Instant.now()
         logger.info(
-            f"Completed fetching paged data for URL {request.url} at {paged_end.format_iso()} in {(paged_end - paged_start).in_seconds():.2f} seconds."
+            f"Completed fetching paged data for URL {request.url} at {metrics.pages_end.format_iso()} in {(metrics.pages_end - metrics.pages_start).in_seconds():.2f} seconds."
         )
-        for result in results:
-            _, http_response = result
-            if http_response.status_code != 200:
-                raise EsiLinkError(
-                    f"Failed to fetch paged data for URL {http_response.url} with status code {http_response.status_code}"
-                )
-            if (
-                first_page.last_modified
-                and http_response.last_modified != first_page.last_modified
-            ):
-                raise EsiLinkError(
-                    f"Last-Modified mismatch for paged response at URL {http_response.url}, expected {first_page.last_modified}, got {http_response.last_modified}"
-                )
+        for task in tasks:
+            http_response = task.result()
             # Merge the JSON data from the paged response into the first page
             if isinstance(first_page.json_data, list) and isinstance(  # pyright: ignore[reportUnknownMemberType]
                 http_response.json_data, list
@@ -215,23 +306,20 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                 logger.warning(
                     f"Cannot merge paged response data for URL {http_response.url}"
                 )
-        # # After all pages are fetched and merged, run handlers on the combined response
-        # await self._do_handlers(request, first_page)
         return None
 
     def build_paged_requests(
         self, request: HttpRequest, first_page: HttpResponse
     ) -> list[HttpRequest]:
         """Build a list of paged requests based on the first page response."""
-
         if not request.is_paged:
             raise EsiLinkError("Request is not marked as paged.")
-        page_count = HF.pages_available(first_page.headers)
+        page_count = int(HF.pages_available(first_page.headers))
         if page_count < 1:
             raise EsiLinkError("Invalid page count retrieved from headers.")
-        http_requests: list[HttpRequest] = []
+        paged_requests: list[HttpRequest] = []
         if page_count == 1:
-            return http_requests
+            return paged_requests
         for page_number in range(2, page_count + 1):
             paged_request = deepcopy(request)
             # Clear any user defined handlers for paged requests
@@ -243,22 +331,33 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                 paged_request.esi_request,
                 esi_schema=self.esi_schema,
             )
-            http_requests.append(paged_request)
-        return http_requests
+            paged_requests.append(paged_request)
+        return paged_requests
 
     async def get_response(
-        self, request: HttpRequest
-    ) -> tuple[HttpRequest, HttpResponse]:
+        self,
+        request: HttpRequest,
+        *,
+        metrics: Metrics | None,
+        raise_for_status: bool = False,
+    ) -> HttpResponse:
         """Get a single HTTP response.
+
+        Use raise_for_status with paged requests, as all pages must complete successfully
+        to be useful.
 
         Args:
             request: The HttpRequest instance to execute.
+            metrics: The Metrics instance to update with request timing.
+            raise_for_status: Whether to raise an exception for HTTP error status codes.
 
         Returns:
             A tuple of the HttpRequest and HttpResponse.
         """
         if not self.session:
             raise EsiLinkError("HTTP session is not initialized.")
+        if metrics:
+            metrics.response_start = Instant.now()
         if self._error_count >= 10:
             raise EsiLinkError("Too many errors encountered; aborting requests.")
         async with self.limiter:
@@ -269,6 +368,8 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                 headers=request.headers,
                 timeout=timeout_obj,
             ) as response:
+                if raise_for_status:
+                    response.raise_for_status()
                 http_response = HttpResponse(
                     status_code=response.status,
                     reason=response.reason,
@@ -279,20 +380,45 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                     last_modified=response.headers.get("Last-Modified", ""),
                     expires=response.headers.get("Expires", ""),
                 )
-                return (request, http_response)
+                if metrics:
+                    metrics.response_end = Instant.now()
+                return http_response
 
     async def execute_requests(
         self,
         requests: list[HttpRequest],
-    ) -> list[tuple[HttpRequest, BaseException | None]]:
+    ) -> list[EsiResponse]:
         """Execute a list of HTTP requests.
 
         Args:
             requests: A list of HttpRequest instances to execute.
 
         Returns:
-            A list of tuples containing the HttpRequest and either None or an exception if one occurred.
+            A list of EsiResponse instances.
         """
-        tasks = [self._worker(req) for req in requests]
-        results = await asyncio.gather(*tasks)
+        request_coros = self.collect_request_coros(requests)
+        results = await asyncio.gather(*request_coros)
         return results
+
+    def collect_request_coros(
+        self, requests: list[HttpRequest]
+    ) -> list[CoroutineType[Any, Any, EsiResponse]]:
+        """Collect and execute the given HTTP requests asynchronously.
+
+        Args:
+            requests: A list of HttpRequest instances to execute.
+
+        Returns:
+            A list of coroutine objects for the given HTTP requests.
+        """
+        request_coros = [self._worker(req) for req in requests]
+        return request_coros
+
+
+def metrics_rate_limits(metrics: Metrics, http_response: HttpResponse) -> None:
+    """Update metrics with rate limit information from the HTTP response headers."""
+    metrics.rate_limit_group = HF.rate_limit_group(http_response.headers)
+    metrics.rate_limit_limit = HF.rate_limit_limit(http_response.headers)
+    metrics.rate_limit_remaining = HF.rate_limit_remaining(http_response.headers)
+    metrics.rate_limit_used = HF.rate_limit_used(http_response.headers)
+    metrics.rate_limit_retry_after = HF.retry_after(http_response.headers)
