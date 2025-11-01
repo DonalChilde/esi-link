@@ -18,7 +18,6 @@ from esi_link.models import (
     EsiRequest,
     EsiRequests,
     HandlerConfig,
-    ResponseContext,
     ResponseHandlerProtocol,
 )
 
@@ -149,10 +148,7 @@ def execute(
         esi_link = cli_config.esi_link
         if esi_link is None:
             raise EsiLinkError("Esi Link is not initialized in the CLI configuration.")
-        response_context = ResponseContext()
-        result = asyncio.run(
-            esi_link.execute_requests(ctx=response_context, requests=requests)
-        )
+        result = asyncio.run(esi_link.execute_requests(requests=requests))
         for esi_response in result:
             if isinstance(esi_response.http_response, Exception):
                 console.print(

@@ -1,7 +1,7 @@
+"""Response Handlers for ESI Link."""
 ###########################################################################
 # ResponseHandlerProtocol Implementations
 ###########################################################################
-
 
 import json
 import logging
@@ -19,7 +19,6 @@ from esi_link.models import (
     HandlerManagerProtocol,
     HttpResponse,
     InvalidHandlerError,
-    ResponseContext,
     ResponseHandlerError,
     ResponseHandlerProtocol,
 )
@@ -132,7 +131,6 @@ class JsonFileResponseDataHandler(ResponseHandlerProtocol, FileOutMixin):
 
     async def handle_response(
         self,
-        ctx: ResponseContext,
         esi_response: EsiResponse,
     ) -> None:
         http_response = esi_response.http_response
@@ -223,7 +221,6 @@ class JsonFileResponseHandler(ResponseHandlerProtocol, FileOutMixin):
 
     async def handle_response(
         self,
-        ctx: ResponseContext,
         esi_response: EsiResponse,
     ) -> None:
         http_response = esi_response.http_response

@@ -57,9 +57,6 @@ def inject_compatibility_date(headers: dict[str, str], compatibility_date: str) 
     headers["X-Esi-Compatibility-Date"] = compatibility_date
 
 
-# FIXME: return strings over ints.
-
-
 def retry_after(headers: HeadersType) -> str:
     """Get the retry-after seconds from the response headers."""
     for header in headers:

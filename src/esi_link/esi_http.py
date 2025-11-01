@@ -220,10 +220,7 @@ class EsiHttpRateLimited(EsiHttpProtocol):
         except Exception as e:
             error_msg = f"Error processing request for URL {request.url}: {e}"
             logger.error(error_msg)
-            request.ctx.response_data.exceptions[request.esi_request.request_id] = (  # pyright: ignore[reportArgumentType]
-                request,
-                e,
-            )
+
             return EsiResponse(
                 request=request.esi_request,
                 http_response=http_response,

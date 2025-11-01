@@ -23,7 +23,6 @@ from esi_link.models import (
     HandlerConfig,
     HandlerManagerProtocol,
     HttpRequest,
-    ResponseContext,
     ResponseHandlerProtocol,
 )
 
@@ -81,14 +80,13 @@ class EsiLink(EsiLinkProtocol):
 
     async def execute_requests(
         self,
-        ctx: ResponseContext,
         requests: EsiRequests,
     ) -> list[EsiResponse]:
         """Execute the given EsiRequests asynchronously."""
         async with self.esi_http as http_client:
-            http_requests = self.build_http_requests(ctx=ctx, requests=requests)
+            http_requests = self.build_http_requests(requests=requests)
             response_coros = await http_client.collect_request_coros(http_requests)
-            request_coros = [self._handler_wrapper(ctx, r) for r in response_coros]
+            request_coros = [self._handler_wrapper(r) for r in response_coros]
             results = await asyncio.gather(*request_coros)
             return results
 
@@ -109,7 +107,6 @@ class EsiLink(EsiLinkProtocol):
 
     async def _handler_wrapper(
         self,
-        ctx: ResponseContext,
         response_coro: CoroutineType[Any, Any, EsiResponse],
     ) -> EsiResponse:
         """Wrap the response coroutine to run response handlers."""
@@ -117,10 +114,10 @@ class EsiLink(EsiLinkProtocol):
         response.metrics.handlers_start = Instant.now()
         app_handlers = self._init_handlers(self.application_handlers_config)
         for handler in app_handlers:
-            await handler.handle_response(ctx=ctx, esi_response=response)
+            await handler.handle_response(esi_response=response)
         request_handlers = self._init_handlers(response.request.handlers)
         for handler in request_handlers:
-            await handler.handle_response(ctx=ctx, esi_response=response)
+            await handler.handle_response(esi_response=response)
         response.metrics.handlers_end = Instant.now()
         return response
 
@@ -197,7 +194,6 @@ class EsiLink(EsiLinkProtocol):
 
     def build_http_requests(
         self,
-        ctx: ResponseContext,
         requests: EsiRequests,
     ) -> list[HttpRequest]:
         """Build HttpRequest objects from EsiRequest objects."""
@@ -215,7 +211,6 @@ class EsiLink(EsiLinkProtocol):
             http_request = HttpRequest(
                 method=indexed_operation.method,
                 url=url,
-                ctx=ctx,
                 esi_request=req,
                 cache_key=self.esi_http.cache.generate_cache_key(
                     esi_request=req, esi_schema=self.esi_schema

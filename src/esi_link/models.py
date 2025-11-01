@@ -144,11 +144,6 @@ class ResponseData(BaseModel):
     http_responses: dict[UUID, tuple[EsiRequest, "HttpResponse"]] = {}
 
 
-class ResponseContext(BaseModel):
-    obj: dict[str, Any] = {}
-    response_data: ResponseData = Field(default_factory=ResponseData)
-
-
 class EsiResponse(BaseModel):
     """Represents the response for a single ESI request."""
 
@@ -303,18 +298,9 @@ class HttpRequest:
     method: str
     url: str
     is_paged: bool
-    ctx: ResponseContext
     esi_request: EsiRequest
     cache_key: UUID | None = None
     """The cache key UUID, built from the EsiRequest. None if caching is not used."""
-    # app_handlers: list["ResponseHandlerProtocol"] = field(
-    #     default_factory=list["ResponseHandlerProtocol"]
-    # )
-    # """App level handlers to process the response. These are run before any request level handlers."""
-    # user_handlers: list["ResponseHandlerProtocol"] = field(
-    #     default_factory=list["ResponseHandlerProtocol"]
-    # )
-    """Request level handlers to process the response. These are run after any app level handlers."""
     headers: dict[str, str] = field(default_factory=dict[str, str])
     """App level headers to include in the request. These are merged with any request level headers."""
     timeout: int = 10
@@ -353,37 +339,6 @@ class HttpResponse(BaseModel):
             True if the response has ETag or Expires headers, False otherwise.
         """
         return bool(self.etag and self.expires)
-
-    # class EsiLinkConfig(BaseModel):
-    #     """Application data for Esi Link."""
-
-    # esi_schema_url: str = "https://esi.evetech.net/meta/openapi.json"
-    # """URL to download the ESI OpenAPI schema."""
-    # esi_schema: EsiSchema | None = None
-    # """The ESI OpenAPI schema."""
-    # application_response_handlers: list[HandlerConfig] = []
-    # """List of application level response handler configurations."""
-    # cache_connection_string: str = "esi-link-memory://"
-    # """Connection string for the cache backend.
-
-    # Format: [cache_type]://[path_or_connection_info]
-
-    # Examples:
-    #     File-based cache: esi-link-json:///path/to/cache/dir
-    #     In-memory cache: esi-link-memory://"""
-    # connection_max_rate: int = 100
-    # """Maximum number of concurrent connections per period to ESI."""
-    # connection_period: float = 60.0
-    # """Time period in seconds for the maximum connection rate."""
-    # esi_auth_connection_string: str | None = None
-    # """Connection string for the ESI authentication store.
-
-    # #TODO support multiple auth store types. For now use JSON file store.
-    # Format: [auth_store_type]://[path_or_connection_info]
-
-    # Examples:
-    #     JSON file store: esi-link-auth-json:///path/to/auth_store.json
-    # """
 
     @classmethod
     def load_config(cls, file_path: Path) -> Self:
@@ -448,7 +403,6 @@ class ResponseHandlerProtocol:
 
     async def handle_response(
         self,
-        ctx: ResponseContext,
         esi_response: EsiResponse,
     ) -> Any:
         """Handle the response from an ESI request.
@@ -602,7 +556,6 @@ class EsiLinkProtocol:
 
     async def execute_requests(
         self,
-        ctx: ResponseContext,
         requests: EsiRequests,
     ) -> list[EsiResponse]:
         """Execute a batch of ESI requests.

@@ -249,34 +249,3 @@ def operation_by_path_method(
         path=path,
         operation=method_data,
     )
-
-
-# def index_operations(schema: dict[str, dict[str, Any]]) -> IndexedOperations:
-#     """Index the operations by their ID."""
-#     by_operation_id: IndexedOperations = {}
-#     for path, methods in schema.get("paths", {}).items():
-#         for method, operation in methods.items():
-#             operation_id = operation.get("operationId")
-#             response_codes = list(operation.get("responses", {}).keys())
-#             response_codes.remove("default") if "default" in response_codes else None
-#             if len(response_codes) == 1 and response_codes[0] in (
-#                 "200",
-#                 "201",
-#                 "204",
-#             ):
-#                 success_code = response_codes[0]
-#             else:
-#                 logger.warning(
-#                     f"Operation {operation_id} has multiple or no success codes: {response_codes}. Defaulting to empty string."
-#                 )
-#                 # TODO decide how to handle multiple success codes, maye use space delimited string?
-#                 success_code = ""
-#             if operation_id:
-#                 by_operation_id[operation_id] = IndexedOperation(
-#                     operation_id=operation_id,
-#                     method=method,
-#                     path=path,
-#                     operation=operation,
-#                     success_code=success_code,
-#                 )
-#     return by_operation_id
