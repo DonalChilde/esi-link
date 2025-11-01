@@ -69,18 +69,18 @@ class EsiLink(EsiLinkProtocol):
             if application_handlers_config
             else APPLICATION_RESPONSE_HANDLERS
         )
-        self.app_handlers: list[ResponseHandlerProtocol] = (
-            self._init_app_level_handlers(self.application_handlers_config)
+        self.app_handlers: list[ResponseHandlerProtocol] = self._init_handlers(
+            self.application_handlers_config
         )
 
-    def _init_app_level_handlers(
+    def _init_handlers(
         self, handler_configs: list[HandlerConfig]
     ) -> list[ResponseHandlerProtocol]:
-        """Initialize application-level response handlers."""
-        app_handlers = [
+        """Initialize response handlers."""
+        instanced_handlers = [
             self.handler_manager.get_handler(config) for config in handler_configs
         ]
-        return app_handlers
+        return instanced_handlers
 
     async def execute_requests(
         self,
@@ -90,6 +90,21 @@ class EsiLink(EsiLinkProtocol):
         """Execute the given EsiRequests asynchronously."""
         http_requests = self.build_http_requests(ctx=ctx, requests=requests)
         async with self.esi_http as http_client:
+            # update esi http protocol to use new methods - see three entry points below.
+            # - only one will be used here, but all three should be available.
+            # update esi link protocol to use new methods - see three entry points below.
+            # Update handlers to use EsiResponse instead of raw responses
+            # - remember to check for exceptions in responses
+            # get list of response coros
+            response_coros = http_client.collect_request_coros(http_requests)
+            # wrap coros in another coro that runs handlers
+            # async.gather the wrapped coros - Do this here, or let caller do it?
+            # for now, just gather here and return results, but add functions to protocol that allow it.
+            # Three entry points:
+            # 1. collect_request_coros - returns list of wrapped coros to be executed here or by caller.
+            # 2. execute_requests - async.run execute_requests_async - does everything sync here.
+            # 3. execute_requests_async - one stop shop that does everything as async def.
+
             results = await http_client.execute_requests(http_requests)
         return results
 
@@ -177,7 +192,7 @@ class EsiLink(EsiLinkProtocol):
             indexed_operation = self.esi_schema.operations.get(req.operation_id)
             if not indexed_operation:
                 raise EsiLinkError(f"Operation ID not found: {req.operation_id}")
-            user_handlers = self._init_app_level_handlers(req.handlers)
+            user_handlers = self._init_handlers(req.handlers)
             is_paged = OA.is_paged(indexed_operation)
             http_request_headers = self._collect_http_request_headers(
                 esi_request=req, token_dict=token_dict
