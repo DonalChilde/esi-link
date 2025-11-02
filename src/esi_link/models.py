@@ -123,11 +123,11 @@ class Metrics(BaseModel):
     cache_update_start: Instant | None = None
     cache_update_end: Instant | None = None
     cache_check: Literal["HIT", "MISS", "STALE"] | None = None
-    rate_limit_group: str | None = None
-    rate_limit_limit: str | None = None
-    rate_limit_remaining: str | None = None
-    rate_limit_used: str | None = None
-    rate_limit_retry_after: str | None = None
+    ratelimit_group: str | None = None
+    ratelimit_limit: str | None = None
+    ratelimit_remaining: str | None = None
+    ratelimit_used: str | None = None
+    retry_after: str | None = None
     response_source: Literal[
         "CACHE",
         "NETWORK_STALE_CACHE_OK",
@@ -136,6 +136,72 @@ class Metrics(BaseModel):
         "NETWORK",
         "NOT_SET",
     ] = "NOT_SET"
+
+    def request_duration(self) -> float | None:
+        """Calculate the total duration of the request in seconds.
+
+        Returns:
+            The total duration in seconds, or None if start or end times are not set.
+        """
+        if self.request_start and self.response_end:
+            delta = self.response_end - self.request_start
+            return delta.in_seconds()
+        return None
+
+    def response_duration(self) -> float | None:
+        """Calculate the duration of the response in seconds.
+
+        Returns:
+            The response duration in seconds, or None if start or end times are not set.
+        """
+        if self.response_start and self.response_end:
+            delta = self.response_end - self.response_start
+            return delta.in_seconds()
+        return None
+
+    def handlers_duration(self) -> float | None:
+        """Calculate the duration of the handlers in seconds.
+
+        Returns:
+            The handlers duration in seconds, or None if start or end times are not set.
+        """
+        if self.handlers_start and self.handlers_end:
+            delta = self.handlers_end - self.handlers_start
+            return delta.in_seconds()
+        return None
+
+    def cache_check_duration(self) -> float | None:
+        """Calculate the duration of the cache check in seconds.
+
+        Returns:
+            The cache check duration in seconds, or None if start or end times are not set.
+        """
+        if self.cache_check_start and self.cache_check_end:
+            delta = self.cache_check_end - self.cache_check_start
+            return delta.in_seconds()
+        return None
+
+    def cache_update_duration(self) -> float | None:
+        """Calculate the duration of the cache update in seconds.
+
+        Returns:
+            The cache update duration in seconds, or None if start or end times are not set.
+        """
+        if self.cache_update_start and self.cache_update_end:
+            delta = self.cache_update_end - self.cache_update_start
+            return delta.in_seconds()
+        return None
+
+    def pages_duration(self) -> float | None:
+        """Calculate the duration of the pages fetch in seconds.
+
+        Returns:
+            The pages fetch duration in seconds, or None if start or end times are not set.
+        """
+        if self.pages_start and self.pages_end:
+            delta = self.pages_end - self.pages_start
+            return delta.in_seconds()
+        return None
 
 
 class ResponseData(BaseModel):
@@ -303,6 +369,8 @@ class HttpRequest:
     """The cache key UUID, built from the EsiRequest. None if caching is not used."""
     headers: dict[str, str] = field(default_factory=dict[str, str])
     """App level headers to include in the request. These are merged with any request level headers."""
+    json_body: Any = None
+    """The JSON body for POST/PUT requests."""
     timeout: int = 10
     page_number: int = 0
     """The page number for paged requests."""
@@ -330,6 +398,18 @@ class HttpResponse(BaseModel):
                 return Instant.parse_rfc2822(self.expires)
             except Exception:
                 return None
+        return None
+
+    def expires_in(self) -> float | None:
+        """Get the number of seconds until the response expires.
+
+        Returns:
+            The number of seconds until expiration, or None if not present.
+        """
+        expires_at = self.expires_at()
+        if expires_at is not None:
+            delta = expires_at - Instant.now()
+            return delta.in_seconds()
         return None
 
     def has_cache_info(self) -> bool:
@@ -543,6 +623,19 @@ class CacheProtocol:
         """
         ...
 
+    def update_http_response(
+        self, cache_key: UUID, http_response: HttpResponse
+    ) -> None:
+        """Update an existing cached http response.
+
+        Args:
+            cache_key: The UUID cache key for the cached response.
+            http_response: The HttpResponse instance to update in the cache.
+
+        ...
+        """
+        ...
+
 
 class EsiLinkProtocol:
     """Protocol for ESI Link implementations."""
@@ -645,7 +738,7 @@ class ResponseHandlerError(EsiLinkError):
     """Raised when a response handler encounters an error."""
 
     def __init__(
-        self, message: str, handler_name: str, response: HttpResponse | None
+        self, message: str, handler_name: str, response: EsiResponse | None
     ) -> None:
         """Initialize the ResponseHandlerError."""
         super().__init__(message)
