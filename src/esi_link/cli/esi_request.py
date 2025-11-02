@@ -104,7 +104,12 @@ def examples(
     """Display example ESI requests."""
     console = Console()
     console.rule("[bold green]Example ESI Requests[/bold green]")
-    blank_requests = [get_status_example(), get_market_orders_example()]
+    blank_requests = [
+        get_status_example(),
+        get_market_orders_example(),
+        get_universe_types_example(),
+        post_universe_names_example(),
+    ]
     esi_requests = EsiRequests(
         requests_id=uuid4(),
         description="Example ESI requests",
@@ -150,13 +155,20 @@ def execute(
             raise EsiLinkError("Esi Link is not initialized in the CLI configuration.")
         result = asyncio.run(esi_link.execute_requests(requests=requests))
         for esi_response in result:
-            if isinstance(esi_response.http_response, Exception):
+            if esi_response.http_response is None or esi_response.error_messages:
+                # TODO refine this condition
                 console.print(
-                    f"[bold red]Error executing ESI request {esi_response.request.request_id}:[/bold red] {esi_response.http_response}"
+                    f"[bold red]Error executing ESI request {esi_response.request.request_id}:[/bold red]"
                 )
+                if esi_response.http_response is None:
+                    console.print("\t- No HTTP response received.")
+                if esi_response.error_messages:
+                    console.print("\t- Error Messages:")
+                    for msg in esi_response.error_messages:
+                        console.print(f"\t- {msg}")
             else:
                 console.print(
-                    f"[bold green]ESI request {esi_response.request.request_id} executed successfully[/bold green]"
+                    f"[bold green]ESI request {esi_response.request.request_id} executed successfully with a {esi_response.http_response.status_code}[/bold green]"
                 )
     except Exception as e:
         console.print(f"[bold red]Error executing ESI requests:[/bold red] {e}")
@@ -218,6 +230,10 @@ def create_blank_request() -> EsiRequest:
 
 
 def get_status_example() -> EsiRequest:
+    """Example ESI request for GetStatus operation.
+
+    An example of a simple request with no parameters.
+    """
     return EsiRequest(
         request_id=uuid4(),
         operation_id="GetStatus",
@@ -228,14 +244,14 @@ def get_status_example() -> EsiRequest:
         headers={},
         handlers=[
             HandlerConfig(
-                name="esi-link.json_data_file",
+                name="esi-link.esi_response_data_to_file",
                 config={
                     "file_path": "${HOME}/tmp/esi-link-data/responses/${NOW}-${OPERATION_ID}.json",
                     "overwrite": False,
                 },
             ),
             HandlerConfig(
-                name="esi-link.json_response_file",
+                name="esi-link.esi_response_to_file",
                 config={
                     "file_path": "${HOME}/tmp/esi-link-data/responses/${NOW}-${OPERATION_ID}-response.json",
                     "overwrite": False,
@@ -246,6 +262,10 @@ def get_status_example() -> EsiRequest:
 
 
 def get_market_orders_example() -> EsiRequest:
+    """Example ESI request for GetMarketsRegionIdOrders operation.
+
+    An example of complex file path templating in response handlers.
+    """
     return EsiRequest(
         request_id=uuid4(),
         operation_id="GetMarketsRegionIdOrders",
@@ -256,14 +276,78 @@ def get_market_orders_example() -> EsiRequest:
         headers={},
         handlers=[
             HandlerConfig(
-                name="esi-link.json_data_file",
+                name="esi-link.esi_response_data_to_file",
                 config={
                     "file_path": "${HOME}/tmp/esi-link-data/responses/${NOW}-${OPERATION_ID}-${REGION_ID}-${TYPE_ID}.json",
                     "overwrite": False,
                 },
             ),
             HandlerConfig(
-                name="esi-link.json_response_file",
+                name="esi-link.esi_response_to_file",
+                config={
+                    "file_path": "${HOME}/tmp/esi-link-data/responses/${NOW}-${OPERATION_ID}-response.json",
+                    "overwrite": False,
+                },
+            ),
+        ],
+    )
+
+
+def get_universe_types_example() -> EsiRequest:
+    """Example ESI request for GetUniverseTypes operation.
+
+    An example of multi page request handling.
+    """
+    return EsiRequest(
+        request_id=uuid4(),
+        operation_id="GetUniverseTypes",
+        path_parameters={},
+        query_parameters={},
+        auth_parameters=None,
+        request_body=None,
+        headers={},
+        handlers=[
+            HandlerConfig(
+                name="esi-link.esi_response_data_to_file",
+                config={
+                    "file_path": "${HOME}/tmp/esi-link-data/responses/${NOW}-${OPERATION_ID}.json",
+                    "overwrite": False,
+                },
+            ),
+            HandlerConfig(
+                name="esi-link.esi_response_to_file",
+                config={
+                    "file_path": "${HOME}/tmp/esi-link-data/responses/${NOW}-${OPERATION_ID}-response.json",
+                    "overwrite": False,
+                },
+            ),
+        ],
+    )
+
+
+def post_universe_names_example() -> EsiRequest:
+    """Example ESI request for PostUniverseNames operation.
+
+    An example of a POST request with a request body.
+    """
+    return EsiRequest(
+        request_id=uuid4(),
+        operation_id="PostUniverseNames",
+        path_parameters={},
+        query_parameters={},
+        auth_parameters=None,
+        request_body=[34, 35, 36],
+        headers={},
+        handlers=[
+            HandlerConfig(
+                name="esi-link.esi_response_data_to_file",
+                config={
+                    "file_path": "${HOME}/tmp/esi-link-data/responses/${NOW}-${OPERATION_ID}.json",
+                    "overwrite": False,
+                },
+            ),
+            HandlerConfig(
+                name="esi-link.esi_response_to_file",
                 config={
                     "file_path": "${HOME}/tmp/esi-link-data/responses/${NOW}-${OPERATION_ID}-response.json",
                     "overwrite": False,
