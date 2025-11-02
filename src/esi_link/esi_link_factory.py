@@ -21,11 +21,12 @@ def esi_link_factory(
             url=settings.esi_schema_url,
             headers={"User-Agent": USER_AGENT},
         )
-    if not settings.auth_connection_string():
+    if not settings.auth_connection_string:
         token_manager = None
     else:
         token_manager = TokenManager(
-            connection_string=settings.auth_connection_string()
+            connection_string=settings.auth_connection_string,
+            user_agent_prefix=USER_AGENT,
         )
     cache = cache_factory(settings.cache_connection_string)
     esi_http = EsiHttpRateLimited(

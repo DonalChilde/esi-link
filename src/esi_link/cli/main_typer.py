@@ -7,6 +7,8 @@ from typing import Annotated
 
 import typer
 from esi_auth.cli.cli_helpers import ensure_env_example as auth_ensure_env_example
+from esi_auth.cli.credential_store_cli import app as auth_credential_app
+from esi_auth.cli.token_store_cli import app as auth_token_app
 from rich.console import Console
 from rich.text import Text
 
@@ -24,12 +26,30 @@ from esi_link.settings import get_settings
 logger = logging.getLogger(__name__)
 
 app = typer.Typer(no_args_is_help=True)
+auth_app = typer.Typer(
+    no_args_is_help=True, help="esi-auth integration commands.", name="auth"
+)
+auth_app.add_typer(
+    auth_credential_app,
+    name="credentials",
+    help="Manage esi-auth credential store.",
+)
+auth_app.add_typer(
+    auth_token_app,
+    name="tokens",
+    help="Manage esi-auth token store.",
+)
 app.add_typer(
     esi_schema_app,
     name="schema",
     help="Information about the operations available in the ESI schema.",
 )
 app.add_typer(esi_request_app, name="requests", help="Make ESI requests.")
+app.add_typer(
+    auth_app,
+    name="auth",
+    help="esi-auth integration commands.",
+)
 
 
 @app.callback(invoke_without_command=True)
