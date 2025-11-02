@@ -134,6 +134,7 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                 logger.info(
                     f"Processed http request for URL {request.url} in "
                     f"{(metrics.response_end - metrics.response_start).in_seconds():.2f} seconds."
+                    f"Status code {http_response.status_code}, Reason: {http_response.reason}"
                 )
             # Update metrics with rate limit information from response headers
             metrics_rate_limits(metrics, http_response)
@@ -200,7 +201,7 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                 case 429:  # Rate Limited
                     # TODO consider retry logic here.
                     raise EsiLinkError(
-                        f"Rate limited on request to {http_response.url}. Retry after {metrics.rate_limit_retry_after} seconds."
+                        f"Rate limited on request to {http_response.url}. Retry after {metrics.retry_after} seconds."
                     )
 
                 # FIXME limit the number of 400 errors before failing.
@@ -218,7 +219,7 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                         f"Unhandled status code {http_response.status_code}, {http_response.reason} for URL {http_response.url}"
                     )
         except Exception as e:
-            error_msg = f"Error processing request for URL {request.url}: {e}"
+            error_msg = f"Error processing request for URL {request.url}: {e!r}"
             logger.error(error_msg)
 
             return EsiResponse(
@@ -364,6 +365,7 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                 url=request.url,
                 headers=request.headers,
                 timeout=timeout_obj,
+                json=request.json_body,
             ) as response:
                 if raise_for_status:
                     response.raise_for_status()
@@ -418,8 +420,8 @@ class EsiHttpRateLimited(EsiHttpProtocol):
 
 def metrics_rate_limits(metrics: Metrics, http_response: HttpResponse) -> None:
     """Update metrics with rate limit information from the HTTP response headers."""
-    metrics.rate_limit_group = HF.rate_limit_group(http_response.headers)
-    metrics.rate_limit_limit = HF.rate_limit_limit(http_response.headers)
-    metrics.rate_limit_remaining = HF.rate_limit_remaining(http_response.headers)
-    metrics.rate_limit_used = HF.rate_limit_used(http_response.headers)
-    metrics.rate_limit_retry_after = HF.retry_after(http_response.headers)
+    metrics.ratelimit_group = HF.ratelimit_group(http_response.headers)
+    metrics.ratelimit_limit = HF.ratelimit_limit(http_response.headers)
+    metrics.ratelimit_remaining = HF.ratelimit_remaining(http_response.headers)
+    metrics.ratelimit_used = HF.ratelimit_used(http_response.headers)
+    metrics.retry_after = HF.retry_after(http_response.headers)
