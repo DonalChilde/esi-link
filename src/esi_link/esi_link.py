@@ -217,6 +217,7 @@ class EsiLink(EsiLinkProtocol):
                 ),
                 headers=http_request_headers,
                 is_paged=is_paged,
+                json_body=req.request_body if req.request_body else None,
             )
             http_requests.append(http_request)
         return http_requests
