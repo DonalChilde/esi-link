@@ -6,7 +6,6 @@ from time import perf_counter
 from typing import Annotated
 
 import typer
-from esi_auth.cli.cli_helpers import ensure_env_example as auth_ensure_env_example
 from esi_auth.cli.credential_store_cli import app as auth_credential_app
 from esi_auth.cli.token_store_cli import app as auth_token_app
 from rich.console import Console
@@ -76,7 +75,7 @@ def default_options(
     console = Console()
     settings = get_settings()
     setup_logging(log_dir=settings.log_dir)
-    _ensure_env_files(dir_path=settings.app_dir)
+    ensure_env_example(file_path=settings.app_dir / ".esi-link.env")
     cli_config = CliConfig(
         debug=debug, verbosity=verbosity, silent=silent, settings=settings
     )
@@ -160,26 +159,13 @@ def example_env(
     ],
 ):
     """Create an example .esi-link.env and .esi-auth.env file for esi-link configuration."""
-    _ensure_env_files(dir_path=dir_path)
-
-
-def _ensure_env_files(dir_path: Path) -> None:
-    """Ensure that the .esi-link.env and .esi-auth.env files exist in the given directory.
-
-    If they do not exist, create example files.
-
-    Args:
-        dir_path: The directory to check for the env files.
-    """
-    console = Console()
     link_path = dir_path / ".esi-link.env"
-    auth_path = dir_path / ".esi-auth.env"
+    console = Console()
     try:
         link_exists = ensure_env_example(file_path=link_path)
-        auth_exists = auth_ensure_env_example(file_path=auth_path)
     except Exception as e:
-        logger.error(f"Error ensuring env files: {e}")
-        console.print(f"[red]Error ensuring env files: {e}[/red]")
+        logger.error(f"Error creating example .esi-link.env file: {e}")
+        console.print(f"[red]Error creating example .esi-link.env file: {e}[/red]")
         raise typer.Exit(code=1) from e
     if link_exists:
         console.print(
@@ -192,20 +178,51 @@ def _ensure_env_files(dir_path: Path) -> None:
         console.print(
             "[bold green]You can edit this file to configure your settings before using esi-link.[/bold green]"
         )
-    if auth_exists:
-        console.print(
-            f"[bold yellow]File already exists at {auth_path}. No changes made.[/bold yellow]"
-        )
-    else:
-        console.print(
-            f"[bold green]Example .esi-auth.env file created at {auth_path}.[/bold green]"
-        )
-        console.print(
-            "[bold green]You [bold red]MUST[/bold red] edit this file to configure your settings before using esi-link with authentication.[/bold green]"
-        )
-        console.print(
-            "[bold green]See the .esi-link.env file and/or esi-auth documentation for details.[/bold green]"
-        )
+
+
+# def _ensure_env_files(dir_path: Path) -> None:
+#     """Ensure that the .esi-link.env and .esi-auth.env files exist in the given directory.
+
+#     If they do not exist, create example files.
+
+#     Args:
+#         dir_path: The directory to check for the env files.
+#     """
+#     console = Console()
+#     link_path = dir_path / ".esi-link.env"
+#     auth_path = dir_path / ".esi-auth.env"
+#     try:
+#         link_exists = ensure_env_example(file_path=link_path)
+#         auth_exists = auth_ensure_env_example(file_path=auth_path)
+#     except Exception as e:
+#         logger.error(f"Error ensuring env files: {e}")
+#         console.print(f"[red]Error ensuring env files: {e}[/red]")
+#         raise typer.Exit(code=1) from e
+#     if link_exists:
+#         console.print(
+#             f"[bold yellow]File already exists at {link_path}. No changes made.[/bold yellow]"
+#         )
+#     else:
+#         console.print(
+#             f"[bold green]Example .esi-link.env file created at {link_path}.[/bold green]"
+#         )
+#         console.print(
+#             "[bold green]You can edit this file to configure your settings before using esi-link.[/bold green]"
+#         )
+#     if auth_exists:
+#         console.print(
+#             f"[bold yellow]File already exists at {auth_path}. No changes made.[/bold yellow]"
+#         )
+#     else:
+#         console.print(
+#             f"[bold green]Example .esi-auth.env file created at {auth_path}.[/bold green]"
+#         )
+#         console.print(
+#             "[bold green]You [bold red]MUST[/bold red] edit this file to configure your settings before using esi-link with authentication.[/bold green]"
+#         )
+#         console.print(
+#             "[bold green]See the .esi-link.env file and/or esi-auth documentation for details.[/bold green]"
+#         )
 
 
 def _init_config(
