@@ -17,7 +17,6 @@ from esi_link.models import (
     HandlerConfig,
     HandlerConfigError,
     HandlerManagerProtocol,
-    HttpResponse,
     InvalidHandlerError,
     ResponseHandlerError,
     ResponseHandlerProtocol,
@@ -120,12 +119,13 @@ class FileOutMixin:
         return path_out
 
 
-class JsonFileResponseDataHandler(ResponseHandlerProtocol, FileOutMixin):
+class EsiResponseDataToFileHandler(ResponseHandlerProtocol, FileOutMixin):
     """A response handler that saves the JSON response data to a file."""
 
-    name: str = "esi-link.json_data_file"
+    name: str = "esi-link.esi_response_data_to_file"
 
     def __init__(self, file_path: str, overwrite: bool = False) -> None:
+        """Initialize the EsiResponseDataToFileHandler."""
         self._file_path = file_path
         self._overwrite = overwrite
 
@@ -133,23 +133,34 @@ class JsonFileResponseDataHandler(ResponseHandlerProtocol, FileOutMixin):
         self,
         esi_response: EsiResponse,
     ) -> None:
-        http_response = esi_response.http_response
-        if (
-            isinstance(http_response, HttpResponse)
-            and http_response.json_data is not None
-        ):
-            path_out = self.format_path(self._file_path, esi_response.request)
-            if not self._overwrite and path_out.exists():
+        """Handle the response by saving the JSON data to a file."""
+        try:
+            http_response = esi_response.http_response
+            if http_response is not None and http_response.json_data is not None:
+                path_out = self.format_path(self._file_path, esi_response.request)
+                if not self._overwrite and path_out.exists():
+                    raise ResponseHandlerError(
+                        f"File {path_out} already exists. Use overwrite=True to overwrite.",
+                        handler_name=self.name,
+                        response=esi_response,
+                    )
+                with open(path_out, "w") as file:
+                    json.dump(http_response.json_data, file, indent=2)
+            else:
                 raise ResponseHandlerError(
-                    f"File {path_out} already exists. Use overwrite=True to overwrite.",
+                    "No JSON data in HTTP response to save to file.",
                     handler_name=self.name,
-                    response=http_response,
+                    response=esi_response,
                 )
-            with open(path_out, "w") as file:
-                json.dump(http_response.json_data, file, indent=2)
+        except Exception as e:
+            # Capture errors and log them in the esi_response error messages.
+            msg = f"Error writing response data to file: {e!r}"
+            esi_response.error_messages.append(msg)
+            logger.error(msg)
 
     @classmethod
     def from_config(cls, config: HandlerConfig) -> Self:
+        """Create a handler instance from the provided configuration."""
         cls.validate_config(config)
         try:
             result = cls(
@@ -192,6 +203,7 @@ class JsonFileResponseDataHandler(ResponseHandlerProtocol, FileOutMixin):
 
     @classmethod
     def validate_config(cls, config: HandlerConfig) -> None:
+        """Validate the handler configuration."""
         file_path = config.config.get("file_path")
         if file_path is None or not isinstance(file_path, str):
             raise HandlerConfigError(
@@ -210,12 +222,13 @@ class JsonFileResponseDataHandler(ResponseHandlerProtocol, FileOutMixin):
             )
 
 
-class JsonFileResponseHandler(ResponseHandlerProtocol, FileOutMixin):
-    """A response handler that saves the html response to a JSON file."""
+class EsiResponseToFile(ResponseHandlerProtocol, FileOutMixin):
+    """A response handler that saves the esi response to a JSON file."""
 
-    name: str = "esi-link.json_response_file"
+    name: str = "esi-link.esi_response_to_file"
 
     def __init__(self, file_path: str, overwrite: bool = False) -> None:
+        """Initialize the EsiResponseToFile handler."""
         self._file_path = file_path
         self._overwrite = overwrite
 
@@ -223,22 +236,25 @@ class JsonFileResponseHandler(ResponseHandlerProtocol, FileOutMixin):
         self,
         esi_response: EsiResponse,
     ) -> None:
-        http_response = esi_response.http_response
-        if (
-            isinstance(http_response, HttpResponse)
-            and http_response.json_data is not None
-        ):
+        """Handle the response by saving the EsiResponse to a JSON file."""
+        try:
             path_out = self.format_path(self._file_path, esi_response.request)
             if not self._overwrite and path_out.exists():
                 raise ResponseHandlerError(
                     f"File {path_out} already exists. Use overwrite=True to overwrite.",
                     handler_name=self.name,
-                    response=http_response,
+                    response=esi_response,
                 )
-            path_out.write_text(http_response.model_dump_json(indent=2))
+            path_out.write_text(esi_response.model_dump_json(indent=2))
+        except Exception as e:
+            # Capture errors and log them in the esi_response error messages.
+            msg = f"Error writing EsiResponse to file: {e!r}"
+            esi_response.error_messages.append(msg)
+            logger.error(msg)
 
     @classmethod
     def from_config(cls, config: HandlerConfig) -> Self:
+        """Create a handler instance from the provided configuration."""
         cls.validate_config(config)
         try:
             result = cls(
@@ -281,6 +297,7 @@ class JsonFileResponseHandler(ResponseHandlerProtocol, FileOutMixin):
 
     @classmethod
     def validate_config(cls, config: HandlerConfig) -> None:
+        """Validate the handler configuration."""
         file_path = config.config.get("file_path")
         if file_path is None or not isinstance(file_path, str):
             raise HandlerConfigError(
@@ -303,10 +320,12 @@ class HandlerManager(HandlerManagerProtocol):
     """A simple handler manager implementation."""
 
     def __init__(self) -> None:
+        """Initialize the handler manager and register built-in handlers."""
         self.handlers: dict[str, type[ResponseHandlerProtocol]] = {}
         self._register_builtin_handlers()
 
     def get_handler(self, config: HandlerConfig) -> ResponseHandlerProtocol:
+        """Get a handler instance from the manager based on the provided config."""
         handler_cls = self.handlers.get(config.name)
         if not handler_cls:
             raise HandlerConfigError(
@@ -317,6 +336,7 @@ class HandlerManager(HandlerManagerProtocol):
     def register_handler(
         self, name: str, handler_cls: type[ResponseHandlerProtocol]
     ) -> None:
+        """Register a handler class with the manager."""
         if not issubclass(handler_cls, ResponseHandlerProtocol):  # pyright: ignore[reportUnnecessaryIsInstance]
             raise InvalidHandlerError(
                 f"Handler class must implement ResponseHandlerProtocol: {name}"
@@ -324,14 +344,15 @@ class HandlerManager(HandlerManagerProtocol):
         self.handlers[name] = handler_cls
 
     def get_all_handlers(self) -> list[type[ResponseHandlerProtocol]]:
+        """Return a list of all registered handler classes."""
         return list(self.handlers.values())
 
     def _register_builtin_handlers(self) -> None:
         # self.register_handler(KeepHttpResponseHandler.name, KeepHttpResponseHandler)
         self.register_handler(
-            JsonFileResponseDataHandler.name, JsonFileResponseDataHandler
+            EsiResponseDataToFileHandler.name, EsiResponseDataToFileHandler
         )
-        self.register_handler(JsonFileResponseHandler.name, JsonFileResponseHandler)
+        self.register_handler(EsiResponseToFile.name, EsiResponseToFile)
 
 
 class FileSafeInstantNowIso:
@@ -343,4 +364,5 @@ class FileSafeInstantNowIso:
         return Instant.now().format_iso().replace(":", "-").replace(".", "_")
 
     def __str__(self) -> str:
+        """Return the current instant as a file-safe ISO string."""
         return self.now()
