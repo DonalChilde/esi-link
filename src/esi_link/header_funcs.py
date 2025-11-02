@@ -65,15 +65,15 @@ def retry_after(headers: HeadersType) -> str:
     return ""
 
 
-def rate_limit_group(headers: HeadersType) -> str:
+def ratelimit_group(headers: HeadersType) -> str:
     """Get the rate limit group from the response headers."""
     for header in headers:
-        if header[0].lower() == "x-rate-limit-group":
+        if header[0].lower() == "x-ratelimit-group":
             return header[1] if header[1] else ""
     return ""
 
 
-def rate_limit_limit(headers: HeadersType) -> str:
+def ratelimit_limit(headers: HeadersType) -> str:
     """Get the rate limit from the response headers."""
     default: str = ""
     for header in headers:
@@ -82,7 +82,7 @@ def rate_limit_limit(headers: HeadersType) -> str:
     return default
 
 
-def rate_limit_remaining(headers: HeadersType) -> str:
+def ratelimit_remaining(headers: HeadersType) -> str:
     """Get the rate limit remaining from the response headers."""
     default: str = ""
     for header in headers:
@@ -91,7 +91,7 @@ def rate_limit_remaining(headers: HeadersType) -> str:
     return default
 
 
-def rate_limit_used(headers: HeadersType) -> str:
+def ratelimit_used(headers: HeadersType) -> str:
     """Get the rate limit used from the response headers."""
     default: str = ""
     for header in headers:
