@@ -39,6 +39,12 @@ applyTo: "**/*.py"
 - Include comments for edge cases and the expected behavior in those cases.
 - Write unit tests for functions and document them with docstrings explaining the test cases.
 
+## Testing
+
+- Use pytest for testing
+- Run tests: `pytest`
+- Run with coverage: `pytest --cov`
+
 ## Documentation
 
 - Ensure all public functions and classes have appropriate docstrings.
@@ -46,3 +52,41 @@ applyTo: "**/*.py"
 - Include examples in docstrings where applicable.
 - Classes with an `__init__` function should have the docstring after that `__init__` function.
 - Classes without an `__init__` function should have the docstring immediately following the class definition.
+
+## Project Structure
+
+- `src/esi_link/` - Main package code
+- `tests/` - Test suite mirroring src structure
+- `cli/` - Command-line interface using Typer
+- `helpers/` - Utility functions
+
+## Dependencies
+
+- aiohttp - Async HTTP requests to ESI API
+- aiolimiter - Rate limiting for API calls
+- pydantic - Data validation and settings management
+- pydantic-settings - Settings management for the CLI
+- typer - CLI framework
+- whenever - Date/time handling
+- esi-auth - Managing authentication tokens for the EVE Esi.
+
+## Development Commands
+
+- Format code: `ruff format`
+- Lint code: `ruff check`
+- Run CLI: `esi-link [command]`
+
+## Project Description
+
+esi-link is a cli-focused front end to the EVE Online ESI api.
+
+Some features are:
+
+- The ability to create repeatable requests, allowing for quickly updating commonly used information.
+- Easy aquisition of authentication tokens for auth required requests.
+- Async network requests based on aiohttp.
+- User configurable rate limiting based on requests per second. (Some restrictions apply.)
+- File based caching to reduce network load, and respect ESI best practices.
+- User configurable response handlers for the downloaded data. Easily save the responses as json data with custom file names.
+- A plug-in system for user-created response handlers (Not yet implemented)
+- An API to allow for use by a third party program (Not yet implemented.)
