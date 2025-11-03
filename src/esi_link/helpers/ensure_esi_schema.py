@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from esi_link import USER_AGENT
-from esi_link.download_esi_schema import download_esi_schema
+from esi_link.helpers.download_esi_schema import download_esi_schema
 from esi_link.models import EsiSchema
 
 

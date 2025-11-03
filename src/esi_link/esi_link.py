@@ -10,8 +10,8 @@ from esi_auth import CharacterToken, TokenManager
 from whenever import Instant
 
 from esi_link import USER_AGENT
-from esi_link import operation_accessors as OA
-from esi_link.build_url import build_url
+from esi_link.helpers import operation_accessors as OA
+from esi_link.helpers.build_url import build_url
 from esi_link.models import (
     EsiHttpProtocol,
     EsiLinkError,

@@ -16,10 +16,10 @@ from esi_link.cli import STYLE_INFO
 from esi_link.cli.esi_cache import app as esi_cache_app
 from esi_link.cli.esi_request import app as esi_request_app
 from esi_link.cli.esi_schema import app as esi_schema_app
-from esi_link.cli.helpers import ensure_env_example
+from esi_link.cli.helpers.ensure_env_example import ensure_env_example
 from esi_link.cli.models import CliConfig
-from esi_link.ensure_esi_schema import ensure_esi_schema
-from esi_link.esi_link_factory import esi_link_factory
+from esi_link.helpers.ensure_esi_schema import ensure_esi_schema
+from esi_link.helpers.esi_link_factory import esi_link_factory
 from esi_link.logging_config import setup_logging
 from esi_link.settings import get_settings
 

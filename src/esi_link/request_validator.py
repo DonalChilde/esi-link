@@ -5,7 +5,7 @@ This module contains functions to validate incoming requests.
 
 from typing import Any, Protocol
 
-from esi_link import operation_accessors as OA
+from esi_link.helpers import operation_accessors as OA
 from esi_link.models import EsiRequest, EsiSchema
 
 

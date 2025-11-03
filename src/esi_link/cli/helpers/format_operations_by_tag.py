@@ -5,7 +5,7 @@ from textwrap import fill
 from rich.panel import Panel
 from rich.table import Table
 
-from esi_link import operation_accessors as OA
+from esi_link.helpers import operation_accessors as OA
 from esi_link.models import EsiSchema
 
 

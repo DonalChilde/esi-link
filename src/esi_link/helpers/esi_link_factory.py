@@ -4,9 +4,9 @@ from esi_auth.esi_auth import TokenManager
 
 from esi_link import USER_AGENT
 from esi_link.cache_p import cache_factory
-from esi_link.download_esi_schema import download_esi_schema
 from esi_link.esi_http import EsiHttpRateLimited
 from esi_link.esi_link import EsiLink
+from esi_link.helpers.download_esi_schema import download_esi_schema
 from esi_link.models import EsiSchema
 from esi_link.response_handlers import HandlerManager
 from esi_link.settings import EsiLinkSettings

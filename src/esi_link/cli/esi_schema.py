@@ -6,10 +6,10 @@ import typer
 from rich.console import Console, Group
 from rich.panel import Panel
 
-from esi_link.cli.models import CliConfig
-from esi_link.format_operations_by_tag import (
+from esi_link.cli.helpers.format_operations_by_tag import (
     operations_by_tag_panels,
 )
+from esi_link.cli.models import CliConfig
 
 app = typer.Typer(no_args_is_help=True)
 

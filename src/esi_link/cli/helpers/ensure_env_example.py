@@ -1,4 +1,4 @@
-"""Helper functions for the CLI applications."""
+"""Ensure that an example .esi-link.env file exists."""
 
 from pathlib import Path
 

@@ -10,8 +10,8 @@ import aiohttp
 from aiolimiter import AsyncLimiter
 from whenever import Instant
 
-from esi_link import header_funcs as HF
-from esi_link.build_url import build_url
+from esi_link.helpers import header_funcs as HF
+from esi_link.helpers.build_url import build_url
 from esi_link.models import (
     CacheProtocol,
     EsiHttpProtocol,
