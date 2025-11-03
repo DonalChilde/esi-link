@@ -136,7 +136,7 @@ class EsiResponseDataToFileHandler(ResponseHandlerProtocol, FileOutMixin):
         """Handle the response by saving the JSON data to a file."""
         try:
             http_response = esi_response.http_response
-            if http_response is not None and http_response.json_data is not None:
+            if http_response is not None:
                 path_out = self.format_path(self._file_path, esi_response.request)
                 if not self._overwrite and path_out.exists():
                     raise ResponseHandlerError(
@@ -148,7 +148,7 @@ class EsiResponseDataToFileHandler(ResponseHandlerProtocol, FileOutMixin):
                     json.dump(http_response.json_data, file, indent=2)
             else:
                 raise ResponseHandlerError(
-                    "No JSON data in HTTP response to save to file.",
+                    "httpResponse is None, nothing to save.",
                     handler_name=self.name,
                     response=esi_response,
                 )

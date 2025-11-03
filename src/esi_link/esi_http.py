@@ -24,9 +24,9 @@ from esi_link.models import (
 )
 
 logger = logging.getLogger(__name__)
-###########################################################################
+# ---------------------------------------------------------------------------
 # EsiHttpProtocol Implementations
-###########################################################################
+# ---------------------------------------------------------------------------
 
 
 class EsiHttpRateLimited(EsiHttpProtocol):
@@ -63,20 +63,6 @@ class EsiHttpRateLimited(EsiHttpProtocol):
         """Exit the async context manager, closing the HTTP session."""
         assert self.session is not None, "Session is not initialized."
         await self.session.close()
-
-    # async def _do_handlers(
-    #     self, request: HttpRequest, http_response: HttpResponse
-    # ) -> None:
-    #     # Process app level handlers
-    #     for handler in request.app_handlers:
-    #         await handler.handle_response(
-    #             request.ctx, http_response, request.esi_request
-    #         )
-    #     # Process user level handlers
-    #     for handler in request.user_handlers:
-    #         await handler.handle_response(
-    #             request.ctx, http_response, request.esi_request
-    #         )
 
     async def _worker(self, request: HttpRequest) -> EsiResponse:
         """Worker to process a single HTTP request.
@@ -123,7 +109,6 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                         metrics.cache_check = "HIT"
                         metrics.response_source = "CACHE"
                         metrics.request_end = Instant.now()
-                        # await self._do_handlers(request, cached_response.response)
                         return EsiResponse(
                             request=request.esi_request,
                             http_response=cached_response.response,
@@ -153,7 +138,6 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                         metrics.cache_update_end = Instant.now()
                         if cache_status == "STALE":
                             metrics.response_source = "NETWORK_STALE_CACHE_UPDATED"
-                    # await self._do_handlers(request, http_response)
                     metrics.request_end = Instant.now()
                     return EsiResponse(
                         request=request.esi_request,
@@ -162,7 +146,7 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                     )
                 case 201:  # Created Successful
                     # TODO handle 201 Created responses if needed
-                    # await self._do_handlers(request, http_response)
+                    raise NotImplementedError("201 Created handling not implemented.")
                     metrics.request_end = Instant.now()
                     metrics.response_source = "NETWORK"
                     return EsiResponse(
@@ -172,7 +156,9 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                     )
                 case 204:  # No Content Successful
                     # TODO handle 204 No Content responses if needed
-                    # await self._do_handlers(request, http_response)
+                    raise NotImplementedError(
+                        "204 No Content handling not implemented."
+                    )
                     metrics.request_end = Instant.now()
                     metrics.response_source = "NETWORK"
                     return EsiResponse(
@@ -199,7 +185,9 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                         metrics=metrics,
                     )
                 case 429:  # Rate Limited
-                    # TODO consider retry logic here.
+                    raise NotImplementedError(
+                        "429 Rate Limit handling not implemented."
+                    )
                     raise EsiLinkError(
                         f"Rate limited on request to {http_response.url}. Retry after {metrics.retry_after} seconds."
                     )
@@ -369,12 +357,17 @@ class EsiHttpRateLimited(EsiHttpProtocol):
             ) as response:
                 if raise_for_status:
                     response.raise_for_status()
+                if response.status == 304:
+                    json_data = None
+                else:
+                    json_data = await response.json()
+                logger.info(f"Response JSON data for URL {request.url}: {json_data!r}")
                 http_response = HttpResponse(
                     status_code=response.status,
                     reason=response.reason,
                     url=str(response.url),
                     headers=tuple(response.headers.items()),
-                    json_data=await response.json(),
+                    json_data=json_data,
                     etag=response.headers.get("ETag", ""),
                     last_modified=response.headers.get("Last-Modified", ""),
                     expires=response.headers.get("Expires", ""),
@@ -390,6 +383,7 @@ class EsiHttpRateLimited(EsiHttpProtocol):
         """Execute a list of HTTP requests.
 
         Gathers all request coroutines and executes them concurrently.
+        Entering here prevents wrapping the coros, e.g. for response handlers.
 
         Args:
             requests: A list of HttpRequest instances to execute.
@@ -407,6 +401,7 @@ class EsiHttpRateLimited(EsiHttpProtocol):
         """Collect coroutines for executing HTTP requests.
 
         Gathers all request coroutines. Can be used to execute requests in a custom manner.
+        e.g., Wrapping the coros in response handlers, etc.
 
         Args:
             requests: A list of HttpRequest instances to execute.
