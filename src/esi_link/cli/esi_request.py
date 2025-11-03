@@ -109,6 +109,7 @@ def examples(
         get_market_orders_example(),
         get_universe_types_example(),
         post_universe_names_example(),
+        get_character_attributes_example(),
     ]
     esi_requests = EsiRequests(
         requests_id=uuid4(),
@@ -343,6 +344,40 @@ def post_universe_names_example() -> EsiRequest:
                 name="esi-link.esi_response_data_to_file",
                 config={
                     "file_path": "${HOME}/tmp/esi-link-data/responses/${NOW}-${OPERATION_ID}.json",
+                    "overwrite": False,
+                },
+            ),
+            HandlerConfig(
+                name="esi-link.esi_response_to_file",
+                config={
+                    "file_path": "${HOME}/tmp/esi-link-data/responses/${NOW}-${OPERATION_ID}-response.json",
+                    "overwrite": False,
+                },
+            ),
+        ],
+    )
+
+
+def get_character_attributes_example() -> EsiRequest:
+    """Example ESI request for GetCharactersCharacterIdAttributes operation.
+
+    An example of a request requiring authentication.
+    """
+    return EsiRequest(
+        request_id=uuid4(),
+        operation_id="GetCharactersCharacterIdAttributes",
+        path_parameters={"character_id": 123456789},
+        query_parameters={},
+        auth_parameters=AuthParams(
+            character_id=123456789, client_alias="your_client_alias_here"
+        ),
+        request_body=None,
+        headers={},
+        handlers=[
+            HandlerConfig(
+                name="esi-link.esi_response_data_to_file",
+                config={
+                    "file_path": "${HOME}/tmp/esi-link-data/responses/${NOW}-${OPERATION_ID}-${CHARACTER_ID}.json",
                     "overwrite": False,
                 },
             ),

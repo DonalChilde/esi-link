@@ -84,7 +84,7 @@ class EsiLink(EsiLinkProtocol):
     ) -> list[EsiResponse]:
         """Execute the given EsiRequests asynchronously."""
         async with self.esi_http as http_client:
-            http_requests = self.build_http_requests(requests=requests)
+            http_requests = await self.build_http_requests(requests=requests)
             response_coros = await http_client.collect_request_coros(http_requests)
             request_coros = [self._handler_wrapper(r) for r in response_coros]
             results = await asyncio.gather(*request_coros)
@@ -121,7 +121,7 @@ class EsiLink(EsiLinkProtocol):
         response.metrics.handlers_end = Instant.now()
         return response
 
-    def get_auth_tokens_for_requests(
+    async def get_auth_tokens_for_requests(
         self,
         esi_requests: EsiRequests,
     ) -> dict[str, dict[int, CharacterToken]]:
@@ -158,7 +158,7 @@ class EsiLink(EsiLinkProtocol):
                 assert self.token_manager is not None, (
                     "TokenManager should never be None here."
                 )
-                token_list = self.token_manager.get_character_tokens(
+                token_list = await self.token_manager.get_character_tokens(
                     credential_alias=client_alias, buffer=5
                 )
                 token_dict[client_alias] = {
@@ -192,13 +192,13 @@ class EsiLink(EsiLinkProtocol):
             http_request_headers["User-Agent"] = USER_AGENT
         return http_request_headers
 
-    def build_http_requests(
+    async def build_http_requests(
         self,
         requests: EsiRequests,
     ) -> list[HttpRequest]:
         """Build HttpRequest objects from EsiRequest objects."""
         http_requests: list[HttpRequest] = []
-        token_dict = self.get_auth_tokens_for_requests(esi_requests=requests)
+        token_dict = await self.get_auth_tokens_for_requests(esi_requests=requests)
         for req in requests.requests.values():
             url = build_url(req, self.esi_schema)
             indexed_operation = self.esi_schema.operations.get(req.operation_id)
