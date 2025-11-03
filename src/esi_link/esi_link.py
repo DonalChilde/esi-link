@@ -25,6 +25,7 @@ from esi_link.models import (
     HttpRequest,
     ResponseHandlerProtocol,
 )
+from esi_link.request_validator import EsiRequestValidatorProtocol
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -48,6 +49,7 @@ class EsiLink(EsiLinkProtocol):
         esi_http: EsiHttpProtocol,
         handler_manager: HandlerManagerProtocol,
         token_manager: TokenManager | None = None,
+        request_validator: EsiRequestValidatorProtocol | None = None,
         application_handlers_config: list[HandlerConfig] | None = None,
     ) -> None:
         """Initialize the EsiLink instance.
@@ -63,6 +65,7 @@ class EsiLink(EsiLinkProtocol):
         self.esi_http = esi_http
         self.handler_manager = handler_manager
         self.token_manager = token_manager
+        self.request_validator = request_validator
         self.application_handlers_config = (
             application_handlers_config
             if application_handlers_config
@@ -89,6 +92,18 @@ class EsiLink(EsiLinkProtocol):
             request_coros = [self._handler_wrapper(r) for r in response_coros]
             results = await asyncio.gather(*request_coros)
             return results
+
+    def validate_request(self, request: EsiRequest) -> None:
+        """Validate the given EsiRequest.
+
+        Args:
+            request (EsiRequest): The request to validate.
+
+        Raises:
+            ValidationError: If the request is invalid.
+        """
+        if self.request_validator:
+            self.request_validator.validate(request=request)
 
     # async def collect_request_coros(
     #     self, ctx: ResponseContext, requests: EsiRequests
@@ -173,7 +188,7 @@ class EsiLink(EsiLinkProtocol):
 
     def _collect_http_request_headers(
         self, esi_request: EsiRequest, token_dict: dict[str, dict[int, CharacterToken]]
-    ) -> dict[str, str]:
+    ) -> dict[str, str | int | float]:
         """Collect HTTP request headers for the given EsiRequest."""
         http_request_headers = deepcopy(esi_request.headers)
         # Add Authorization header if needed
@@ -215,7 +230,9 @@ class EsiLink(EsiLinkProtocol):
                 cache_key=self.esi_http.cache.generate_cache_key(
                     esi_request=req, esi_schema=self.esi_schema
                 ),
-                headers=http_request_headers,
+                headers={
+                    key: str(value) for key, value in http_request_headers.items()
+                },
                 is_paged=is_paged,
                 json_body=req.request_body if req.request_body else None,
             )

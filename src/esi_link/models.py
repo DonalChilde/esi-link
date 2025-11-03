@@ -54,7 +54,7 @@ class EsiRequest(BaseModel):
     query_parameters: dict[str, str | int | float] = {}
     auth_parameters: AuthParams | None = None
     request_body: Any = None
-    headers: dict[str, str] = {}
+    headers: dict[str, str | int | float] = {}
     handlers: list[HandlerConfig] = []
     """List of handler configurations to apply to this request."""
 
@@ -659,6 +659,20 @@ class EsiLinkProtocol:
 
         Returns:
             A list of tuples containing the HttpRequest and either None or an exception if one occurred.
+        """
+        ...
+
+    def validate_request(
+        self,
+        request: EsiRequest,
+    ) -> None:
+        """Validate the given ESI request.
+
+        Args:
+            request (EsiRequest): The request to validate.
+
+        Raises:
+            ValidationError: If the request is invalid.
         """
         ...
 

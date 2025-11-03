@@ -20,6 +20,7 @@ from esi_link.models import (
     HandlerConfig,
     ResponseHandlerProtocol,
 )
+from esi_link.request_validator import ValidationError
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -154,6 +155,9 @@ def execute(
         esi_link = cli_config.esi_link
         if esi_link is None:
             raise EsiLinkError("Esi Link is not initialized in the CLI configuration.")
+        for request in requests.requests.values():
+            esi_link.validate_request(request)
+
         result = asyncio.run(esi_link.execute_requests(requests=requests))
         for esi_response in result:
             if esi_response.http_response is None or esi_response.error_messages:
@@ -171,6 +175,11 @@ def execute(
                 console.print(
                     f"[bold green]ESI request {esi_response.request.request_id} executed successfully with a {esi_response.http_response.status_code}[/bold green]"
                 )
+    except ValidationError as ve:
+        console.print(
+            f"[bold red]Validation error for ESI request {ve.request.request_id if ve.request else 'N/A'}:[/bold red] {ve}"
+        )
+        raise typer.Exit(code=1) from ve
     except Exception as e:
         console.print(f"[bold red]Error executing ESI requests:[/bold red] {e}")
         raise typer.Exit(code=1) from e
