@@ -3,7 +3,6 @@
 # FIXME: Implement cache statistics and clearing functionality
 
 import typer
-from rich import print as rich_print
 
 app = typer.Typer(no_args_is_help=True)
 

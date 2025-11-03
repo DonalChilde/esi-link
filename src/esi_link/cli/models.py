@@ -7,6 +7,9 @@ from esi_link.esi_link import EsiLink
 from esi_link.models import EsiSchema
 from esi_link.settings import EsiLinkSettings
 
+# FIXME Change load schema and create link on demand in commands, like esi-auth
+# This will allow removal of ctx.obj usage in commands
+
 
 @dataclass
 class CliConfig:
@@ -15,7 +18,6 @@ class CliConfig:
     debug: bool = False
     verbosity: int = 1
     silent: bool = False
-
     esi_schema: EsiSchema | None = None
     esi_link: EsiLink | None = None
 

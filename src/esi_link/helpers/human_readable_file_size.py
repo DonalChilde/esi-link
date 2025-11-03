@@ -4,8 +4,7 @@ from pathlib import Path
 
 
 def file_size(file_path: Path, decimal_places: int = 2) -> str:
-    """
-    Get the size of a file in a human-readable string format.
+    """Get the size of a file in a human-readable string format.
 
     Args:
         file_path (Path): The path to the file.
@@ -22,8 +21,7 @@ def file_size(file_path: Path, decimal_places: int = 2) -> str:
 
 
 def human_readable_file_size(size: int, decimal_places: int = 2) -> str:
-    """
-    Convert a file size in bytes to a human-readable string format.
+    """Convert a file size in bytes to a human-readable string format.
 
     Args:
         size (int): The file size in bytes.

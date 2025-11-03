@@ -1,15 +1,9 @@
-"""Utilities for generating cache identifiers.
-
-This module provides a function to generate a deterministic UUID based on a URL.
-The URL is canonicalized to ensure the same cache id regardless of the order of
-query parameters or case differences in scheme/host.
-"""
+"""Functions to canonicalize URLs for stable hashing."""
 
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
-from uuid import NAMESPACE_URL, UUID, uuid5
 
 
-def _canonicalize_url(url: str) -> str:
+def canonicalize_url(url: str) -> str:
     """Return a canonical form of the URL suitable for stable hashing.
 
     Normalizations applied:
@@ -31,13 +25,3 @@ def _canonicalize_url(url: str) -> str:
     fragment = ""
 
     return urlunsplit((scheme, netloc, path, query, fragment))
-
-
-def cache_id_from_url(url: str) -> UUID:
-    """Generate a UUIDv5 from a URL string for use as a cache id.
-
-    The URL is canonicalized so that logically equivalent URLs (e.g., differing
-    only in query parameter order) yield the same UUID.
-    """
-    canonical = _canonicalize_url(url)
-    return uuid5(NAMESPACE_URL, canonical)

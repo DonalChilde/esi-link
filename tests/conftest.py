@@ -5,7 +5,6 @@ from typing import Any
 
 import pytest
 
-from esi_link.esi_schema.schema_store import SchemaStore
 from tests.resources import RESOURCES_ANCHOR
 
 
@@ -51,16 +50,3 @@ def esi_schema_() -> dict[str, Any]:
     with resources.as_file(file_resource) as schema_path:
         with open(schema_path, encoding="utf-8") as file:
             return json.load(file)
-
-
-@pytest.fixture(scope="session", name="schema_store")
-def schema_store_(esi_schema: dict[str, Any], test_output_dir: Path) -> SchemaStore:
-    """Create a SchemaStore instance for testing."""
-    file_resource = resources.files(RESOURCES_ANCHOR).joinpath(
-        "schema/schema_store.json"
-    )
-    with resources.as_file(file_resource) as schema_path:
-        dummy_store = test_output_dir / "schema-store-temp/schema-store.json"
-        dummy_store.parent.mkdir(parents=True, exist_ok=True)
-        dummy_store.write_text(schema_path.read_text(encoding="utf-8"))
-        return SchemaStore(dummy_store)

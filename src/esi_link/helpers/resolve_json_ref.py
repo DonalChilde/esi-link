@@ -1,13 +1,13 @@
 """Resolve internal json references."""
 
 # pyright: basic
-from typing import Any, Dict
+from typing import Any
 
 
-def resolve_internal_refs(parent: Dict[str, Any], child: Any) -> Any:
-    """
-    Recursively resolve internal JSON references ($ref) in a child object,
-    using the provided parent object as the reference root.
+def resolve_internal_refs(parent: dict[str, Any], child: Any) -> Any:
+    """Recursively resolve internal JSON references ($ref) in a child object.
+
+    Using the provided parent object as the reference root.
 
     Args:
         parent (Dict[str, Any]): The full parent JSON object.
@@ -19,10 +19,7 @@ def resolve_internal_refs(parent: Dict[str, Any], child: Any) -> Any:
     Example:
         >>> parent = {
         ...     "components": {
-        ...         "schemas": {
-        ...             "A": {"type": "object"},
-        ...             "B": {"$ref": "#/components/schemas/A"}
-        ...         }
+        ...         "schemas": {"A": {"type": "object"}, "B": {"$ref": "#/components/schemas/A"}}
         ...     }
         ... }
         >>> child = parent["components"]["schemas"]["B"]

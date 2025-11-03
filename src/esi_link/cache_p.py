@@ -1,6 +1,7 @@
 """Cache implementations for ESI Link."""
 
 import logging
+from enum import StrEnum
 from pathlib import Path
 from uuid import NAMESPACE_URL, UUID, uuid5
 
@@ -17,6 +18,20 @@ from esi_link.models import (
 
 logger = logging.getLogger(__name__)
 ESI_LINK_NAMESPACE = uuid5(NAMESPACE_URL, "esi-link")
+
+
+class CacheStatus(StrEnum):
+    """Represents the cache status of an ESI query.
+
+    #NOTE not used yet
+    """
+
+    HIT = "hit"
+    """A current response is available in the cache."""
+    MISS = "miss"
+    """The response was not found in cache."""
+    STALE = "stale"
+    """The cached response is stale and needs to be refreshed."""
 
 
 class EsiLinkCache(BaseModel):

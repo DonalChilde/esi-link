@@ -1,20 +1,8 @@
-from collections.abc import Callable
+"""Helper functions for the CLI applications."""
+
 from pathlib import Path
 
-import typer
-
 from esi_link.settings import env_example
-
-
-def filter_if_silent(is_silent: bool) -> Callable[[str], None]:
-    """Filter messages based on silent mode."""
-
-    def msg_filter(msg: str) -> None:
-        if is_silent:
-            return
-        typer.echo(msg)
-
-    return msg_filter
 
 
 def ensure_env_example(file_path: Path) -> bool:
@@ -26,7 +14,7 @@ def ensure_env_example(file_path: Path) -> bool:
         file_path: The path to the file to check or create.
 
     Returns:
-        True if the file was created, False if it already existed.
+        True if the file already existed, False if it was created.
     """
     if not file_path.exists():
         file_path.parent.mkdir(parents=True, exist_ok=True)

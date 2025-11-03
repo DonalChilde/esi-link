@@ -1,3 +1,5 @@
+"""Ensure that a path is suitable for file output."""
+
 ####################################################
 #                                                  #
 #    src/snippets/file/validate_file_out.py

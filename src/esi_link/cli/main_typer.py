@@ -13,6 +13,7 @@ from rich.text import Text
 
 from esi_link import __app_name__, __version__
 from esi_link.cli import STYLE_INFO
+from esi_link.cli.esi_cache import app as esi_cache_app
 from esi_link.cli.esi_request import app as esi_request_app
 from esi_link.cli.esi_schema import app as esi_schema_app
 from esi_link.cli.helpers import ensure_env_example
@@ -49,6 +50,7 @@ app.add_typer(
     name="auth",
     help="esi-auth integration commands.",
 )
+app.add_typer(esi_cache_app, name="cache", help="ESI cache management commands.")
 
 
 @app.callback(invoke_without_command=True)
