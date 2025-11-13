@@ -1,4 +1,4 @@
-"""Simple function to download a text file from a web server."""
+"""Simple functions to download a text or JSON file from a web server."""
 
 import asyncio
 import logging
@@ -10,14 +10,13 @@ import aiohttp
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
-# TODO: add params argument for query parameters
-
 
 async def _download_text(
     url: str,
     *,
     params: dict[str, str] | None,
     headers: dict[str, str] | None,
+    json: dict[str, Any] | None = None,
     session: aiohttp.ClientSession | None,
 ) -> str:
     """Download a text file from a URL and return its content as a string."""
@@ -29,13 +28,16 @@ async def _download_text(
         params = {}
     if headers is None:
         headers = {}
-    async with session.get(url, headers=headers, params=params) as response:
+    if json is None:
+        json = {}
+    async with session.get(url, headers=headers, params=params, json=json) as response:
         logger.debug(
             f"Received response with status {response.status} from {response.real_url}"
         )
         logger.debug(f"Response headers: {response.headers}")
         response.raise_for_status()
         text = await response.text()
+        await asyncio.sleep(0)  # allow other tasks to run
         logger.info(
             f"Downloaded text from {url} in {perf_counter() - start:.2f} seconds"
         )
@@ -47,11 +49,12 @@ def download_text(
     *,
     params: dict[str, str] | None,
     headers: dict[str, str] | None,
+    json: dict[str, Any] | None = None,
     session: aiohttp.ClientSession | None = None,
 ) -> str:
     """Download a text file from a URL and return its content as a string."""
     return asyncio.run(
-        _download_text(url, params=params, headers=headers, session=session)
+        _download_text(url, params=params, headers=headers, json=json, session=session)
     )
 
 
@@ -60,6 +63,7 @@ async def _download_json(
     *,
     params: dict[str, str] | None,
     headers: dict[str, str] | None,
+    json: dict[str, Any] | None = None,
     session: aiohttp.ClientSession | None,
 ) -> Any:
     """Download a JSON file from a URL."""
@@ -71,13 +75,16 @@ async def _download_json(
         params = {}
     if headers is None:
         headers = {}
-    async with session.get(url, headers=headers, params=params) as response:
+    if json is None:
+        json = {}
+    async with session.get(url, headers=headers, params=params, json=json) as response:
         logger.debug(
             f"Received response with status {response.status} from {response.real_url}"
         )
         logger.debug(f"Response headers: {response.headers}")
         response.raise_for_status()
         json_data = await response.json()
+        await asyncio.sleep(0)  # allow other tasks to run
         logger.info(
             f"Downloaded json from {url} in {perf_counter() - start:.2f} seconds"
         )
@@ -89,9 +96,10 @@ def download_json(
     *,
     params: dict[str, str] | None,
     headers: dict[str, str] | None,
+    json: dict[str, Any] | None = None,
     session: aiohttp.ClientSession | None = None,
 ) -> Any:
     """Download a JSON file from a URL."""
     return asyncio.run(
-        _download_json(url, params=params, headers=headers, session=session)
+        _download_json(url, params=params, headers=headers, json=json, session=session)
     )
