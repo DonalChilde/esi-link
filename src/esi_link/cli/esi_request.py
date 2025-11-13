@@ -11,10 +11,9 @@ from rich.table import Table
 from whenever import Instant
 from yaml import safe_dump
 
-from esi_link.cli.models import CliConfig
+from esi_link.helpers.esi_link_factory import esi_link_factory
 from esi_link.models import (
     AuthParams,
-    EsiLinkError,
     EsiRequest,
     EsiRequests,
     HandlerConfig,
@@ -126,7 +125,6 @@ def examples(
 
 @app.command()
 def execute(
-    ctx: typer.Context,
     path_in: Annotated[
         Path,
         typer.Argument(
@@ -151,10 +149,11 @@ def execute(
         f"[bold green]Loaded {len(requests.requests)} ESI requests from:[/bold green] {path_in}"
     )
     try:
-        cli_config: CliConfig = ctx.obj
-        esi_link = cli_config.esi_link
-        if esi_link is None:
-            raise EsiLinkError("Esi Link is not initialized in the CLI configuration.")
+        try:
+            esi_link = esi_link_factory()
+        except Exception as e:
+            console.print(f"[red]Error initializing EsiLink: {e}[/red]")
+            raise typer.Exit(code=1) from e
         for request in requests.requests.values():
             esi_link.validate_request(request)
 
@@ -186,17 +185,15 @@ def execute(
 
 
 @app.command(name="handlers")
-def handlers_(ctx: typer.Context):
+def handlers_():
     """Display available response handlers."""
     console = Console()
     console.rule("[bold green]Available Response Handlers[/bold green]")
-    cli_config: CliConfig = ctx.obj
-    esi_link = cli_config.esi_link
-    if esi_link is None:
-        console.print(
-            "[bold red]Esi Link is not initialized in the CLI configuration.[/bold red]"
-        )
-        raise typer.Exit(code=1)
+    try:
+        esi_link = esi_link_factory()
+    except Exception as e:
+        console.print(f"[red]Error initializing EsiLink: {e}[/red]")
+        raise typer.Exit(code=1) from e
     handlers = esi_link.handler_manager.get_all_handlers()
     table = create_handlers_table(handlers)
     console.print(table)

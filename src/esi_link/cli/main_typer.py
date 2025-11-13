@@ -62,13 +62,6 @@ def default_options(
         bool,
         typer.Option(help="Enable silent mode. Only results and errors will be shown."),
     ] = False,
-    force_schema_update: Annotated[
-        bool,
-        typer.Option(
-            "--force",
-            help="Force update of ESI schema from URL, even if already present in configuration.",
-        ),
-    ] = False,
 ):
     """Esi Link Command Line Interface.
 
@@ -82,13 +75,6 @@ def default_options(
         debug=debug, verbosity=verbosity, silent=silent, settings=settings
     )
     ctx.obj = cli_config
-
-    # Complete the initialization of the configuration
-    _init_config(
-        ctx,
-        force_schema_update=force_schema_update,
-    )
-
     welcome = f"""
     Welcome to Esi Link! Your CLI interface to the Eve Online ESI api.
     Application configuration data located at {cli_config.settings.app_dir}
@@ -104,8 +90,8 @@ def remove_config(
 ):
     """Remove the Esi Link configuration. A new configuration will be created on next run."""
     console = Console()
-    cli_config: CliConfig = ctx.obj
-    config_file_path = cli_config.settings.config_file
+    settings = get_settings()
+    config_file_path = settings.config_file
     if config_file_path.exists():
         console.print(
             f"[yellow]Removing existing configuration file at {config_file_path}...[/yellow]"
@@ -138,8 +124,8 @@ def status(ctx: typer.Context):
     """Show the status of the Esi Link configuration."""
     console = Console()
     console.rule(Text("esi-link Cli Configuration Information", style=STYLE_INFO))
-    cli_config: CliConfig = ctx.obj
-    console.print(cli_config)
+    settings = get_settings()
+    console.print(settings)
 
 
 @app.command()
@@ -225,32 +211,6 @@ def example_env(
 #         console.print(
 #             "[bold green]See the .esi-link.env file and/or esi-auth documentation for details.[/bold green]"
 #         )
-
-
-def _init_config(
-    ctx: typer.Context,
-    force_schema_update: bool = False,
-) -> None:
-    """Initialize the CLI configuration with cache and client."""
-    start = perf_counter()
-    console = Console()
-    cli_config: CliConfig = ctx.obj
-    settings = cli_config.settings
-
-    try:
-        esi_schema = ensure_esi_schema(
-            esi_schema_path=settings.esi_schema_path,
-            esi_schema_url=settings.esi_schema_url,
-            force_update=force_schema_update,
-        )
-        cli_config.esi_schema = esi_schema
-    except Exception as e:
-        logger.error(f"Error ensuring ESI schema: {e}")
-        console.print(f"[red]Error ensuring ESI schema: {e}[/red]")
-        raise typer.Exit(code=1) from e
-
-    cli_config.esi_link = esi_link_factory(settings=settings, esi_schema=esi_schema)
-    logger.info(f"EsiLink initialized in {perf_counter() - start:.2f} seconds.")
 
 
 if __name__ == "__main__":

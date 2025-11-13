@@ -6,21 +6,21 @@ from esi_link import USER_AGENT
 from esi_link.cache_p import cache_factory
 from esi_link.esi_http import EsiHttpRateLimited
 from esi_link.esi_link import EsiLink
-from esi_link.helpers.download_esi_schema import download_esi_schema
-from esi_link.models import EsiSchema
+from esi_link.helpers.ensure_esi_schema import ensure_esi_schema
 from esi_link.response_handlers import HandlerManager
-from esi_link.settings import EsiLinkSettings
+from esi_link.settings import get_settings
 
 
 def esi_link_factory(
-    settings: EsiLinkSettings, esi_schema: EsiSchema | None = None
+    force_schema_update: bool = False,
 ) -> EsiLink:
     """Factory function to create an EsiLink instance based on the provided configuration."""
-    if esi_schema is None:
-        esi_schema = download_esi_schema(
-            url=settings.esi_schema_url,
-            headers={"User-Agent": USER_AGENT},
-        )
+    settings = get_settings()
+    esi_schema = ensure_esi_schema(
+        esi_schema_path=settings.esi_schema_path,
+        esi_schema_url=settings.esi_schema_url,
+        force_update=force_schema_update,
+    )
     if not settings.auth_connection_string:
         token_manager = None
     else:

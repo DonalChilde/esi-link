@@ -8,12 +8,12 @@ app = typer.Typer(no_args_is_help=True)
 
 
 @app.command()
-def clear(ctx: typer.Context):
+def clear():
     """Clear the ESI cache file."""
     raise NotImplementedError("Cache clearing not yet implemented.")
 
 
 @app.command()
-def stats(ctx: typer.Context):
+def stats():
     """Show statistics about the ESI cache."""
     raise NotImplementedError("Cache statistics not yet implemented.")
