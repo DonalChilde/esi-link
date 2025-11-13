@@ -14,10 +14,10 @@ logger.addHandler(logging.NullHandler())
 async def _download_text(
     url: str,
     *,
-    params: dict[str, str] | None,
-    headers: dict[str, str] | None,
+    params: dict[str, str] | None = None,
+    headers: dict[str, str] | None = None,
     json: dict[str, Any] | None = None,
-    session: aiohttp.ClientSession | None,
+    session: aiohttp.ClientSession | None = None,
 ) -> str:
     """Download a text file from a URL and return its content as a string."""
     logger.info(f"Downloading text from {url}")
@@ -47,8 +47,8 @@ async def _download_text(
 def download_text(
     url: str,
     *,
-    params: dict[str, str] | None,
-    headers: dict[str, str] | None,
+    params: dict[str, str] | None = None,
+    headers: dict[str, str] | None = None,
     json: dict[str, Any] | None = None,
     session: aiohttp.ClientSession | None = None,
 ) -> str:
@@ -61,10 +61,10 @@ def download_text(
 async def _download_json(
     url: str,
     *,
-    params: dict[str, str] | None,
-    headers: dict[str, str] | None,
+    params: dict[str, str] | None = None,
+    headers: dict[str, str] | None = None,
     json: dict[str, Any] | None = None,
-    session: aiohttp.ClientSession | None,
+    session: aiohttp.ClientSession | None = None,
 ) -> Any:
     """Download a JSON file from a URL."""
     logger.info(f"Downloading JSON from {url}")
@@ -94,8 +94,8 @@ async def _download_json(
 def download_json(
     url: str,
     *,
-    params: dict[str, str] | None,
-    headers: dict[str, str] | None,
+    params: dict[str, str] | None = None,
+    headers: dict[str, str] | None = None,
     json: dict[str, Any] | None = None,
     session: aiohttp.ClientSession | None = None,
 ) -> Any:
