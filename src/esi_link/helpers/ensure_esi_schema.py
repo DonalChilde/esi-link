@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+from whenever import Instant
+
 from esi_link import USER_AGENT
 from esi_link.helpers.download_esi_schema import download_esi_schema
 from esi_link.models import EsiSchema
@@ -29,8 +31,12 @@ def ensure_esi_schema(
     """
     if not esi_schema_path.exists() or force_update:
         # Download the schema from the URL and save it to the path
+        today = Instant.now().subtract(
+            hours=11
+        )  # ESI uses UTC-11 for compatibility date
+        compatibility_date = today.py_datetime().date().isoformat()
         esi_schema = download_esi_schema(
-            esi_schema_url, headers={"User-Agent": USER_AGENT}
+            esi_schema_url, user_agent=USER_AGENT, compatibility_date=compatibility_date
         )
         esi_schema.save_to_file(file_path=esi_schema_path, overwrite=True)
         return esi_schema

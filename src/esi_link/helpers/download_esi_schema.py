@@ -7,7 +7,9 @@ from esi_link.helpers.resolve_json_ref import resolve_internal_refs
 from esi_link.models import EsiLinkError, EsiSchema
 
 
-def download_esi_schema(url: str, headers: dict[str, str]) -> EsiSchema:
+def download_esi_schema(
+    url: str, user_agent: str, compatibility_date: str
+) -> EsiSchema:
     """Download the ESI schema from the specified URL.
 
     Also resolves internal JSON references.
@@ -20,7 +22,12 @@ def download_esi_schema(url: str, headers: dict[str, str]) -> EsiSchema:
         An EsiSchema instance representing the downloaded schema.
     """
     try:
-        response = download_json(url, headers=headers)
+        headers = {
+            "User-Agent": user_agent,
+        }
+        response = download_json(
+            url, params={"compatibility_date": compatibility_date}, headers=headers
+        )
         resolved_schema = resolve_internal_refs(response, response)
         if resolved_schema.get("openapi") is None:
             raise EsiLinkError("Downloaded schema is not a valid OpenAPI schema.")

@@ -1,3 +1,5 @@
+"""Pytest configuration and fixtures for testing."""
+
 import json
 from importlib import resources
 from pathlib import Path
@@ -8,8 +10,11 @@ import pytest
 from tests.resources import RESOURCES_ANCHOR
 
 
-##### Add an option to mark slow tests, so that they don't run every time. #####
+# ---------------------------------------------------------------------------------
+# Add an option to mark slow tests, so that they don't run every time.
+# ---------------------------------------------------------------------------------
 def pytest_addoption(parser: pytest.Parser) -> None:
+    """Add a command line option to run slow tests."""
     # https://docs.pytest.org/en/stable/example/simple.html#control-skipping-of-tests-according-to-command-line-option
     # conftest.py must be in the root test package.
     parser.addoption(
@@ -18,12 +23,14 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 
 def pytest_configure(config: pytest.Config):
+    """Register the slow marker."""
     config.addinivalue_line("markers", "slow: mark test as slow to run")
 
 
 def pytest_collection_modifyitems(
     config: pytest.Config, items: list[pytest.Item]
 ) -> None:
+    """Skip slow tests unless --runslow is given."""
     if config.getoption("--runslow"):
         # --runslow given in cli: do not skip slow tests
         return
@@ -33,7 +40,7 @@ def pytest_collection_modifyitems(
             item.add_marker(skip_slow)
 
 
-#################################################################################
+# ---------------------------------------------------------------------------------
 
 
 @pytest.fixture(scope="session", name="test_output_dir")
