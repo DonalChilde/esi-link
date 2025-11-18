@@ -210,19 +210,6 @@ class ResponseData(BaseModel):
     http_responses: dict[UUID, tuple[EsiRequest, "HttpResponse"]] = {}
 
 
-class EsiResponse(BaseModel):
-    """Represents the response for a single ESI request."""
-
-    request: EsiRequest
-    http_response: "HttpResponse | None"
-    metrics: Metrics
-    error_messages: list[str] = []
-
-    model_config = {
-        "arbitrary_types_allowed": True,
-    }
-
-
 class CachedResponse(BaseModel):
     """Represents a cached ESI response."""
 
@@ -471,6 +458,15 @@ class HttpResponse(BaseModel):
         self.esi_schema = EsiSchema.from_schema(
             schema=schema, download_date=download_date
         )
+
+
+class EsiResponse(BaseModel):
+    """Represents the response for a single ESI request."""
+
+    request: EsiRequest
+    http_response: HttpResponse | None
+    metrics: Metrics
+    error_messages: list[str] = []
 
 
 ############################################################################
