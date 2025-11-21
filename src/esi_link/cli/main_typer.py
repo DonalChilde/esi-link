@@ -2,7 +2,6 @@
 
 import logging
 from pathlib import Path
-from time import perf_counter
 from typing import Annotated
 
 import typer
@@ -18,8 +17,6 @@ from esi_link.cli.esi_request import app as esi_request_app
 from esi_link.cli.esi_schema import app as esi_schema_app
 from esi_link.cli.helpers.ensure_env_example import ensure_env_example
 from esi_link.cli.models import CliConfig
-from esi_link.helpers.ensure_esi_schema import ensure_esi_schema
-from esi_link.helpers.esi_link_factory import esi_link_factory
 from esi_link.logging_config import setup_logging
 from esi_link.settings import get_settings
 

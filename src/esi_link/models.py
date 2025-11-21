@@ -469,6 +469,15 @@ class EsiResponse(BaseModel):
     error_messages: list[str] = []
 
 
+class EsiResponses(BaseModel):
+    """Represents a batch of ESI responses."""
+
+    started_at: Instant | None = None
+    completed_at: Instant | None = None
+    responses: dict[UUID, EsiResponse]
+    """responses keyed by EsiRequest.request_id"""
+
+
 ############################################################################
 # Protocols
 ############################################################################
@@ -646,7 +655,7 @@ class EsiLinkProtocol:
     async def execute_requests(
         self,
         requests: EsiRequests,
-    ) -> list[EsiResponse]:
+    ) -> EsiResponses:
         """Execute a batch of ESI requests.
 
         Args:
@@ -654,7 +663,7 @@ class EsiLinkProtocol:
             requests: The EsiRequests instance containing the requests to execute.
 
         Returns:
-            A list of tuples containing the HttpRequest and either None or an exception if one occurred.
+            An EsiResponses instance containing the responses.
         """
         ...
 
