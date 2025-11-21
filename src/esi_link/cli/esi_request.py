@@ -158,7 +158,8 @@ def execute(
             esi_link.validate_request(request)
 
         result = asyncio.run(esi_link.execute_requests(requests=requests))
-        for esi_response in result:
+        for esi_response in result.responses.values():
+            # TODO make use of timing info in esi_response
             if esi_response.http_response is None or esi_response.error_messages:
                 # TODO refine this condition
                 console.print(

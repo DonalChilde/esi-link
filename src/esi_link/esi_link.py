@@ -19,6 +19,7 @@ from esi_link.models import (
     EsiRequest,
     EsiRequests,
     EsiResponse,
+    EsiResponses,
     EsiSchema,
     HandlerConfig,
     HandlerManagerProtocol,
@@ -84,14 +85,41 @@ class EsiLink(EsiLinkProtocol):
     async def execute_requests(
         self,
         requests: EsiRequests,
-    ) -> list[EsiResponse]:
-        """Execute the given EsiRequests asynchronously."""
+    ) -> EsiResponses:
+        """Execute the given EsiRequests asynchronously.
+
+        This method processes a collection of ESI (EVE Swagger Interface) requests by:
+        1. Building HTTP requests from the provided EsiRequests
+        2. Collecting request coroutines from the HTTP client
+        3. Wrapping each response coroutine with a handler
+        4. Executing all requests concurrently using asyncio.gather
+        5. Returning the responses along with timing information
+
+        Args:
+            requests (EsiRequests): A collection of ESI requests to be executed.
+
+        Returns:
+            EsiResponses: An object containing:
+                - started_at: Timestamp when execution began
+                - completed_at: Timestamp when all requests completed
+                - responses: A dictionary mapping request IDs to their responses
+
+        Raises:
+            Any exceptions raised by the HTTP client or request handlers will propagate
+            unless handled by _handler_wrapper.
+        """
+        started_at = Instant.now()
         async with self.esi_http as http_client:
             http_requests = await self.build_http_requests(requests=requests)
             response_coros = await http_client.collect_request_coros(http_requests)
             request_coros = [self._handler_wrapper(r) for r in response_coros]
             results = await asyncio.gather(*request_coros)
-            return results
+            completed_at = Instant.now()
+            return EsiResponses(
+                started_at=started_at,
+                completed_at=completed_at,
+                responses={r.request.request_id: r for r in results},
+            )
 
     def validate_request(self, request: EsiRequest) -> None:
         """Validate the given EsiRequest.
