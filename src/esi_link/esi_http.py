@@ -170,7 +170,7 @@ class EsiHttpRateLimited(EsiHttpProtocol):
                     if request.cache_key is None:
                         raise EsiLinkError("Received 304 but no cache is configured.")
                     metrics.cache_update_start = Instant.now()
-                    self.cache.store_http_response(
+                    self.cache.update_http_response(
                         cache_key=request.cache_key, http_response=http_response
                     )
                     metrics.cache_update_end = Instant.now()
