@@ -71,10 +71,17 @@ def display_responses(responses: EsiResponses) -> None:
     """
     console = Console()
     for key, response in responses.responses.items():
-        console.print(
-            f"Response status for request ID {key}: {response.http_response.status_code if response.http_response else 'No Response'}"
-        )
+        if response.http_response is None:
+            console.print(f"No response for request ID {key}")
+            continue
+        console.print(f"Response for request ID {key}:")
+        console.print(f"\trequest url: {response.http_response.url}")
+        console.print(f"\tcache status: {response.metrics.cache_check}")
+        console.print(f"\thttp status: {response.http_response.status_code}")
         console.print(f"\trequest took {response.metrics.request_duration()} seconds")
+        console.print(
+            f"\tresource expires in: {response.http_response.expires_in()} seconds"
+        )
         http_response = responses.responses[key].http_response
         if http_response:
             console.print(http_response.json_data, overflow="crop")

@@ -86,8 +86,6 @@ def display_responses(responses: EsiResponses) -> None:
         if http_response:
             console.print(http_response.json_data, overflow="crop")
 
-    # FIXME caching  is not returning the cached value. First call works, subsequent calls return a 304 but no data.
-
 
 def build_requests() -> EsiRequests:
     """Build ESI requests for testing.
