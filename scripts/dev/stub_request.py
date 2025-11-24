@@ -72,7 +72,10 @@ def display_responses(responses: EsiResponses) -> None:
     console = Console()
     for key, response in responses.responses.items():
         if response.http_response is None:
-            console.print(f"No response for request ID {key}")
+            console.print(
+                f"No response for request ID {key}, operation ID {response.request.operation_id}"
+            )
+            console.print(f"\tError: {response.error_messages}")
             continue
         console.print(f"Response for request ID {key}:")
         console.print(f"\trequest url: {response.http_response.url}")
