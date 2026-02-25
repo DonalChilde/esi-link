@@ -57,8 +57,12 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
                     raise RuntimeError("Request execution was forcefully stopped")
                 match request.runtime_info.method:
                     case "GET":
+                        if request.runtime_info.is_paged:
+                            pass  # TODO: implement pagination handling
                         response = await self._get(request, session)
                     case "POST":
+                        if request.runtime_info.is_paged:
+                            pass  # TODO: implement pagination handling
                         response = await self._post(request, session)
                     case "PUT":
                         response = await self._put(request, session)
