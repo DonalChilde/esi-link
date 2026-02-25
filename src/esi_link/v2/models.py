@@ -1,8 +1,10 @@
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any, Self
 from uuid import UUID
 
 import aiohttp
+from aiolimiter import AsyncLimiter
 from pydantic import BaseModel, Field
 from whenever import Instant
 
@@ -47,7 +49,7 @@ class RuntimeRequestInfo(BaseModel):
     is_paged: bool = False
     is_auth: bool = False
     headers: dict[str, str] = {}
-    """Includes UserAgent, and auth if required."""
+    """Includes UserAgent,Etag,If-None-Match,If-Modified-Since, and auth if required."""
     timeout: int = 10
     cache_key: UUID | None = None
     """Cache key for the request, if applicable. This is used to identify cached responses."""
@@ -62,7 +64,6 @@ class EsiRequest(BaseModelToDisk):
     query_parameters: dict[str, str | int | float] = {}
     auth_parameters: AuthParameters | None = None
     body: Any | None = None
-    headers: dict[str, str] = {}
     response_handlers: list[HandlerConfig] = []
     runtime_info: RuntimeRequestInfo | None = None
 
@@ -76,7 +77,7 @@ class EsiRequests(BaseModelToDisk):
     requests: dict[UUID, EsiRequest]
 
 
-class ResponseData(BaseModel):
+class HttpResponse(BaseModel):
     """Represents the data of an ESI response."""
 
     status_code: int
@@ -119,9 +120,9 @@ class EsiResponse(BaseModelToDisk):
     """Represents the response from an ESI request."""
 
     request_id: UUID
-    response_data: ResponseData | None = None
+    response_data: HttpResponse | None = None
     metrics: Metrics | None = None
-    exceptions: list[type[Exception]] = []
+    exceptions: list[Exception] = []
 
 
 class CachedResponse(BaseModelToDisk):
@@ -130,7 +131,7 @@ class CachedResponse(BaseModelToDisk):
     cache_key: UUID
     cached_on: Instant = Field(default_factory=_get_current_instant)
     """The instant when the response was cached."""
-    response_data: ResponseData
+    response_data: HttpResponse
 
 
 @dataclass(slots=True)
@@ -330,6 +331,24 @@ class HandlerManagerProtocol:
         """
         ...
 
+    def validate_handler_config(self, config: HandlerConfig) -> None:
+        """Validate a handler configuration against the registered handler.
+
+        Args:
+            config: The HandlerConfig instance containing the configuration.
+
+        Raises:
+            InvalidHandlerError: If the configuration is invalid for the specified handler.
+            HandlerNotFoundError: If the specified handler is not found.
+        """
+        ...
+
+
+class CachedResponseStatus(StrEnum):
+    VALID = "valid"
+    INVALID = "invalid"
+    STALE = "stale"
+
 
 class CacheManagerProtocol:
     def get_cached_response(self, cache_key: UUID) -> CachedResponse | None:
@@ -343,16 +362,17 @@ class CacheManagerProtocol:
         """
         ...
 
-    def set_cached_response(self, cached_response: CachedResponse) -> None:
+    def set_cached_response(self, cache_key: UUID, response_data: HttpResponse) -> None:
         """Set a cached response in the cache.
 
         Args:
-            cached_response: The CachedResponse instance to store in the cache.
+            cache_key: The UUID key for the cached response.
+            response_data: The new ResponseData to store in the cache.
         """
         ...
 
     def refresh_cached_response(
-        self, cache_key: UUID, new_response_data: ResponseData
+        self, cache_key: UUID, new_response_data: HttpResponse
     ) -> None:
         """Refresh an existing cached response with new response data.
 
@@ -362,6 +382,20 @@ class CacheManagerProtocol:
 
         Raises:
             KeyError: If no cached response exists for the given cache key.
+        """
+        ...
+
+    def status(
+        self, cache_key: UUID, cached_response: CachedResponse | None
+    ) -> CachedResponseStatus:
+        """Get the cache status for a given cache key.
+
+        Args:
+            cache_key: The UUID key for the cached response.
+            cached_response: The CachedResponse instance to check the status for.
+
+        Returns:
+            The CachedResponseStatus indicating the status of the cached response.
         """
         ...
 
@@ -376,13 +410,17 @@ class RequestExecutionException(Exception):
 
 class EsiRequestExecutorProtocol:
     async def execute_request(
-        self, request: EsiRequest, session: aiohttp.ClientSession
+        self,
+        request: EsiRequest,
+        session: aiohttp.ClientSession,
+        rate_limiter: AsyncLimiter,
     ) -> tuple[EsiRequest, EsiResponse]:
         """Execute an ESI request and return the response.
 
         Args:
             request: The EsiRequest instance to execute.
             session: An aiohttp ClientSession to use for making the HTTP request.
+            rate_limiter: An AsyncLimiter instance to use for rate limiting the request.
 
         Returns:
             A tuple containing the original EsiRequest and an EsiResponse instance.
