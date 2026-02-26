@@ -27,26 +27,16 @@ auth_app = typer.Typer(
     no_args_is_help=True, help="esi-auth integration commands.", name="auth"
 )
 auth_app.add_typer(
-    auth_credential_app,
-    name="credentials",
-    help="Manage esi-auth credential store.",
+    auth_credential_app, name="credentials", help="Manage esi-auth credential store."
 )
-auth_app.add_typer(
-    auth_token_app,
-    name="tokens",
-    help="Manage esi-auth token store.",
-)
+auth_app.add_typer(auth_token_app, name="tokens", help="Manage esi-auth token store.")
 app.add_typer(
     esi_schema_app,
     name="schema",
     help="Information about the operations available in the ESI schema.",
 )
 app.add_typer(esi_request_app, name="requests", help="Make ESI requests.")
-app.add_typer(
-    auth_app,
-    name="auth",
-    help="esi-auth integration commands.",
-)
+app.add_typer(auth_app, name="auth", help="esi-auth integration commands.")
 app.add_typer(esi_cache_app, name="cache", help="ESI cache management commands.")
 
 

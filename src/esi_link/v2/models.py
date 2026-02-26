@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from enum import StrEnum
+from types import TracebackType
 from typing import Any, Self
 from uuid import UUID
 
@@ -120,7 +121,7 @@ class EsiResponse(BaseModelToDisk):
     """Represents the response from an ESI request."""
 
     request_id: UUID
-    response_data: HttpResponse | None = None
+    http_response: HttpResponse | None = None
     metrics: Metrics | None = None
     exceptions: list[Exception] = []
 
@@ -131,7 +132,7 @@ class CachedResponse(BaseModelToDisk):
     cache_key: UUID
     cached_on: Instant = Field(default_factory=_get_current_instant)
     """The instant when the response was cached."""
-    response_data: HttpResponse
+    http_response: HttpResponse
 
 
 @dataclass(slots=True)
@@ -348,54 +349,73 @@ class CachedResponseStatus(StrEnum):
     VALID = "valid"
     INVALID = "invalid"
     STALE = "stale"
+    MISS = "miss"
 
 
 class CacheManagerProtocol:
-    def get_cached_response(self, cache_key: UUID) -> CachedResponse | None:
+    def __enter__(self) -> Self:
+        """Enter the runtime context related to this object."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        """Exit the runtime context related to this object."""
+        ...
+
+    def get(
+        self, key: UUID, max_age: int | None = None
+    ) -> tuple[CachedResponse | None, CachedResponseStatus]:
         """Get a cached response by cache key.
 
         Args:
-            cache_key: The UUID key for the cached response.
+            key: The UUID key for the cached response.
+            max_age: The maximum age of the cached response in seconds. If the cached
+                response is older than this, it will be considered stale.
 
         Returns:
-            The CachedResponse if found, or None if not found.
+            A tuple containing the CachedResponse if found, or None if not found, and
+                the CachedResponseStatus.
         """
         ...
 
-    def set_cached_response(self, cache_key: UUID, response_data: HttpResponse) -> None:
+    def set(self, key: UUID, http_response: HttpResponse) -> None:
         """Set a cached response in the cache.
 
         Args:
-            cache_key: The UUID key for the cached response.
-            response_data: The new ResponseData to store in the cache.
+            key: The UUID key for the cached response.
+            http_response: The new HttpResponse to store in the cache.
         """
         ...
 
-    def refresh_cached_response(
-        self, cache_key: UUID, new_response_data: HttpResponse
-    ) -> None:
+    def refresh(self, key: UUID, new_http_response: HttpResponse) -> None:
         """Refresh an existing cached response with new response data.
 
         Args:
-            cache_key: The UUID key for the cached response to refresh.
-            new_response_data: The new ResponseData to update the cached response with.
+            key: The UUID key for the cached response to refresh.
+            new_http_response: The new HttpResponse to update the cached response with.
 
         Raises:
             KeyError: If no cached response exists for the given cache key.
         """
         ...
 
-    def status(
-        self, cache_key: UUID, cached_response: CachedResponse | None
-    ) -> CachedResponseStatus:
-        """Get the cache status for a given cache key.
-
-        Args:
-            cache_key: The UUID key for the cached response.
-            cached_response: The CachedResponse instance to check the status for.
+    def clear(self) -> int:
+        """Clear all cached responses from the cache.
 
         Returns:
-            The CachedResponseStatus indicating the status of the cached response.
+            The number of cached responses that were cleared.
+        """
+        ...
+
+    def cache_info(self) -> dict[str, Any]:
+        """Get information about the cache, such as size, number of entries, etc.
+
+        Returns:
+            A dictionary containing information about the cache.
         """
         ...
 

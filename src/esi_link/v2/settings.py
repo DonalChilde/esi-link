@@ -23,29 +23,38 @@ class EsiLinkSettings(BaseSettings):
         default=DEFAULT_APP_DIR / "logs",
         description="The log directory for ESI Link.",
     )
-    config_file: Path = Field(
-        default=DEFAULT_APP_DIR / "esi_link_config.json",
-        description="The configuration file for ESI Link.",
-    )
+    # config_file: Path = Field(
+    #     default=DEFAULT_APP_DIR / "esi_link_config.json",
+    #     description="The configuration file for ESI Link.",
+    # )
     esi_schema_url: str = Field(
         default="https://esi.evetech.net/meta/openapi.json",
         description="The URL to download the ESI schema from.",
     )
-    esi_schema_path: Path = Field(
-        default=DEFAULT_APP_DIR / "esi_schema.json",
-        description="The path to the ESI schema file.",
+    indexed_esi_schema_path: Path = Field(
+        default=DEFAULT_APP_DIR / "indexed_esi_schema.json",
+        description="The path to the indexed ESI schema file.",
     )
-    cache_connection_string: str = Field(
-        default=f"esi-link-file:{DEFAULT_APP_DIR.resolve()}/esi-link-cache.json",
-        description="The connection string for ESI Link cache.",
+    cache_directory: Path = Field(
+        default=DEFAULT_APP_DIR / "cache",
+        description="The directory for ESI Link cache files.",
     )
-    """Connection string for the cache backend.
+    disk_cache_directory: Path = Field(
+        default=DEFAULT_APP_DIR / "cache" / "disk_cache",
+        description="The directory for ESI Link diskcache files.",
+    )
+    # # FIXME Do we need this setting now?
+    # cache_connection_string: str = Field(
+    #     default=f"esi-link-file:{DEFAULT_APP_DIR.resolve()}/esi-link-cache.json",
+    #     description="The connection string for ESI Link cache.",
+    # )
+    # """Connection string for the cache backend.
 
-    Format: [cache_type]://[path_or_connection_info]
+    # Format: [cache_type]://[path_or_connection_info]
 
-    Examples:
-        File-based cache: esi-link-json:///path/to/cache/dir
-        In-memory cache: esi-link-memory://"""
+    # Examples:
+    #     File-based cache: esi-link-json:///path/to/cache/dir
+    #     In-memory cache: esi-link-memory://"""
 
     connection_period: int = Field(
         default=60,
@@ -96,6 +105,12 @@ def get_settings() -> EsiLinkSettings:
     environ["PFMSOFT_ESI_AUTH_APP_DIR"] = str(settings.auth_app_dir.resolve())
     environ["PFMSOFT_ESI_AUTH_CONNECTION_STRING"] = settings.auth_connection_string
     environ["PFMSOFT_ESI_AUTH_AUTH_SERVER_TIMEOUT"] = str(settings.auth_server_timeout)
+
+    # Ensure application directories exist
+    settings.app_dir.mkdir(parents=True, exist_ok=True)
+    settings.cache_directory.mkdir(parents=True, exist_ok=True)
+    settings.disk_cache_directory.mkdir(parents=True, exist_ok=True)
+    settings.auth_app_dir.mkdir(parents=True, exist_ok=True)
     return settings
 
 

@@ -76,7 +76,7 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
             if response is None:
                 response = EsiResponse(
                     request_id=request.request_id,
-                    response_data=None,
+                    http_response=None,
                     metrics=None,
                     exceptions=[e],
                 )
@@ -124,10 +124,10 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
             match cached_response_status:
                 case CachedResponseStatus.VALID:
                     assert cached_response is not None
-                    http_response = deepcopy(cached_response.response_data)
+                    http_response = deepcopy(cached_response.http_response)
                     return EsiResponse(
                         request_id=request.request_id,
-                        response_data=http_response,
+                        http_response=http_response,
                         metrics=metrics,
                         exceptions=[],
                     )
@@ -149,7 +149,7 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
             )
             esi_response = EsiResponse(
                 request_id=request.request_id,
-                response_data=http_response,
+                http_response=http_response,
                 metrics=metrics,
                 exceptions=[],
             )
@@ -188,8 +188,8 @@ def set_cache_headers(request: EsiRequest, cached_response: CachedResponse) -> N
     """Set the appropriate cache headers on the request based on the cached response."""
     if request.runtime_info is None:
         raise ValueError("Request runtime info is missing")
-    etag = cached_response.response_data.etag
-    last_modified = cached_response.response_data.last_modified
+    etag = cached_response.http_response.etag
+    last_modified = cached_response.http_response.last_modified
     if etag is not None:
         request.runtime_info.headers["If-None-Match"] = etag
     if last_modified is not None:
