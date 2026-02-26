@@ -3,13 +3,9 @@ from rich.table import Table
 
 from esi_link.v2.helpers.indexed_operation_helpers import (
     IndexedOperationSummary,
-    collect_operation_summaries,
-    summaries_by_tag,
 )
-from esi_link.v2.models import IndexedEsiSchema, IndexedOperation, IndexedSchemaStore
 
 
-# TODO: write a function that accepts IndexedOperationSummary objects grouped by tagand displays them in a nice table format using rich.
 def display_operations_by_tag(
     summaries_by_tag: dict[str, list[IndexedOperationSummary]],
 ) -> None:

@@ -48,11 +48,14 @@ class RuntimeRequestInfo(BaseModel):
     """Represents the runtime information needed for an EsiRequest."""
 
     url: str
+    base_url: str
+    path_template: str
+    additional_query_params: dict[str, str] = Field(default_factory=dict)
     method: str
     is_paged: bool = False
     is_auth: bool = False
     headers: dict[str, str] = {}
-    """Includes UserAgent,Etag,If-None-Match,If-Modified-Since, and auth if required."""
+    """Includes UserAgent,If-None-Match,If-Modified-Since, X-Compatibility-Date, and auth if required."""
     timeout: int = 10
     cache_key: UUID | None = None
     """Cache key for the request, if applicable. This is used to identify cached responses."""
@@ -236,6 +239,21 @@ class IndexedOperation:
     def auth_required(self) -> bool:
         """Determine if the operation requires authentication based on the presence of security requirements."""
         return "security" in self.operation and bool(self.operation["security"])
+
+    @property
+    def is_paged(self) -> bool:
+        """Determine if the operation is paged based on the presence of pagination-related parameters."""
+        for param in self.query_params:
+            if param.get("name") in {"page"}:
+                return True
+        return False
+
+    @property
+    def is_cached(self) -> bool:
+        """Determine if the operation is cacheable."""
+        if self.method in {"GET", "get"}:
+            return True
+        return False
 
 
 class IndexedEsiSchema(BaseModelToDisk):
@@ -489,21 +507,27 @@ class HandlerManagerProtocol:
 
 
 class AuthProviderProtocol:
-    async def get_auth_headers(
-        self, character_id: int, auth_alias: str | None = None
-    ) -> dict[str, str]:
-        """Get authentication headers based on the provided authentication parameters.
+    def get_auth_token(
+        self, character_id: int, client_alias: str | None = None
+    ) -> dict[str, str | int]:
+        """Get authentication token based on the provided authentication parameters.
 
         Args:
             character_id: The ID of the character for which to generate authentication headers.
-            auth_alias: An optional alias for the authentication method to use.
+            client_alias: An optional alias for the authentication method to use.
 
         Returns:
-            A dictionary of HTTP headers to include in the request for authentication.
+            A dictionary containing authentication parameters such as access token, refresh token, etc.
 
         Raises:
-            Exception: If there is an error generating the authentication headers.
+            ValueError: If the authentication parameters are invalid or if authentication fails.
         """
+        ...
+
+    def get_auth_headers(
+        self, character_id: int, client_alias: str | None = None
+    ) -> dict[str, str]:
+        """Get authentication headers based on the provided authentication parameters."""
         ...
 
 

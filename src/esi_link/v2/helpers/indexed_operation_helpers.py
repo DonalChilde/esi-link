@@ -1,7 +1,6 @@
-from dataclasses import dataclass
-from typing import Any, TypedDict
+from typing import TypedDict
 
-from esi_link.v2.models import IndexedEsiSchema, IndexedOperation, IndexedSchemaStore
+from esi_link.v2.models import IndexedEsiSchema
 
 
 class IndexedOperationSummary(TypedDict):
