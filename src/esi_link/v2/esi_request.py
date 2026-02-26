@@ -9,8 +9,20 @@ def validate_request_path_params(request: EsiRequest, schema: IndexedEsiSchema) 
 def validate_request_query_params(
     request: EsiRequest, schema: IndexedEsiSchema
 ) -> None:
-    """Validate the request query parameters against the indexed schema."""
-    ...
+    """Validate the request query parameters against the indexed schema.
+
+    This includes checking for required parameters, validating parameter types, and
+    ensuring that parameter values conform to any specified constraints (e.g., enums, min/max values).
+    """
+    operation = schema.operations[request.operation_id]
+    for param_name, param_schema in operation.operation.get("parameters", {}).items():
+        # FIXME need an example of a parameter schema to implement this properly
+        if param_schema.required and param_name not in request.query_parameters:
+            raise ValueError(f"Missing required query parameter: {param_name}")
+        if param_name in request.query_parameters:
+            value = request.query_parameters[param_name]
+            # Validate parameter type and constraints based on param_schema
+            ...
 
 
 def validate_request_body(request: EsiRequest, schema: IndexedEsiSchema) -> None:

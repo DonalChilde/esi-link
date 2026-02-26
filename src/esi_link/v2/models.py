@@ -123,7 +123,7 @@ class EsiResponse(BaseModelToDisk):
     request_id: UUID
     http_response: HttpResponse | None = None
     metrics: Metrics | None = None
-    exceptions: list[Exception] = []
+    exceptions: list[type[Exception]] = []
 
 
 class CachedResponse(BaseModelToDisk):
@@ -206,6 +206,41 @@ class IndexedEsiSchema(BaseModelToDisk):
             servers=dereferenced_schema.get("servers", []),
             tags=dereferenced_schema.get("tags", []),
         )
+
+
+class IndexedSchemaStore(BaseModelToDisk):
+    """Represents a store for multiple versions of the IndexedEsiSchema.
+
+    The compatability date index is a string in ISO 8601 format 2026-02-21 representing
+    the date that the schema version was downloaded. This allows for storing multiple
+    versions of the schema and retrieving the appropriate one based on the date of the ESI
+    request being executed.
+    """
+
+    schemas: dict[str, IndexedEsiSchema] = Field(default_factory=dict)
+    """A mapping of download dates (as ISO 8601 strings) to IndexedEsiSchema instances."""
+
+    def purge_older(self, cutoff_date: str) -> None:
+        """Purge schemas that were downloaded before the given cutoff date.
+
+        Args:
+            cutoff_date: The ISO 8601 string representing the cutoff date. Schemas downloaded
+                before this date will be removed from the store.
+        """
+        keys_to_purge = [key for key in self.schemas if key < cutoff_date]
+        for key in keys_to_purge:
+            del self.schemas[key]
+
+    def latest_schema(self) -> IndexedEsiSchema | None:
+        """Get the latest schema in the store based on download date.
+
+        Returns:
+            The IndexedEsiSchema instance with the most recent download date, or None if the store is empty.
+        """
+        if not self.schemas:
+            return None
+        latest_key = max(self.schemas.keys())
+        return self.schemas[latest_key]
 
 
 # --------------------------------------------------------------------------------------

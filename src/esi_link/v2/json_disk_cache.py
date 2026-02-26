@@ -1,10 +1,13 @@
+"""A JSON-based disk cache implementation."""
+
+from pathlib import Path
 from types import TracebackType
 from typing import Any, Self
 from uuid import UUID
 
-from diskcache import Cache  # type: ignore
 from whenever import Instant
 
+from esi_link.v2.helpers.stale_cache_check import check_stale
 from esi_link.v2.models import (
     CachedResponse,
     CachedResponseStatus,
@@ -13,16 +16,15 @@ from esi_link.v2.models import (
 )
 
 
-class DiskCache(CacheManagerProtocol):
-    def __init__(self, cache_directory: str, max_age_seconds: int = 3600):
-        """A disk-based cache implementation using the diskcache library."""
+class JsonDiskCache(CacheManagerProtocol):
+    def __init__(self, cache_directory: Path, max_age_seconds: int = 3600):
+        """A disk-based cache implementation using json files."""
         self.cache_directory = cache_directory
-        self.cache = Cache(cache_directory)
+        self.cache_directory.mkdir(parents=True, exist_ok=True)
         self.max_age_seconds = max_age_seconds
 
     def __enter__(self) -> Self:
-        """Enter the runtime context related to this object, which will automatically open the disk cache."""
-        self.cache.__enter__()
+        """Enter the runtime context related to this object."""
         return self
 
     def __exit__(
@@ -31,8 +33,7 @@ class DiskCache(CacheManagerProtocol):
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        """Exit the runtime context related to this object, which will automatically close the disk cache."""
-        self.cache.__exit__(exc_type, exc_value, traceback)  # type: ignore
+        """Exit the runtime context related to this object."""
 
     def get(
         self, key: UUID, max_age: int | None = None
@@ -40,12 +41,10 @@ class DiskCache(CacheManagerProtocol):
         """Get a value from the disk cache."""
         if max_age is None:
             max_age = self.max_age_seconds
-        response = self.cache.get(str(key))  # type: ignore
-        if response is None:
+        response_path = self.cache_directory.joinpath(f"{key}.json")
+        if not response_path.exists():
             return None, CachedResponseStatus.MISS
-        assert isinstance(response, CachedResponse), (
-            "Cached value is not of type CachedResponse"
-        )
+        response = CachedResponse.model_validate_json(response_path.read_text())
         if check_stale(response, max_age_seconds=max_age):
             return response, CachedResponseStatus.STALE
         return response, CachedResponseStatus.VALID
@@ -57,7 +56,8 @@ class DiskCache(CacheManagerProtocol):
             cached_on=Instant.now(),
             http_response=http_response,
         )
-        self.cache.set(str(key), cached_response)  # type: ignore
+        response_path = self.cache_directory.joinpath(f"{key}.json")
+        response_path.write_text(cached_response.model_dump_json())
 
     def refresh(self, key: UUID, new_http_response: HttpResponse) -> None:
         """Refresh a value in the disk cache."""
@@ -65,18 +65,19 @@ class DiskCache(CacheManagerProtocol):
 
     def clear(self) -> int:
         """Clear all cached responses from the cache."""
-        return self.cache.clear()
+        count = 0
+        for file in self.cache_directory.glob("*.json"):
+            file.unlink()
+            count += 1
+        return count
 
     def cache_info(self) -> dict[str, Any]:
         """Get information about the cache, such as size, number of entries, etc."""
+        directory_size = sum(
+            file.stat().st_size for file in self.cache_directory.glob("*.json")
+        )
         return {
             "path": self.cache_directory,
-            "size": self.cache.volume(),
-            "entries": len(self.cache),  # type: ignore
+            "size": directory_size,
+            "entries": len(list(self.cache_directory.glob("*.json"))),
         }
-
-
-def check_stale(cached_response: CachedResponse, max_age_seconds: int) -> bool:
-    """Check if a cached response is stale based on its age."""
-    age = (Instant.now() - cached_response.cached_on).in_seconds()
-    return age > max_age_seconds

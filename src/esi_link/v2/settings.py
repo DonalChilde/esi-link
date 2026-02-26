@@ -31,9 +31,9 @@ class EsiLinkSettings(BaseSettings):
         default="https://esi.evetech.net/meta/openapi.json",
         description="The URL to download the ESI schema from.",
     )
-    indexed_esi_schema_path: Path = Field(
-        default=DEFAULT_APP_DIR / "indexed_esi_schema.json",
-        description="The path to the indexed ESI schema file.",
+    schema_store_path: Path = Field(
+        default=DEFAULT_APP_DIR / "schema-store.json",
+        description="The path to the store of indexed ESI schema files.",
     )
     cache_directory: Path = Field(
         default=DEFAULT_APP_DIR / "cache",
