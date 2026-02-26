@@ -18,11 +18,11 @@ from esi_link.v2.models import (
 
 
 class DiskCache(CacheManagerProtocol):
-    def __init__(self, cache_directory: Path, max_age_seconds: int = 3600):
+    def __init__(self, cache_directory: Path, local_max_age_seconds: int = 3600):
         """A disk-based cache implementation using the diskcache library."""
         self.cache_directory = cache_directory
         self.cache = Cache(cache_directory)
-        self.max_age_seconds = max_age_seconds
+        self.local_max_age_seconds = local_max_age_seconds
 
     def __enter__(self) -> Self:
         """Enter the runtime context related to this object, which will automatically open the disk cache."""
@@ -39,20 +39,20 @@ class DiskCache(CacheManagerProtocol):
         self.cache.__exit__(exc_type, exc_value, traceback)  # type: ignore
 
     def get(
-        self, key: UUID, max_age: int | None = None
+        self, key: UUID, local_max_age: int | None = None
     ) -> tuple[CachedResponse | None, CachedResponseStatus]:
         """Get a value from the disk cache."""
-        if max_age is None:
-            max_age = self.max_age_seconds
+        if local_max_age is None:
+            local_max_age = self.local_max_age_seconds
         response = self.cache.get(str(key))  # type: ignore
         if response is None:
             return None, CachedResponseStatus.MISS
         assert isinstance(response, CachedResponse), (
             "Cached value is not of type CachedResponse"
         )
-        if check_stale(response, max_age_seconds=max_age):
+        if check_stale(response, max_age_seconds=local_max_age):
             return response, CachedResponseStatus.STALE
-        return response, CachedResponseStatus.VALID
+        return response, CachedResponseStatus.HIT
 
     def set(self, key: UUID, http_response: HttpResponse) -> None:
         """Set a value in the disk cache."""

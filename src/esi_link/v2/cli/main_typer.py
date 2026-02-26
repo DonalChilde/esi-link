@@ -1,3 +1,5 @@
+"""Main entry point for the Esi Link CLI using Typer."""
+
 import logging
 
 import typer

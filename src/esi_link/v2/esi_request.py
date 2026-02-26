@@ -1,3 +1,5 @@
+"""Functions for working with EsiRequests."""
+
 from esi_link.v2.models import EsiRequest, HandlerManagerProtocol, IndexedEsiSchema
 
 

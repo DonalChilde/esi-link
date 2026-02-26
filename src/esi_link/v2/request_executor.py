@@ -1,11 +1,10 @@
+"""Module for executing ESI requests, including handling HTTP requests, caching, and rate limiting."""
+
 import asyncio
 from copy import deepcopy
-from typing import Any
-from uuid import UUID
 
 import aiohttp
 from aiolimiter import AsyncLimiter
-from whenever import Instant
 
 from esi_link.v2.models import (
     CachedResponse,
@@ -24,6 +23,7 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
     def __init__(
         self, cache_manager: CacheManagerProtocol, max_rate: int, period: float
     ):
+        """Executor for ESI requests that handles making HTTP requests, caching, and rate limiting."""
         self.cache_manager = cache_manager
         self.max_rate = max_rate
         self.period = period
@@ -34,7 +34,7 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
         request: EsiRequest,
         session: aiohttp.ClientSession,
         rate_limiter: AsyncLimiter,
-    ) -> tuple[EsiRequest, EsiResponse]:
+    ) -> EsiResponse:
         """Execute an ESI request and return the response.
 
         Exceptions will be trapped and included in the EsiResponse, but will not be raised by this method.
@@ -45,7 +45,7 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
             rate_limiter: An AsyncLimiter instance to use for rate limiting the request.
 
         Returns:
-            A tuple containing the original EsiRequest and an EsiResponse instance.
+            An EsiResponse instance corresponding to the executed request.
 
         """
         response: EsiResponse | None = None
@@ -75,25 +75,23 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
         except Exception as e:
             if response is None:
                 response = EsiResponse(
-                    request_id=request.request_id,
+                    request=request,
                     http_response=None,
                     metrics=None,
                     exceptions=[e],
                 )
             else:
                 response.exceptions.append(e)
-        return request, response
+        return response
 
-    async def execute_requests(
-        self, requests: EsiRequests
-    ) -> tuple[EsiRequests, dict[UUID, EsiResponse]]:
+    async def execute_requests(self, requests: EsiRequests) -> list[EsiResponse]:
         """Execute a batch of ESI requests and return the responses.
 
         Args:
             requests: The EsiRequests instance containing the batch of requests to execute.
 
         Returns:
-            A tuple containing the original EsiRequests instance and a dictionary mapping request UUIDs to EsiResponse instances.
+            A list of EsiResponse instances corresponding to the executed requests.
 
         """
         rate_limiter = AsyncLimiter(self.max_rate, self.period)
@@ -103,8 +101,8 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
                 for request in requests.requests.values()
             ]
             results = await asyncio.gather(*tasks)
-            responses = {request.request_id: response for request, response in results}
-            return requests, responses
+
+            return results
 
     async def _get(
         self, request: EsiRequest, session: aiohttp.ClientSession
@@ -115,23 +113,20 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
             raise ValueError("Request runtime info is missing")
         cache_key = request.runtime_info.cache_key
         cached_response: CachedResponse | None = None
-        cached_response_status: CachedResponseStatus | None = None
         if cache_key is not None:
-            cached_response = self.cache_manager.get_cached_response(cache_key)
-            cached_response_status = self.cache_manager.status(
-                cache_key, cached_response
-            )
-            match cached_response_status:
-                case CachedResponseStatus.VALID:
+            cached_response, status = self.cache_manager.get(cache_key)
+
+            match status:
+                case CachedResponseStatus.HIT:
                     assert cached_response is not None
                     http_response = deepcopy(cached_response.http_response)
                     return EsiResponse(
-                        request_id=request.request_id,
+                        request=request,
                         http_response=http_response,
                         metrics=metrics,
                         exceptions=[],
                     )
-                case CachedResponseStatus.INVALID:
+                case CachedResponseStatus.MISS:
                     # update from esi
                     pass
                 case CachedResponseStatus.STALE:
@@ -148,7 +143,7 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
                 body=response_data,
             )
             esi_response = EsiResponse(
-                request_id=request.request_id,
+                request=request,
                 http_response=http_response,
                 metrics=metrics,
                 exceptions=[],
@@ -157,10 +152,10 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
             match response.status:
                 case 200:
                     if cache_key is not None:
-                        self.cache_manager.set_cached_response(cache_key, http_response)
+                        self.cache_manager.set(cache_key, http_response)
                 case 304:
                     assert cache_key is not None
-                    self.cache_manager.refresh_cached_response(cache_key, http_response)
+                    self.cache_manager.refresh(cache_key, http_response)
                 case _:
                     response.raise_for_status()
             return esi_response

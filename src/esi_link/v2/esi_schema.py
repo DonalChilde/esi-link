@@ -1,3 +1,5 @@
+"""Functions for working with the ESI schema."""
+
 import json
 from pathlib import Path
 from typing import Any

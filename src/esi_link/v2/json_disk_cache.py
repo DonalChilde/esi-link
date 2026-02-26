@@ -17,11 +17,11 @@ from esi_link.v2.models import (
 
 
 class JsonDiskCache(CacheManagerProtocol):
-    def __init__(self, cache_directory: Path, max_age_seconds: int = 3600):
+    def __init__(self, cache_directory: Path, local_max_age_seconds: int = 3600):
         """A disk-based cache implementation using json files."""
         self.cache_directory = cache_directory
         self.cache_directory.mkdir(parents=True, exist_ok=True)
-        self.max_age_seconds = max_age_seconds
+        self.local_max_age_seconds = local_max_age_seconds
 
     def __enter__(self) -> Self:
         """Enter the runtime context related to this object."""
@@ -36,18 +36,18 @@ class JsonDiskCache(CacheManagerProtocol):
         """Exit the runtime context related to this object."""
 
     def get(
-        self, key: UUID, max_age: int | None = None
+        self, key: UUID, local_max_age: int | None = None
     ) -> tuple[CachedResponse | None, CachedResponseStatus]:
         """Get a value from the disk cache."""
-        if max_age is None:
-            max_age = self.max_age_seconds
+        if local_max_age is None:
+            local_max_age = self.local_max_age_seconds
         response_path = self.cache_directory.joinpath(f"{key}.json")
         if not response_path.exists():
             return None, CachedResponseStatus.MISS
         response = CachedResponse.model_validate_json(response_path.read_text())
-        if check_stale(response, max_age_seconds=max_age):
+        if check_stale(response, max_age_seconds=local_max_age):
             return response, CachedResponseStatus.STALE
-        return response, CachedResponseStatus.VALID
+        return response, CachedResponseStatus.HIT
 
     def set(self, key: UUID, http_response: HttpResponse) -> None:
         """Set a value in the disk cache."""

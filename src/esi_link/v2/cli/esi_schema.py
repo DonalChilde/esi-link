@@ -1,3 +1,5 @@
+"""CLI commands related to the ESI schema."""
+
 from pathlib import Path
 from typing import Annotated
 
@@ -6,8 +8,8 @@ from rich.console import Console
 
 from esi_link.v2 import example_requests
 from esi_link.v2.esi_schema import (
+    add_schema_to_store,
     download_schema,
-    save_indexed_schema_to_file,
     save_schemas_to_file,
 )
 from esi_link.v2.models import IndexedEsiSchema
@@ -48,8 +50,8 @@ def download(
             f"ESI schema downloaded and saved to {raw_path} and {deref_path}."
         )
     indexed_schema = IndexedEsiSchema.from_raw_schema(schema, timestamp)
-    save_indexed_schema_to_file(indexed_schema)
-    console.print(f"ESI schema downloaded and saved to app directory.")
+    add_schema_to_store(indexed_schema)
+    console.print(f"ESI schema downloaded and added to app schema store.")
 
 
 @app.command()

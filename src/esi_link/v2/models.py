@@ -1,3 +1,5 @@
+"""Data models and Protocols for ESI Link."""
+
 from dataclasses import dataclass, field
 from enum import StrEnum
 from types import TracebackType
@@ -6,7 +8,7 @@ from uuid import UUID
 
 import aiohttp
 from aiolimiter import AsyncLimiter
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from whenever import Instant
 
 from esi_link.v2.helpers.pydantic.save_to_disk import BaseModelToDisk
@@ -120,10 +122,13 @@ class Metrics:
 class EsiResponse(BaseModelToDisk):
     """Represents the response from an ESI request."""
 
-    request_id: UUID
+    request: EsiRequest
     http_response: HttpResponse | None = None
     metrics: Metrics | None = None
-    exceptions: list[type[Exception]] = []
+    exception_messages: list[str] = Field(default_factory=list)
+    exceptions: list[Exception] = Field(..., exclude=True)
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class CachedResponse(BaseModelToDisk):
@@ -252,6 +257,7 @@ class HandlerException(Exception):
     """Base exception class for response handler errors."""
 
     def __init__(self, message: str, config: dict[str, Any]):
+        """Base exception class for response handler errors."""
         super().__init__(message)
         self.config = config
 
@@ -260,6 +266,7 @@ class InvalidHandlerError(HandlerException):
     """Exception raised when a response handler configuration is invalid."""
 
     def __init__(self, message: str, config: dict[str, Any]):
+        """Exception raised when a response handler configuration is invalid."""
         super().__init__(message, config)
 
 
@@ -267,6 +274,7 @@ class HandlerNotFoundError(HandlerException):
     """Exception raised when a response handler is not found."""
 
     def __init__(self, message: str, config: dict[str, Any]):
+        """Exception raised when a response handler is not found."""
         super().__init__(message, config)
 
 
@@ -274,6 +282,7 @@ class HandlerExecutionError(HandlerException):
     """Exception raised when a response handler fails during execution."""
 
     def __init__(self, message: str, config: dict[str, Any]):
+        """Exception raised when a response handler fails during execution."""
         super().__init__(message, config)
 
 
@@ -381,10 +390,9 @@ class HandlerManagerProtocol:
 
 
 class CachedResponseStatus(StrEnum):
-    VALID = "valid"
-    INVALID = "invalid"
-    STALE = "stale"
+    HIT = "hit"
     MISS = "miss"
+    STALE = "stale"
 
 
 class CacheManagerProtocol:
@@ -402,13 +410,16 @@ class CacheManagerProtocol:
         ...
 
     def get(
-        self, key: UUID, max_age: int | None = None
+        self, key: UUID, local_max_age: int | None = None
     ) -> tuple[CachedResponse | None, CachedResponseStatus]:
         """Get a cached response by cache key.
 
+        Local max age allows the caller to specify a max age for staleness that is
+        different from the max age received from the server.
+
         Args:
             key: The UUID key for the cached response.
-            max_age: The maximum age of the cached response in seconds. If the cached
+            local_max_age: The maximum age of the cached response in seconds. If the cached
                 response is older than this, it will be considered stale.
 
         Returns:
@@ -459,6 +470,7 @@ class RequestExecutionException(Exception):
     """Exception raised when an error occurs during ESI request execution."""
 
     def __init__(self, message: str, request: EsiRequest):
+        """Exception raised when an error occurs during ESI request execution."""
         super().__init__(message)
         self.request = request
 
@@ -469,7 +481,7 @@ class EsiRequestExecutorProtocol:
         request: EsiRequest,
         session: aiohttp.ClientSession,
         rate_limiter: AsyncLimiter,
-    ) -> tuple[EsiRequest, EsiResponse]:
+    ) -> EsiResponse:
         """Execute an ESI request and return the response.
 
         Args:
@@ -478,21 +490,19 @@ class EsiRequestExecutorProtocol:
             rate_limiter: An AsyncLimiter instance to use for rate limiting the request.
 
         Returns:
-            A tuple containing the original EsiRequest and an EsiResponse instance.
+            An EsiResponse instance corresponding to the executed request.
 
         """
         ...
 
-    async def execute_requests(
-        self, requests: EsiRequests
-    ) -> tuple[EsiRequests, dict[UUID, EsiResponse]]:
+    async def execute_requests(self, requests: EsiRequests) -> list[EsiResponse]:
         """Execute a batch of ESI requests and return the responses.
 
         Args:
             requests: The EsiRequests instance containing the batch of requests to execute.
 
         Returns:
-            A tuple containing the original EsiRequests instance and a dictionary mapping request UUIDs to EsiResponse instances.
+            A list of EsiResponse instances corresponding to the executed requests.
 
         """
         ...
