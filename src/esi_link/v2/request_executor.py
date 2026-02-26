@@ -78,9 +78,11 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
                     request=request,
                     http_response=None,
                     metrics=None,
+                    exception_messages=[str(e)],
                     exceptions=[e],
                 )
             else:
+                response.exception_messages.append(str(e))
                 response.exceptions.append(e)
         return response
 

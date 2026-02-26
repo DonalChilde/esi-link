@@ -8,7 +8,7 @@ from uuid import UUID
 from diskcache import Cache  # type: ignore
 from whenever import Instant
 
-from esi_link.v2.helpers.stale_cache_check import check_stale
+from esi_link.v2.helpers.stale_cache_check import is_stale
 from esi_link.v2.models import (
     CachedResponse,
     CachedResponseStatus,
@@ -19,7 +19,18 @@ from esi_link.v2.models import (
 
 class DiskCache(CacheManagerProtocol):
     def __init__(self, cache_directory: Path, local_max_age_seconds: int = 3600):
-        """A disk-based cache implementation using the diskcache library."""
+        """A disk-based cache implementation using the diskcache library.
+
+        Local expiration checks can be performed using the local_max_age_seconds parameter,
+        which determines how long a cached response is considered fresh before it is
+        treated as stale. This allows for more aggressive cache invalidation based on
+        local rules, in addition to the standard HTTP caching headers.
+
+        Args:
+            cache_directory: The directory where cached responses will be stored.
+            local_max_age_seconds: The maximum age in seconds for a cached response to
+                be considered fresh. This is used for local expiration checks before considering the response stale based on its expires_at value.
+        """
         self.cache_directory = cache_directory
         self.cache = Cache(cache_directory)
         self.local_max_age_seconds = local_max_age_seconds
@@ -50,7 +61,7 @@ class DiskCache(CacheManagerProtocol):
         assert isinstance(response, CachedResponse), (
             "Cached value is not of type CachedResponse"
         )
-        if check_stale(response, max_age_seconds=local_max_age):
+        if is_stale(response, local_max_age_seconds=local_max_age):
             return response, CachedResponseStatus.STALE
         return response, CachedResponseStatus.HIT
 
@@ -58,8 +69,9 @@ class DiskCache(CacheManagerProtocol):
         """Set a value in the disk cache."""
         cached_response = CachedResponse(
             cache_key=key,
-            cached_on=Instant.now(),
+            cached_at=Instant.now(),
             http_response=http_response,
+            expires_at=http_response.expires_at,
         )
         self.cache.set(str(key), cached_response)  # type: ignore
 
@@ -67,8 +79,17 @@ class DiskCache(CacheManagerProtocol):
         """Refresh a value in the disk cache."""
         self.set(key, new_http_response)
 
-    def clear(self) -> int:
+    def clear(self, only_stale: bool = False) -> int:
         """Clear all cached responses from the cache."""
+        if only_stale:
+            keys_to_delete: list[str] = [
+                key
+                for key, response in self.cache.items()  # type: ignore
+                if is_stale(response, local_max_age_seconds=self.local_max_age_seconds)  # type: ignore
+            ]
+            for key in keys_to_delete:
+                self.cache.delete(key)  # type: ignore
+            return len(keys_to_delete)
         return self.cache.clear()
 
     def cache_info(self) -> dict[str, Any]:

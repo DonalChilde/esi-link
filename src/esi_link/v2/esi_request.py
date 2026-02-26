@@ -1,11 +1,18 @@
 """Functions for working with EsiRequests."""
 
-from esi_link.v2.models import EsiRequest, HandlerManagerProtocol, IndexedEsiSchema
+from esi_link.v2.models import (
+    AuthProviderProtocol,
+    EsiRequest,
+    HandlerManagerProtocol,
+    IndexedEsiSchema,
+)
 
 
 def validate_request_path_params(request: EsiRequest, schema: IndexedEsiSchema) -> None:
     """Validate the request path against the indexed schema."""
-    ...
+    raise NotImplementedError(
+        "Request path parameter validation is not implemented yet"
+    )
 
 
 def validate_request_query_params(
@@ -23,18 +30,21 @@ def validate_request_query_params(
             raise ValueError(f"Missing required query parameter: {param_name}")
         if param_name in request.query_parameters:
             value = request.query_parameters[param_name]
+            _ = value
             # Validate parameter type and constraints based on param_schema
             ...
 
 
 def validate_request_body(request: EsiRequest, schema: IndexedEsiSchema) -> None:
     """Validate the request body against the indexed schema."""
-    ...
+    raise NotImplementedError("Request body validation is not implemented yet")
 
 
 def validate_request_auth(request: EsiRequest, schema: IndexedEsiSchema) -> None:
     """Validate the request authentication against the indexed schema."""
-    ...
+    raise NotImplementedError(
+        "Request authentication validation is not implemented yet"
+    )
 
 
 def validate_esi_request(
@@ -53,9 +63,12 @@ def validate_esi_request(
         handler_manager.validate_handler_config(handler_config)
 
 
-def populate_runtime_info(request: EsiRequest, schema: IndexedEsiSchema) -> None:
+def populate_runtime_info(
+    request: EsiRequest, schema: IndexedEsiSchema, auth_provider: AuthProviderProtocol
+) -> None:
     """Populate the runtime info for an ESI request based on the indexed schema."""
     if request.operation_id not in schema.operations:
         raise ValueError(f"Operation ID {request.operation_id} not found in schema")
     operation = schema.operations[request.operation_id]
+    _ = operation
     ...

@@ -7,7 +7,7 @@ from uuid import UUID
 
 from whenever import Instant
 
-from esi_link.v2.helpers.stale_cache_check import check_stale
+from esi_link.v2.helpers.stale_cache_check import is_stale
 from esi_link.v2.models import (
     CachedResponse,
     CachedResponseStatus,
@@ -18,7 +18,18 @@ from esi_link.v2.models import (
 
 class JsonDiskCache(CacheManagerProtocol):
     def __init__(self, cache_directory: Path, local_max_age_seconds: int = 3600):
-        """A disk-based cache implementation using json files."""
+        """A disk-based cache implementation using json files in a single directory.
+
+        Local expiration checks can be performed using the local_max_age_seconds parameter,
+        which determines how long a cached response is considered fresh before it is
+        treated as stale. This allows for more aggressive cache invalidation based on
+        local rules, in addition to the standard HTTP caching headers.
+
+        Args:
+            cache_directory: The directory where cached responses will be stored.
+            local_max_age_seconds: The maximum age in seconds for a cached response to
+                be considered fresh. This is used for local expiration checks before considering the response stale based on its expires_at value.
+        """
         self.cache_directory = cache_directory
         self.cache_directory.mkdir(parents=True, exist_ok=True)
         self.local_max_age_seconds = local_max_age_seconds
@@ -45,7 +56,7 @@ class JsonDiskCache(CacheManagerProtocol):
         if not response_path.exists():
             return None, CachedResponseStatus.MISS
         response = CachedResponse.model_validate_json(response_path.read_text())
-        if check_stale(response, max_age_seconds=local_max_age):
+        if is_stale(response, local_max_age_seconds=local_max_age):
             return response, CachedResponseStatus.STALE
         return response, CachedResponseStatus.HIT
 
@@ -53,8 +64,9 @@ class JsonDiskCache(CacheManagerProtocol):
         """Set a value in the disk cache."""
         cached_response = CachedResponse(
             cache_key=key,
-            cached_on=Instant.now(),
+            cached_at=Instant.now(),
             http_response=http_response,
+            expires_at=http_response.expires_at,
         )
         response_path = self.cache_directory.joinpath(f"{key}.json")
         response_path.write_text(cached_response.model_dump_json())
@@ -63,10 +75,16 @@ class JsonDiskCache(CacheManagerProtocol):
         """Refresh a value in the disk cache."""
         self.set(key, new_http_response)
 
-    def clear(self) -> int:
+    def clear(self, only_stale: bool = False) -> int:
         """Clear all cached responses from the cache."""
         count = 0
         for file in self.cache_directory.glob("*.json"):
+            if only_stale:
+                response = CachedResponse.model_validate_json(file.read_text())
+                if not is_stale(
+                    response, local_max_age_seconds=self.local_max_age_seconds
+                ):
+                    continue
             file.unlink()
             count += 1
         return count

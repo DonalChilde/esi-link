@@ -111,6 +111,47 @@ class HttpResponse(BaseModel):
         """Extract the Expires header from the response headers, if present."""
         return self.headers.get("Expires") or self.headers.get("expires")
 
+    @property
+    def date(self) -> str | None:
+        """Extract the Date header from the response headers, if present."""
+        return self.headers.get("Date") or self.headers.get("date")
+
+    @property
+    def cache_control(self) -> str | None:
+        """Extract the Cache-Control header from the response headers, if present."""
+        return (
+            self.headers.get("Cache-Control")
+            or self.headers.get("Cache-control")
+            or self.headers.get("cache-control")
+        )
+
+    @property
+    def max_age(self) -> int | None:
+        """Extract the max-age directive from the Cache-Control header, if present."""
+        cache_control = self.cache_control
+        if cache_control:
+            directives = cache_control.split(",")
+            for directive in directives:
+                if "max-age" in directive:
+                    try:
+                        return int(directive.split("=")[1].strip())
+                    except (IndexError, ValueError):
+                        pass
+        return None
+
+    @property
+    def expires_at(self) -> Instant | None:
+        """Calculate the expiration time of the response based on the Expires header or Cache-Control max-age."""
+        max_age = self.max_age
+        if max_age is not None:
+            return self.received_at.add(seconds=max_age)
+        if self.expires:
+            try:
+                return Instant.parse_rfc2822(self.expires)
+            except ValueError:
+                pass
+        return None
+
 
 @dataclass(slots=True)
 class Metrics:
@@ -135,9 +176,11 @@ class CachedResponse(BaseModelToDisk):
     """Represents a cached response for an ESI request."""
 
     cache_key: UUID
-    cached_on: Instant = Field(default_factory=_get_current_instant)
+    cached_at: Instant = Field(default_factory=_get_current_instant)
     """The instant when the response was cached."""
     http_response: HttpResponse
+    expires_at: Instant | None = None
+    """The instant when the cached response expires and should be considered stale."""
 
 
 @dataclass(slots=True)
@@ -389,6 +432,25 @@ class HandlerManagerProtocol:
         ...
 
 
+class AuthProviderProtocol:
+    async def get_auth_headers(
+        self, character_id: int, auth_alias: str | None = None
+    ) -> dict[str, str]:
+        """Get authentication headers based on the provided authentication parameters.
+
+        Args:
+            character_id: The ID of the character for which to generate authentication headers.
+            auth_alias: An optional alias for the authentication method to use.
+
+        Returns:
+            A dictionary of HTTP headers to include in the request for authentication.
+
+        Raises:
+            Exception: If there is an error generating the authentication headers.
+        """
+        ...
+
+
 class CachedResponseStatus(StrEnum):
     HIT = "hit"
     MISS = "miss"
@@ -449,8 +511,11 @@ class CacheManagerProtocol:
         """
         ...
 
-    def clear(self) -> int:
+    def clear(self, only_stale: bool = False) -> int:
         """Clear all cached responses from the cache.
+
+        Args:
+            only_stale: If True, only clear stale cached responses.
 
         Returns:
             The number of cached responses that were cleared.
