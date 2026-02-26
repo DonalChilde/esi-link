@@ -39,22 +39,14 @@ class EsiLinkSettings(BaseSettings):
         default=DEFAULT_APP_DIR / "cache",
         description="The directory for ESI Link cache files.",
     )
-    disk_cache_directory: Path = Field(
+    diskcache_directory: Path = Field(
         default=DEFAULT_APP_DIR / "cache" / "disk_cache",
         description="The directory for ESI Link diskcache files.",
     )
-    # # FIXME Do we need this setting now?
-    # cache_connection_string: str = Field(
-    #     default=f"esi-link-file:{DEFAULT_APP_DIR.resolve()}/esi-link-cache.json",
-    #     description="The connection string for ESI Link cache.",
-    # )
-    # """Connection string for the cache backend.
-
-    # Format: [cache_type]://[path_or_connection_info]
-
-    # Examples:
-    #     File-based cache: esi-link-json:///path/to/cache/dir
-    #     In-memory cache: esi-link-memory://"""
+    json_cache_directory: Path = Field(
+        default=DEFAULT_APP_DIR / "cache" / "json_cache",
+        description="The directory for ESI Link JSON cache files.",
+    )
 
     connection_period: int = Field(
         default=60,
@@ -109,7 +101,8 @@ def get_settings() -> EsiLinkSettings:
     # Ensure application directories exist
     settings.app_dir.mkdir(parents=True, exist_ok=True)
     settings.cache_directory.mkdir(parents=True, exist_ok=True)
-    settings.disk_cache_directory.mkdir(parents=True, exist_ok=True)
+    settings.diskcache_directory.mkdir(parents=True, exist_ok=True)
+    settings.json_cache_directory.mkdir(parents=True, exist_ok=True)
     settings.auth_app_dir.mkdir(parents=True, exist_ok=True)
     return settings
 
