@@ -7,7 +7,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from whenever import Instant
 
-from esi_link import DEFAULT_APP_DIR, __app_name__, __version__
+from esi_link.v2 import DEFAULT_APP_DIR, __app_name__, __version__
 
 _app_env_prefix = "PFMSOFT_ESI_LINK_"
 

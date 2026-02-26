@@ -1,31 +1,52 @@
 """Functions for working with the ESI schema."""
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from whenever import Instant
 
 from esi_link.v2.helpers.download_file import download_json
+from esi_link.v2.helpers.eve_dates import compatibility_date
 from esi_link.v2.helpers.resolve_json_ref import resolve_internal_refs
 from esi_link.v2.models import IndexedEsiSchema, IndexedSchemaStore
 from esi_link.v2.settings import get_settings
 
 
-def download_schema() -> tuple[dict[str, Any], Instant]:
+@dataclass(slots=True)
+class SchemaDownload:
+    """A class representing a downloaded ESI schema and its associated metadata."""
+
+    raw_schema: dict[str, Any]
+    download_date: Instant
+
+
+def download_schema(
+    compatibility_date: str | None = None,
+) -> SchemaDownload:
     """Download the latest ESI schema from the official source.
 
     Returns:
-        A tuple containing the downloaded schema as a dictionary and the timestamp of
-        when it was downloaded.
+        A SchemaDownload object containing the downloaded schema and its metadata.
     """
+    if compatibility_date is None:
+        # Get the current compatibility date for ESI schema downloads.
+        compatibility_date = compatibility_date()
+    params = {"compatibility_date": compatibility_date}
     settings = get_settings()
     url = settings.esi_schema_url
-    schema = download_json(url)
+    schema = download_json(url, params=params)
+    if "error" in schema:
+        raise ValueError(f"Error downloading schema: {schema['error']}")
     if not validate_schema(schema):
+        # catch other types of invalid schema.
         raise ValueError("Downloaded schema is invalid")
     timestamp = Instant.now()
-    return schema, timestamp
+    return SchemaDownload(
+        raw_schema=schema,
+        download_date=timestamp,
+    )
 
 
 def save_schemas_to_file(
@@ -69,7 +90,7 @@ def load_schema_store() -> IndexedSchemaStore:
 def add_schema_to_store(indexed_schema: IndexedEsiSchema) -> IndexedSchemaStore:
     """Add an indexed ESI schema to the schema store."""
     schema_store = load_schema_store()
-    schema_date = indexed_schema.download_date.py_datetime().date().isoformat()
+    schema_date = indexed_schema.version
     schema_store.schemas[schema_date] = indexed_schema
     settings = get_settings()
     schema_path = settings.schema_store_path
@@ -81,7 +102,7 @@ def add_schema_to_store(indexed_schema: IndexedEsiSchema) -> IndexedSchemaStore:
 
 def validate_schema(raw_schema: dict[str, Any]) -> bool:
     """Validate the downloaded ESI schema."""
-    # Schema is an openapi 3.0 schema, so we can check for the presence of required fields
+    # Schema is an openapi 3.1 schema, so we can check for the presence of required fields
     required_fields = ["openapi", "info", "paths"]
     for field in required_fields:
         if field not in raw_schema:

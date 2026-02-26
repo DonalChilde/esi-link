@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from enum import StrEnum
 from types import TracebackType
-from typing import Any, Self
+from typing import Any, Self, cast
 from uuid import UUID
 
 import aiohttp
@@ -190,6 +190,53 @@ class IndexedOperation:
     path: str
     operation: dict[str, Any] = field(default_factory=dict[str, Any])
 
+    @property
+    def tags(self) -> list[str]:
+        """Extract the tags from the operation object, if present."""
+        return self.operation.get("tags", [])
+
+    @property
+    def description(self) -> str:
+        """Extract the description from the operation object, if present."""
+        return self.operation.get("description", "")
+
+    @property
+    def path_params(self) -> list[dict[str, Any]]:
+        """Extract the path parameters from the operation object, if present."""
+        return [
+            param
+            for param in self.operation.get("parameters", [])
+            if param.get("in") == "path"
+        ]
+
+    @property
+    def query_params(self) -> list[dict[str, Any]]:
+        """Extract the query parameters from the operation object, if present."""
+        return [
+            param
+            for param in self.operation.get("parameters", [])
+            if param.get("in") == "query"
+        ]
+
+    @property
+    def header_params(self) -> list[dict[str, Any]]:
+        """Extract the header parameters from the operation object, if present."""
+        return [
+            param
+            for param in self.operation.get("parameters", [])
+            if param.get("in") == "header"
+        ]
+
+    @property
+    def request_body(self) -> dict[str, Any] | None:
+        """Extract the request body from the operation object, if present."""
+        return self.operation.get("requestBody")
+
+    @property
+    def auth_required(self) -> bool:
+        """Determine if the operation requires authentication based on the presence of security requirements."""
+        return "security" in self.operation and bool(self.operation["security"])
+
 
 class IndexedEsiSchema(BaseModelToDisk):
     """Represents the entire schema for ESI requests and responses, indexed for efficient access."""
@@ -212,13 +259,22 @@ class IndexedEsiSchema(BaseModelToDisk):
     def __str__(self) -> str:
         """String representation of the IndexedEsiSchema instance."""
         return (
-            f"IndexedEsiSchema(openapi={self.openapi}, operations={len(self.operations)}, "
+            f"IndexedEsiSchema(version={self.version}, "
+            f"openapi={self.openapi}, operations={len(self.operations)}, "
             f"download_date={self.download_date})"
         )
 
+    @property
+    def version(self) -> str:
+        """Get the version of the ESI schema based on the compatibility date."""
+        version = cast(str, self.info["version"])
+        return version
+
     @classmethod
     def from_raw_schema(
-        cls, raw_schema: dict[str, Any], download_date: Instant
+        cls,
+        raw_schema: dict[str, Any],
+        download_date: Instant,
     ) -> Self:
         """Factory method to create an IndexedEsiSchema instance from a raw OpenAPI schema.
 
@@ -259,7 +315,7 @@ class IndexedEsiSchema(BaseModelToDisk):
 class IndexedSchemaStore(BaseModelToDisk):
     """Represents a store for multiple versions of the IndexedEsiSchema.
 
-    The compatability date index is a string in ISO 8601 format 2026-02-21 representing
+    The compatibility date index is a string in ISO 8601 format 2026-02-21 representing
     the date that the schema version was downloaded. This allows for storing multiple
     versions of the schema and retrieving the appropriate one based on the date of the ESI
     request being executed.
