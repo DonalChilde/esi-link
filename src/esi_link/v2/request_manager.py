@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-from copy import deepcopy
 from time import perf_counter
 
 from esi_link.v2.auth_provider import DummyAuthProvider
@@ -19,12 +18,11 @@ from esi_link.v2.models import (
     HandlerManagerProtocol,
     IndexedEsiSchema,
     RequestValidatorProtocol,
-    RuntimeRequestInfo,
     UrlGeneratorProtocol,
 )
 from esi_link.v2.request_executor import EsiRequestExecutor
-from esi_link.v2.request_runtime_info import RuntimeInfoGenerator
 from esi_link.v2.request_validation import RequestValidator
+from esi_link.v2.runtime_request_generator import RuntimeRequestGenerator
 from esi_link.v2.settings import EsiLinkSettings, get_settings
 from esi_link.v2.url_generator import UrlGenerator
 
@@ -70,26 +68,30 @@ class EsiLink(EsiRequestExecutionManagerProtocol):
 
     def _make_esi_runtime_request(self, request: EsiRequest) -> EsiRuntimeRequest:
         """Convert an EsiRequest to an EsiRuntimeRequest by populating the runtime info."""
-        runtime_info = self._get_runtime_info(request)
-        runtime_request = EsiRuntimeRequest(
-            request=request,
-            runtime_info=runtime_info,
-        )
-        return runtime_request
-
-    def _get_runtime_info(self, request: EsiRequest) -> RuntimeRequestInfo:
-        """Get runtime information for the request."""
         if self.schema is None:
             raise EsiLinkException("Schema must be loaded to set runtime info")
-        runtime_info_generator = RuntimeInfoGenerator(
+        runtime_info_generator = RuntimeRequestGenerator(
             operation=self.schema.operations[request.operation_id],
             compatibility_date=self.schema.version,
             auth_provider=self.auth_provider,
             url_generator=self.url_generator,
             language=self.language,
         )
-        request_info = runtime_info_generator.generate_runtime_info(request)
-        return request_info
+        return runtime_info_generator.get_runtime_request(request)
+
+    # def _get_runtime_info(self, request: EsiRequest) -> RuntimeRequestInfo:
+    #     """Get runtime information for the request."""
+    #     if self.schema is None:
+    #         raise EsiLinkException("Schema must be loaded to set runtime info")
+    #     runtime_info_generator = RuntimeInfoGenerator(
+    #         operation=self.schema.operations[request.operation_id],
+    #         compatibility_date=self.schema.version,
+    #         auth_provider=self.auth_provider,
+    #         url_generator=self.url_generator,
+    #         language=self.language,
+    #     )
+    #     request_info = runtime_info_generator.generate_runtime_info(request)
+    #     return request_info
 
     async def _handle_response(self, response: EsiResponse) -> EsiResponse:
         """Handle the response."""
@@ -168,7 +170,7 @@ class EsiLink(EsiRequestExecutionManagerProtocol):
         runtime_requests: list[EsiRuntimeRequest] = []
         for request in requests:
             self.validate(request)
-            runtime_requests.append(self._make_esi_runtime_request(deepcopy(request)))
+            runtime_requests.append(self._make_esi_runtime_request(request))
         responses = asyncio.run(
             self.send_runtime_requests(
                 runtime_requests, max_rate=max_rate, period=period, timeout=timeout

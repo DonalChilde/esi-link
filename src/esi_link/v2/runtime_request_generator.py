@@ -1,14 +1,16 @@
 """Functions for working with EsiRequests."""
 
 import logging
+from copy import deepcopy
 
 from esi_link.v2 import USER_AGENT
 from esi_link.v2.models import (
     AuthProviderProtocol,
     EsiRequest,
     EsiRequestError,
+    EsiRuntimeRequest,
     IndexedOperation,
-    RuntimeInfoGeneratorProtocol,
+    RuntimeRequestGeneratorProtocol,
     RuntimeRequestInfo,
     UrlGeneratorProtocol,
 )
@@ -16,7 +18,7 @@ from esi_link.v2.models import (
 logger = logging.getLogger(__name__)
 
 
-class RuntimeInfoGenerator(RuntimeInfoGeneratorProtocol):
+class RuntimeRequestGenerator(RuntimeRequestGeneratorProtocol):
     def __init__(
         self,
         operation: IndexedOperation,
@@ -25,7 +27,7 @@ class RuntimeInfoGenerator(RuntimeInfoGeneratorProtocol):
         url_generator: UrlGeneratorProtocol,
         language: str,
     ) -> None:
-        """Initialize the RuntimeInfoGenerator with the necessary components."""
+        """Initialize the RuntimeRequestGenerator with the necessary components."""
         self.operation = operation
         self.compatibility_date = compatibility_date
         self.auth_provider = auth_provider
@@ -47,6 +49,18 @@ class RuntimeInfoGenerator(RuntimeInfoGeneratorProtocol):
             cache_key=url_info.cache_key if self.operation.is_cached else None,
         )
         return runtime_info
+
+    def get_runtime_request(self, request: EsiRequest) -> EsiRuntimeRequest:
+        """Generate the full EsiRuntimeRequest for a given EsiRequest, including runtime info.
+
+        A deepcopy of the request is used to avoid mutation issues with handlers and retries.
+        """
+        info = self.generate_runtime_info(request)
+        runtime_request = EsiRuntimeRequest(
+            request=deepcopy(request),
+            runtime_info=info,
+        )
+        return runtime_request
 
     def _get_auth_headers(self, request: EsiRequest) -> dict[str, str]:
         if self.operation.auth_required and not request.auth_parameters:

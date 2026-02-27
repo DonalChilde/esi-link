@@ -878,9 +878,16 @@ class UrlGeneratorProtocol:
         ...
 
 
-class RuntimeInfoGeneratorProtocol:
+class RuntimeRequestGeneratorProtocol:
     def generate_runtime_info(self, request: EsiRequest) -> RuntimeRequestInfo:
         """Generate the runtime information for an ESI request based on its parameters."""
+        ...
+
+    def get_runtime_request(self, request: EsiRequest) -> EsiRuntimeRequest:
+        """Generate the full EsiRuntimeRequest for a given EsiRequest, including runtime info.
+
+        This should deep copy the request to avoid mutation issues with handlers and retries.
+        """
         ...
 
 
