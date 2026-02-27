@@ -1,5 +1,4 @@
-# TODO implement the AuthProviderProtocol, a front end to esi-auth.
-
+"""Auth provider implementations for ESI Link."""
 
 from esi_link.v2.models import AuthProviderProtocol
 

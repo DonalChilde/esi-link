@@ -72,6 +72,7 @@ def display_responses(responses: list[EsiResponse]) -> None:
             continue
         console.print(f"Response for request ID {response.request.request_id}:")
         console.print(f"\trequest url: {response.http_response.url}")
+        console.print(f"\tcache_key: {response.runtime_info.cache_key}")
         console.print(f"\tcache status: NOT_IMPLEMENTED")
         console.print(f"\thttp status: {response.http_response.status_code}")
         console.print(f"\trequest took NOT_IMPLEMENTED seconds")

@@ -1,3 +1,5 @@
+"""UrlGenerator implementation for generating urls and cache keys for ESI requests based on an indexed schema."""
+
 from uuid import UUID, uuid5
 
 from esi_link.v2 import ESI_LINK_NAMESPACE
@@ -12,6 +14,7 @@ from esi_link.v2.models import (
 
 class UrlGenerator(UrlGeneratorProtocol):
     def __init__(self, schema: IndexedEsiSchema):
+        """Initialize the UrlGenerator with the indexed schema."""
         self.schema = schema
 
     def generate_path_url(self, request: EsiRequest) -> str:

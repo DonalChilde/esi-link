@@ -1,3 +1,5 @@
+"""Request validation for ESI requests based on an indexed schema."""
+
 import logging
 
 from esi_link.v2.models import (
@@ -87,6 +89,7 @@ class RequestValidator(RequestValidatorProtocol):
     def __init__(
         self, schema: IndexedEsiSchema, handler_manager: HandlerManagerProtocol
     ):
+        """Initialize the RequestValidator with the indexed schema and handler manager."""
         self.schema = schema
         self.handler_manager = handler_manager
 

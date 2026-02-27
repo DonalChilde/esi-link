@@ -16,53 +16,6 @@ from esi_link.v2.models import (
 logger = logging.getLogger(__name__)
 
 
-# def populate_runtime_info(
-#     request: EsiRequest,
-#     schema: IndexedEsiSchema,
-#     auth_provider: AuthProviderProtocol,
-#     lang: str = "en",
-# ) -> None:
-#     """Populate the runtime info for an ESI request based on the indexed schema."""
-#     if request.operation_id not in schema.operations:
-#         raise ValueError(f"Operation ID {request.operation_id} not found in schema")
-#     operation = schema.operations[request.operation_id]
-#     base_url = schema.servers[0]["url"]
-#     path_template = operation.path
-#     headers: dict[str, str] = {}
-#     if operation.auth_required and request.auth_parameters:
-#         auth_headers = auth_provider.get_auth_headers(
-#             character_id=request.auth_parameters.character_id,
-#             client_alias=request.auth_parameters.client_alias,
-#         )
-#         headers.update(auth_headers)
-#     headers["User-Agent"] = USER_AGENT
-#     headers["Accept-Language"] = lang
-#     headers["X-Compatibility-Date"] = schema.version
-#     url = build_url(
-#         path_parameters=request.path_parameters or {},
-#         query_parameters=request.query_parameters or {},
-#         base_url=base_url,
-#         path_template=path_template,
-#     )
-#     if operation.is_cached:
-#         cache_key = cache_key_from_url(url)
-#     else:
-#         cache_key = None
-#     runtime = RuntimeRequestInfo(
-#         url=url,
-#         base_url=base_url,
-#         path_template=path_template,
-#         additional_query_params={},
-#         method=operation.method,
-#         is_paged=operation.is_paged,
-#         is_auth=operation.auth_required,
-#         headers=headers,
-#         timeout=10,
-#         cache_key=cache_key,
-#     )
-#     request.runtime_info = runtime
-
-
 class RuntimeInfoGenerator(RuntimeInfoGeneratorProtocol):
     def __init__(
         self,
@@ -72,6 +25,7 @@ class RuntimeInfoGenerator(RuntimeInfoGeneratorProtocol):
         url_generator: UrlGeneratorProtocol,
         language: str,
     ) -> None:
+        """Initialize the RuntimeInfoGenerator with the necessary components."""
         self.operation = operation
         self.compatibility_date = compatibility_date
         self.auth_provider = auth_provider
