@@ -1,3 +1,5 @@
+"""Example ESI requests for testing and demonstration purposes."""
+
 from uuid import uuid4
 
 from esi_link.v2.runtime_request_generator import EsiRequest

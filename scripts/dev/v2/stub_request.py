@@ -16,6 +16,7 @@ from esi_link.v2.handler_manager import DummyHandlerManager
 from esi_link.v2.logging_config import setup_logging
 from esi_link.v2.models import EsiRequests, EsiResponse
 from esi_link.v2.request_manager import EsiLink
+from esi_link.v2.schema_manager import SchemaManager
 from esi_link.v2.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -25,8 +26,8 @@ SCRIPT_NAME = "NOT_DEFINED"
 def main() -> None:
     """Main entry point for the link_test script."""
     settings = get_settings()
-    schema_store = load_schema_store(settings=settings)
-    schema = schema_store.latest_schema()
+    schema_manager = SchemaManager(settings=settings)
+    schema = schema_manager.get_latest_schema()
     handler_manager = DummyHandlerManager()
     esi_link = EsiLink(
         settings=settings, schema=schema, handler_manager=handler_manager

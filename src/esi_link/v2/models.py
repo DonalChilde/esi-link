@@ -27,6 +27,14 @@ def _get_current_instant() -> Instant:
     return Instant.now()
 
 
+@dataclass(slots=True)
+class SchemaDownload:
+    """A class representing a downloaded ESI schema and its associated metadata."""
+
+    raw_schema: dict[str, Any]
+    download_date: Instant
+
+
 class HandlerConfig(BaseModel):
     """Configuration for a response handler."""
 
@@ -969,9 +977,7 @@ class SchemaManagerProtocol:
         """
         ...
 
-    def download_schema(
-        self, compatibility_date: str | None = None
-    ) -> tuple[dict[str, Any], Instant]:
+    def download_schema(self, compatibility_date: str | None = None) -> SchemaDownload:
         """Download the raw OpenAPI schema from the ESI endpoint.
 
         Args:
@@ -979,12 +985,12 @@ class SchemaManagerProtocol:
                 download the schema. If None, the latest schema will be downloaded.
 
         Returns:
-            A tuple containing the raw OpenAPI schema as a dictionary and the download date as an Instant.
+            A SchemaDownload object containing the raw OpenAPI schema and the download date.
         """
         ...
 
 
-# TODO implement deep copy of request before execution to avoid mutation issues with handlers and retries
+# TODO:
 # Limit function args to keywords where appropriate.
 # Exception base for validation and handler execution. to contain extra data.
 # other exceptions, to make it easy to generate useful log entries. e.g shortened print strings.

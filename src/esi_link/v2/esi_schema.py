@@ -1,7 +1,6 @@
 """Functions for working with the ESI schema."""
 
 import json
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -10,16 +9,8 @@ from whenever import Instant
 from esi_link.v2.helpers.download_file import download_json
 from esi_link.v2.helpers.eve_dates import compatibility_date as get_compatibility_date
 from esi_link.v2.helpers.resolve_json_ref import resolve_internal_refs
-from esi_link.v2.models import IndexedEsiSchema, IndexedSchemaStore
+from esi_link.v2.models import IndexedEsiSchema, IndexedSchemaStore, SchemaDownload
 from esi_link.v2.settings import EsiLinkSettings, get_settings
-
-
-@dataclass(slots=True)
-class SchemaDownload:
-    """A class representing a downloaded ESI schema and its associated metadata."""
-
-    raw_schema: dict[str, Any]
-    download_date: Instant
 
 
 def download_schema(
