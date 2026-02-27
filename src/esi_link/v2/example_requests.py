@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from esi_link.v2.esi_request import EsiRequest
+from esi_link.v2.request_runtime_info import EsiRequest
 
 
 def esi_status() -> EsiRequest:

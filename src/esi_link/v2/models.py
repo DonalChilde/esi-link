@@ -1,13 +1,13 @@
 """Data models and Protocols for ESI Link."""
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import StrEnum
 from types import TracebackType
-from typing import Any, Self, cast
+from typing import Any, Literal, Self, cast
 from uuid import UUID
 
 import aiohttp
-from aiolimiter import AsyncLimiter
 from pydantic import BaseModel, ConfigDict, Field
 from whenever import Instant
 
@@ -47,11 +47,11 @@ class AuthParameters(BaseModel):
 class RuntimeRequestInfo(BaseModel):
     """Represents the runtime information needed for an EsiRequest."""
 
-    url: str
-    base_url: str
-    path_template: str
+    path_url: str
     additional_query_params: dict[str, str] = Field(default_factory=dict)
-    method: str
+    """Additional query parameters that are not defined in the request, but are needed 
+    for the request. Including things like the page number for paged requests."""
+    method: Literal["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
     is_paged: bool = False
     is_auth: bool = False
     headers: dict[str, str] = {}
@@ -71,11 +71,20 @@ class EsiRequest(BaseModelToDisk):
     auth_parameters: AuthParameters | None = None
     body: Any | None = None
     response_handlers: list[HandlerConfig] = []
-    runtime_info: RuntimeRequestInfo | None = None
+
+
+class EsiRuntimeRequest(BaseModelToDisk):
+    request: EsiRequest
+    runtime_info: RuntimeRequestInfo
 
 
 class EsiRequests(BaseModelToDisk):
-    """Represents a batch of ESI requests to be executed."""
+    """Represents a batch of ESI requests to be executed.
+
+    This model exists mostly for serialization puposes, with the imagined use being
+    a set of requests that are loaded from disk and run repeatedly over time. For instance,
+    downloading a fresh set of pricing data every day.
+    """
 
     created_on: Instant = Field(default_factory=_get_current_instant)
     requests_id: UUID
@@ -87,6 +96,7 @@ class HttpResponse(BaseModel):
     """Represents the data of an ESI response."""
 
     status_code: int
+    url: str
     headers: dict[str, str] = {}
     body: Any | None = None
     received_at: Instant = Field(default_factory=_get_current_instant)
@@ -164,9 +174,10 @@ class Metrics:
 
 
 class EsiResponse(BaseModelToDisk):
-    """Represents the response from an ESI request."""
+    """Represents the response to an ESI request."""
 
     request: EsiRequest
+    runtime_info: RuntimeRequestInfo
     http_response: HttpResponse | None = None
     metrics: Metrics | None = None
     exception_messages: list[str] = Field(default_factory=list)
@@ -189,7 +200,7 @@ class CachedResponse(BaseModelToDisk):
 @dataclass(slots=True)
 class IndexedOperation:
     operation_id: str
-    method: str
+    method: Literal["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
     path: str
     operation: dict[str, Any] = field(default_factory=dict[str, Any])
 
@@ -288,6 +299,13 @@ class IndexedEsiSchema(BaseModelToDisk):
         version = cast(str, self.info["version"])
         return version
 
+    @property
+    def base_url(self) -> str:
+        """Get the base URL for the ESI API from the servers section of the schema."""
+        if self.servers:
+            return self.servers[0]["url"]
+        raise ValueError("No servers defined in schema")
+
     @classmethod
     def from_raw_schema(
         cls,
@@ -365,12 +383,38 @@ class IndexedSchemaStore(BaseModelToDisk):
         return self.schemas[latest_key]
 
 
+@dataclass(slots=True)
+class GeneratedUrlInfo:
+    """Represents the generated URL information for an ESI request."""
+
+    path_url: str
+    cache_url: str
+    cache_key: UUID
+
+
 # --------------------------------------------------------------------------------------
-# Protocols and Exceptions
+# Exceptions
 # --------------------------------------------------------------------------------------
 
 
-class HandlerException(Exception):
+class EsiLinkException(Exception):
+    """Base exception class for ESI Link errors."""
+
+    def __init__(self, message: str):
+        """Base exception class for ESI Link errors."""
+        super().__init__(message)
+
+
+class EsiRequestError(EsiLinkException):
+    """Exception raised when an error occurs related to an  ESI request."""
+
+    def __init__(self, message: str, request: EsiRequest):
+        """Exception raised when an error occurs during ESI request execution."""
+        super().__init__(message)
+        self.request = request
+
+
+class HandlerException(EsiLinkException):
     """Base exception class for response handler errors."""
 
     def __init__(self, message: str, config: dict[str, Any]):
@@ -398,9 +442,36 @@ class HandlerNotFoundError(HandlerException):
 class HandlerExecutionError(HandlerException):
     """Exception raised when a response handler fails during execution."""
 
-    def __init__(self, message: str, config: dict[str, Any]):
+    def __init__(self, message: str, config: dict[str, Any], request_id: UUID):
         """Exception raised when a response handler fails during execution."""
         super().__init__(message, config)
+        self.request_id = request_id
+
+
+class RequestExecutionException(EsiLinkException):
+    """Exception raised when an error occurs during ESI request execution."""
+
+    def __init__(self, message: str, request: EsiRequest):
+        """Exception raised when an error occurs during ESI request execution."""
+        super().__init__(message)
+        self.request = request
+
+
+class ValidationError(EsiLinkException):
+    """Exception raised when an ESI request fails validation."""
+
+    def __init__(
+        self, message: str, request: EsiRequest, compatibility_date: str | None = None
+    ):
+        """Exception raised when an ESI request fails validation."""
+        super().__init__(message)
+        self.request = request
+        self.compatibility_date = compatibility_date
+
+
+# --------------------------------------------------------------------------------------
+# Protocols
+# --------------------------------------------------------------------------------------
 
 
 class ResponseHandlerProtocol:
@@ -410,7 +481,7 @@ class ResponseHandlerProtocol:
     config: dict[str, Any]
     """The HandlerConfig used to create the handler instance."""
 
-    def handle_response(self, response: EsiResponse) -> None:
+    async def handle_response(self, response: EsiResponse) -> None:
         """Handle the given ESI response.
 
         Args:
@@ -611,28 +682,23 @@ class CacheManagerProtocol:
         ...
 
 
-class RequestExecutionException(Exception):
-    """Exception raised when an error occurs during ESI request execution."""
-
-    def __init__(self, message: str, request: EsiRequest):
-        """Exception raised when an error occurs during ESI request execution."""
-        super().__init__(message)
-        self.request = request
-
-
 class EsiRequestExecutorProtocol:
+    """Protocol for executing ESI requests.
+
+    Rate limit management is left to the implementing class, to allow for flexibility
+    in how rate limiting is handled.
+    """
+
     async def execute_request(
         self,
-        request: EsiRequest,
+        request: EsiRuntimeRequest,
         session: aiohttp.ClientSession,
-        rate_limiter: AsyncLimiter,
     ) -> EsiResponse:
         """Execute an ESI request and return the response.
 
         Args:
             request: The EsiRequest instance to execute.
             session: An aiohttp ClientSession to use for making the HTTP request.
-            rate_limiter: An AsyncLimiter instance to use for rate limiting the request.
 
         Returns:
             An EsiResponse instance corresponding to the executed request.
@@ -640,14 +706,280 @@ class EsiRequestExecutorProtocol:
         """
         ...
 
-    async def execute_requests(self, requests: EsiRequests) -> list[EsiResponse]:
-        """Execute a batch of ESI requests and return the responses.
+    async def execute_requests(
+        self,
+        requests: Iterable[EsiRuntimeRequest],
+    ) -> list[EsiResponse]:
+        """Execute a batch of ESI runtime requests.
+
+        This is the core method for executing ESI requests, and should handle the actual
+        process of making the HTTP requests, applying rate limiting, and returning the
+        responses. Validation of requests is not performed in this method. To prevent
+        unneeded network errors, requests should have already been validated before being
+        passed to this method.
 
         Args:
-            requests: The EsiRequests instance containing the batch of requests to execute.
+            requests: An iterable of EsiRuntimeRequest instances to execute.
+
 
         Returns:
             A list of EsiResponse instances corresponding to the executed requests.
 
         """
         ...
+
+
+class EsiRequestExecutionManagerProtocol:
+    def validate(self, request: EsiRequest) -> None:
+        """Validate an ESI request before execution.
+
+        This method should perform all necessary validation checks on the EsiRequest
+        to ensure that it is well-formed and can be executed successfully. This may include
+        checks such as verifying that required fields are present, that parameter values
+        are of the correct type and format, and that any referenced operation IDs or handler
+        configurations are valid.
+
+        Args:
+            request: The EsiRequest instance to validate.
+
+        Raises:
+            ValueError: If the request is invalid for any reason, with a message describing the issue.
+        """
+
+    async def handle_responses(self, responses: list[EsiResponse]) -> list[EsiResponse]:
+        """Handle a list of ESI responses.
+
+        This method should perform any necessary processing on a list of EsiResponse instances,
+        such as running response handlers for each response, and performing any other
+        necessary post-processing steps. Any exceptions generated be the response handlers
+        should be captured and stored in the EsiResponse instances rather than raised,
+        to allow for handling of multiple handlers even if some handlers fail.
+
+        Args:
+            responses: A list of EsiResponse instances to handle.
+
+        Returns:
+            A list of EsiResponse instances after handling, which may have been modified by
+            response handlers or other processing steps.
+        """
+        ...
+
+    async def send_runtime_requests(
+        self,
+        requests: list[EsiRuntimeRequest],
+        *,
+        max_rate: int,
+        period: float,
+        timeout: float,
+    ) -> list[EsiResponse]:
+        """Send a batch of ESI requests and return the responses.
+
+        This method should handle the entire process of sending a batch of ESI requests,
+        including execution of the requests with appropriate rate limiting, and
+        returning the list of responses.
+
+        Validation of requests is not performed before making network calls in this method,
+        to allow for flexibility in how the method is used.
+
+        Requests should have the runtime information filled in before being passed to
+        this method.
+
+
+
+        Args:
+            requests: A list of EsiRuntimeRequest instances.
+            max_rate: The maximum number of requests to send per time period for rate limiting.
+            period: The time period in seconds for rate limiting.
+            timeout: The maximum time in seconds to wait for a response from each request.
+                This timeout applies to each individual request, starting at the time the
+                network request is sent, not the entire batch.
+
+        Returns:
+            A list of EsiResponse instances corresponding to the sent requests.
+        """
+        ...
+
+    def execute_requests(
+        self,
+        requests: list[EsiRequest],
+        *,
+        max_rate: int = 100,
+        period: float = 60.0,
+        timeout: float = 10.0,
+    ) -> list[EsiResponse]:
+        """Execute a batch of ESI requests, including validation, sending, and response handling.
+
+        This method should perform the entire process of executing a batch of ESI requests,
+        including:
+         - validating each request,
+         - deepcopying requests to avoid mutation issues with handlers and retries,
+         - filling the runtime information for each request,
+         - sending the requests with appropriate rate limiting,
+         - handling the responses (e.g., running response handlers)
+         - returning the final list of responses.
+
+        Args:
+            requests: A list of EsiRuntimeRequest instances to execute.
+            max_rate: The maximum number of requests to send per time period for rate limiting.
+            period: The time period in seconds for rate limiting.
+            timeout: The maximum time in seconds to wait for a response from each request.
+                This timeout applies to each individual request, starting at the time the
+                network request is sent, not the entire batch.
+
+        Returns:
+            A list of EsiResponse instances corresponding to the executed requests after handling.
+        """
+        ...
+
+
+class UrlGeneratorProtocol:
+    def generate_path_url(self, request: EsiRequest) -> str:
+        """Generate the url path for an ESI request based on its parameters.\
+            
+        This url does not contain query parameters, and is not suitable for generateing 
+        a cache key. It is used as the url argument for http requests, assuming that 
+        query parameters are sent separately.
+        """
+        ...
+
+    def generate_cache_url(self, request: EsiRequest) -> str:
+        """Generate the url to use for cache key generation for an ESI request based on its parameters.
+
+        This url should contain all path and most query parameters, and should be
+        consistent for requests that should share a cache key. It is used for generating
+        cache keys, and is not necessarily the same as the url used for making the http request.
+
+        NOTE: Validate the request before generating the cache url, to ensure that all
+        required parameters are present and correctly formatted, to avoid generating
+        different cache urls for requests that should share a cache key.
+        """
+        ...
+
+    def generate_cache_key(self, request: EsiRequest) -> UUID:
+        """Generate a cache key for an ESI request based on its parameters.
+
+        The key is usually generated by hashing the url generated by generate_cache_url,
+        but can be any UUID that is consistently generated for requests that should share
+        a cache key.
+        """
+        ...
+
+    def generate_url_info(self, request: EsiRequest) -> GeneratedUrlInfo:
+        """Generate all url related information for an ESI request.
+
+        This is a convenience method that generates the path url, cache url, and cache key
+        for an ESI request in one call, since these values are often needed together
+        and share intermediate calculations.
+
+        NOTE: Validate the request before generating the cache url, to ensure that all
+        required parameters are present and correctly formatted, to avoid generating
+        different cache urls for requests that should share a cache key.
+        """
+        ...
+
+
+class RuntimeInfoGeneratorProtocol:
+    def generate_runtime_info(self, request: EsiRequest) -> RuntimeRequestInfo:
+        """Generate the runtime information for an ESI request based on its parameters."""
+        ...
+
+
+class RequestValidatorProtocol:
+    def validate(self, request: EsiRequest) -> None:
+        """Validate an ESI request before execution.
+
+        This method should perform all necessary validation checks on the EsiRequest
+        to ensure that it is well-formed and can be executed successfully. This may include
+        checks such as verifying that required fields are present, that parameter values
+        are of the correct type and format, and that any referenced operation IDs or handler
+        configurations are valid.
+
+        Args:
+            request: The EsiRequest instance to validate.
+
+        Raises:
+            ValueError: If the request is invalid for any reason, with a message describing the issue.
+        """
+
+
+class SchemaManagerProtocol:
+    def get_schema_for_date(self, compatibility_date: str) -> IndexedEsiSchema:
+        """Get the appropriate schema for a given date.
+
+        Args:
+            compatibility_date: The ISO 8601 string representing the date for which to retrieve the schema.
+
+        Returns:
+            The IndexedEsiSchema instance that is appropriate for the given date.
+
+        Raises:
+            ValueError: If no appropriate schema is found for the given date.
+        """
+        ...
+
+    def get_latest_schema(self) -> IndexedEsiSchema:
+        """Get the latest schema available in the store.
+
+        Returns:
+            The IndexedEsiSchema instance with the most recent download date.
+
+        Raises:
+            ValueError: If no schemas are available in the store.
+        """
+        ...
+
+    def available_schemas(self) -> list[str]:
+        """Get a list of all available schemas in the store.
+
+        Returns:
+            A list of the compatibility dates for all IndexedEsiSchema instances available in the store.
+        """
+        ...
+
+    def add_schema(self, schema: IndexedEsiSchema) -> None:
+        """Add a new schema to the store.
+
+        Args:
+            schema: The IndexedEsiSchema instance to add to the store.
+        """
+        ...
+
+    def transform_schema(
+        self, raw_schema: dict[str, Any], download_date: Instant
+    ) -> IndexedEsiSchema:
+        """Transform a raw OpenAPI schema into an IndexedEsiSchema instance.
+
+        This method should handle the process of taking a raw OpenAPI schema as a dictionary,
+        dereferencing any internal references, and transforming it into an IndexedEsiSchema
+        instance that can be stored and used for request execution.
+
+        Args:
+            raw_schema: The raw OpenAPI schema as a dictionary.
+            download_date: The date the schema was downloaded.
+
+        Returns:
+            The transformed IndexedEsiSchema instance.
+        """
+        ...
+
+    def download_schema(
+        self, compatibility_date: str | None = None
+    ) -> tuple[dict[str, Any], Instant]:
+        """Download the raw OpenAPI schema from the ESI endpoint.
+
+        Args:
+            compatibility_date: The ISO 8601 string representing the date for which to
+                download the schema. If None, the latest schema will be downloaded.
+
+        Returns:
+            A tuple containing the raw OpenAPI schema as a dictionary and the download date as an Instant.
+        """
+        ...
+
+
+# TODO implement deep copy of request before execution to avoid mutation issues with handlers and retries
+# Limit function args to keywords where appropriate.
+# Exception base for validation and handler execution. to contain extra data.
+# other exceptions, to make it easy to generate useful log entries. e.g shortened print strings.
+# Eval for consistent naming conventions.
+# Expand protocol docs strings with more program execution details.

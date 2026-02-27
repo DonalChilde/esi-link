@@ -1,7 +1,9 @@
 """Module for executing ESI requests, including handling HTTP requests, caching, and rate limiting."""
 
 import asyncio
+from collections.abc import Iterable
 from copy import deepcopy
+from typing import Any
 
 import aiohttp
 from aiolimiter import AsyncLimiter
@@ -10,10 +12,9 @@ from esi_link.v2.models import (
     CachedResponse,
     CachedResponseStatus,
     CacheManagerProtocol,
-    EsiRequest,
     EsiRequestExecutorProtocol,
-    EsiRequests,
     EsiResponse,
+    EsiRuntimeRequest,
     HttpResponse,
     Metrics,
 )
@@ -28,21 +29,20 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
         self.max_rate = max_rate
         self.period = period
         self.force_quit = False
+        self.async_limiter = AsyncLimiter(max_rate, period)
 
     async def execute_request(
         self,
-        request: EsiRequest,
+        request: EsiRuntimeRequest,
         session: aiohttp.ClientSession,
-        rate_limiter: AsyncLimiter,
     ) -> EsiResponse:
         """Execute an ESI request and return the response.
 
         Exceptions will be trapped and included in the EsiResponse, but will not be raised by this method.
 
         Args:
-            request: The EsiRequest instance to execute.
+            request: The EsiRuntimeRequest instance to execute.
             session: An aiohttp ClientSession to use for making the HTTP request.
-            rate_limiter: An AsyncLimiter instance to use for rate limiting the request.
 
         Returns:
             An EsiResponse instance corresponding to the executed request.
@@ -50,9 +50,7 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
         """
         response: EsiResponse | None = None
         try:
-            if request.runtime_info is None:
-                raise ValueError("Request runtime info is missing")
-            async with rate_limiter:
+            async with self.async_limiter:
                 if self.force_quit:
                     raise RuntimeError("Request execution was forcefully stopped")
                 match request.runtime_info.method:
@@ -75,7 +73,8 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
         except Exception as e:
             if response is None:
                 response = EsiResponse(
-                    request=request,
+                    request=request.request,
+                    runtime_info=request.runtime_info,
                     http_response=None,
                     metrics=None,
                     exception_messages=[str(e)],
@@ -86,33 +85,29 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
                 response.exceptions.append(e)
         return response
 
-    async def execute_requests(self, requests: EsiRequests) -> list[EsiResponse]:
+    async def execute_requests(
+        self, requests: Iterable[EsiRuntimeRequest]
+    ) -> list[EsiResponse]:
         """Execute a batch of ESI requests and return the responses.
 
         Args:
-            requests: The EsiRequests instance containing the batch of requests to execute.
+            requests: An iterable of EsiRuntimeRequest instances to execute.
 
         Returns:
             A list of EsiResponse instances corresponding to the executed requests.
 
         """
-        rate_limiter = AsyncLimiter(self.max_rate, self.period)
         async with aiohttp.ClientSession() as session:
-            tasks = [
-                self.execute_request(request, session, rate_limiter)
-                for request in requests.requests.values()
-            ]
+            tasks = [self.execute_request(request, session) for request in requests]
             results = await asyncio.gather(*tasks)
 
             return results
 
     async def _get(
-        self, request: EsiRequest, session: aiohttp.ClientSession
+        self, request: EsiRuntimeRequest, session: aiohttp.ClientSession
     ) -> EsiResponse:
         """Execute a GET request and return the response."""
         metrics = Metrics()
-        if request.runtime_info is None:
-            raise ValueError("Request runtime info is missing")
         cache_key = request.runtime_info.cache_key
         cached_response: CachedResponse | None = None
         if cache_key is not None:
@@ -123,7 +118,8 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
                     assert cached_response is not None
                     http_response = deepcopy(cached_response.http_response)
                     return EsiResponse(
-                        request=request,
+                        request=request.request,
+                        runtime_info=request.runtime_info,
                         http_response=http_response,
                         metrics=metrics,
                         exceptions=[],
@@ -133,19 +129,27 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
                     pass
                 case CachedResponseStatus.STALE:
                     assert cached_response is not None
-                    set_cache_headers(request, cached_response)
+                    set_stale_cache_headers(request, cached_response)
+        query_parameters: dict[str, Any] = (
+            request.request.query_parameters
+            | request.runtime_info.additional_query_params
+        )
 
         async with session.get(
-            request.runtime_info.url, params=request.query_parameters
+            request.runtime_info.path_url,
+            params=query_parameters,
+            headers=request.runtime_info.headers,
         ) as response:
             response_data = await response.json()
             http_response = HttpResponse(
                 status_code=response.status,
+                url=str(response.url),
                 headers=dict(response.headers),
                 body=response_data,
             )
             esi_response = EsiResponse(
-                request=request,
+                request=request.request,
+                runtime_info=request.runtime_info,
                 http_response=http_response,
                 metrics=metrics,
                 exceptions=[],
@@ -163,28 +167,28 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
             return esi_response
 
     async def _post(
-        self, request: EsiRequest, session: aiohttp.ClientSession
+        self, request: EsiRuntimeRequest, session: aiohttp.ClientSession
     ) -> EsiResponse:
         """Execute a POST request and return the response."""
         ...
 
     async def _put(
-        self, request: EsiRequest, session: aiohttp.ClientSession
+        self, request: EsiRuntimeRequest, session: aiohttp.ClientSession
     ) -> EsiResponse:
         """Execute a PUT request and return the response."""
         ...
 
     async def _delete(
-        self, request: EsiRequest, session: aiohttp.ClientSession
+        self, request: EsiRuntimeRequest, session: aiohttp.ClientSession
     ) -> EsiResponse:
         """Execute a DELETE request and return the response."""
         ...
 
 
-def set_cache_headers(request: EsiRequest, cached_response: CachedResponse) -> None:
+def set_stale_cache_headers(
+    request: EsiRuntimeRequest, cached_response: CachedResponse
+) -> None:
     """Set the appropriate cache headers on the request based on the cached response."""
-    if request.runtime_info is None:
-        raise ValueError("Request runtime info is missing")
     etag = cached_response.http_response.etag
     last_modified = cached_response.http_response.last_modified
     if etag is not None:

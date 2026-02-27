@@ -1,6 +1,7 @@
 """Top-level package for Esi Link."""
 
 from pathlib import Path
+from uuid import NAMESPACE_URL, uuid5
 
 import typer
 
@@ -22,7 +23,8 @@ __version__ = "0.1.0"
 # The full version, including alpha/beta/rc tags.
 __release__ = __version__
 #######################################################################################
-NAMESPACE = "pfmsoft"
+APP_NAMESPACE = "pfmsoft"
 APPLICATION_NAME = "esi-link2"
-DEFAULT_APP_DIR = Path(typer.get_app_dir(f"{NAMESPACE}-{APPLICATION_NAME}"))
+DEFAULT_APP_DIR = Path(typer.get_app_dir(f"{APP_NAMESPACE}-{APPLICATION_NAME}"))
 USER_AGENT = f"{__app_name__}/{__version__} (+{__url__})"
+ESI_LINK_NAMESPACE = uuid5(NAMESPACE_URL, "esi-link")

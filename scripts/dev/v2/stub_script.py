@@ -5,7 +5,7 @@
 
 from pathlib import Path
 
-from esi_link.logging_config import setup_logging
+from esi_link.v2.logging_config import setup_logging
 
 SCRIPT_NAME = "stub_script"
 

@@ -8,10 +8,10 @@ from typing import Any
 from whenever import Instant
 
 from esi_link.v2.helpers.download_file import download_json
-from esi_link.v2.helpers.eve_dates import compatibility_date
+from esi_link.v2.helpers.eve_dates import compatibility_date as get_compatibility_date
 from esi_link.v2.helpers.resolve_json_ref import resolve_internal_refs
 from esi_link.v2.models import IndexedEsiSchema, IndexedSchemaStore
-from esi_link.v2.settings import get_settings
+from esi_link.v2.settings import EsiLinkSettings, get_settings
 
 
 @dataclass(slots=True)
@@ -32,7 +32,7 @@ def download_schema(
     """
     if compatibility_date is None:
         # Get the current compatibility date for ESI schema downloads.
-        compatibility_date = compatibility_date()
+        compatibility_date = get_compatibility_date()
     params = {"compatibility_date": compatibility_date}
     settings = get_settings()
     url = settings.esi_schema_url
@@ -73,9 +73,9 @@ def save_schemas_to_file(
 #     return settings.indexed_esi_schema_path.exists()
 
 
-def load_schema_store() -> IndexedSchemaStore:
+def load_schema_store(settings: EsiLinkSettings | None = None) -> IndexedSchemaStore:
     """Load the ESI schema store from a local file in the app directory."""
-    settings = get_settings()
+    settings = settings or get_settings()
     schema_path = settings.schema_store_path
     if not schema_path.exists():
         schema_store = IndexedSchemaStore(schemas={})
@@ -87,12 +87,14 @@ def load_schema_store() -> IndexedSchemaStore:
     return IndexedSchemaStore.model_validate_json(schema)
 
 
-def add_schema_to_store(indexed_schema: IndexedEsiSchema) -> IndexedSchemaStore:
+def add_schema_to_store(
+    indexed_schema: IndexedEsiSchema, settings: EsiLinkSettings | None = None
+) -> IndexedSchemaStore:
     """Add an indexed ESI schema to the schema store."""
-    schema_store = load_schema_store()
+    settings = settings or get_settings()
+    schema_store = load_schema_store(settings=settings)
     schema_date = indexed_schema.version
     schema_store.schemas[schema_date] = indexed_schema
-    settings = get_settings()
     schema_path = settings.schema_store_path
     schema_path.parent.mkdir(parents=True, exist_ok=True)
     with schema_path.open("w") as f:
