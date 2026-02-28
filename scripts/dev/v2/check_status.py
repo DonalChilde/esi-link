@@ -19,7 +19,7 @@ from esi_link.v2.schema_manager import SchemaManager
 from esi_link.v2.settings import get_settings
 
 logger = logging.getLogger(__name__)
-SCRIPT_NAME = "NOT_DEFINED"
+SCRIPT_NAME = "check_status"
 
 
 def main() -> None:
@@ -79,7 +79,6 @@ def save_response(response: EsiResponse, output_dir: Path) -> None:
     output_file = (
         output_dir / f"response_{request_id}-{operation_id}-{status_code}.json"
     )
-
     with output_file.open("w") as f:
         f.write(response.model_dump_json(indent=2))
 
@@ -104,10 +103,16 @@ def display_responses(responses: list[EsiResponse]) -> None:
         console.print(f"Response for request ID {response.request.request_id}:")
         console.print(f"\trequest url: {response.http_response.url}")
         console.print(f"\tcache_key: {response.runtime_info.cache_key}")
-        console.print(f"\tcache status: NOT_IMPLEMENTED")
+        console.print(f"\tcache status: {response.metrics.cache_response_status}")
         console.print(f"\thttp status: {response.http_response.status_code}")
-        console.print(f"\trequest took NOT_IMPLEMENTED seconds")
-        console.print(f"\tresource expires in: NOT_IMPLEMENTED seconds")
+        console.print(
+            f"\trequest took {response.metrics.task_completed - response.metrics.task_started:.4f} seconds"
+        )
+        if response.http_response and response.http_response.expires_at:
+            expires_in = (
+                response.http_response.expires_at - Instant.now()
+            ).in_seconds()
+            console.print(f"\tresource expires in: {expires_in:.4f} seconds")
         if response.http_response:
             console.print(response.http_response.body, overflow="crop")
 

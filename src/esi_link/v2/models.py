@@ -173,12 +173,28 @@ class HttpResponse(BaseModel):
                 pass
         return None
 
+    @property
+    def pages(self) -> int:
+        """Extract the number of pages from the X-Pages header, if present."""
+        pages = self.headers.get("X-Pages", 1) or self.headers.get("x-pages", 1)
+        return int(pages)
+
 
 @dataclass(slots=True)
 class Metrics:
     """Performance metrics for an esi request."""
 
-    pass
+    task_started: float | None = None
+    task_completed: float | None = None
+    primary_request_started: float | None = None
+    primary_request_completed: float | None = None
+    paged_requests_start: float | None = None
+    paged_requests_completed: float | None = None
+    paged_request_count: int = 0
+    cache_response_status: "CachedResponseStatus | None" = None
+    cache_stale_status_code: int = 0
+    cache_check_started: float | None = None
+    cache_check_completed: float | None = None
 
 
 class EsiResponse(BaseModelToDisk):
@@ -611,9 +627,9 @@ class AuthProviderProtocol:
 
 
 class CachedResponseStatus(StrEnum):
-    HIT = "hit"
-    MISS = "miss"
-    STALE = "stale"
+    HIT = "HIT"
+    MISS = "MISS"
+    STALE = "STALE"
 
 
 class CacheManagerProtocol:
