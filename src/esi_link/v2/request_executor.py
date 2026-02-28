@@ -336,3 +336,7 @@ def set_stale_cache_headers(
         request.runtime_info.headers["If-None-Match"] = etag
     if last_modified is not None:
         request.runtime_info.headers["If-Modified-Since"] = last_modified
+
+
+# TODO merge paged data
+# TODO validate last-modified for paged data.
