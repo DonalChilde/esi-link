@@ -114,8 +114,15 @@ def display_responses(responses: list[EsiResponse]) -> None:
                 response.http_response.expires_at - Instant.now()
             ).in_seconds()
             console.print(f"\tresource expires in: {expires_in:.4f} seconds")
+        if response.http_response and response.http_response.ratelimit:
+            console.print(
+                f"\tratelimits -> group: {response.http_response.ratelimit.group}, "
+                f"limit: {response.http_response.ratelimit.limit}, "
+                f"remaining: {response.http_response.ratelimit.remaining}, "
+                f"used: {response.http_response.ratelimit.used}"
+            )
         if response.http_response:
-            console.print(response.http_response.body, overflow="crop")
+            console.print(response.http_response.body_json, overflow="crop")
 
 
 def build_requests() -> EsiRequests:

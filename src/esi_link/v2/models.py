@@ -1,5 +1,6 @@
 """Data models and Protocols for ESI Link."""
 
+import json
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -100,13 +101,21 @@ class EsiRequests(BaseModelToDisk):
     requests: dict[UUID, EsiRequest]
 
 
+@dataclass(slots=True)
+class x_ratelimit:
+    group: str
+    limit: str
+    remaining: str
+    used: str
+
+
 class HttpResponse(BaseModel):
     """Represents the data of an ESI response."""
 
     status_code: int
     url: str
     headers: dict[str, str] = {}
-    body: Any | None = None
+    body_text: str
     received_at: Instant = Field(default_factory=_get_current_instant)
 
     @property
@@ -178,6 +187,29 @@ class HttpResponse(BaseModel):
         """Extract the number of pages from the X-Pages header, if present."""
         pages = self.headers.get("X-Pages", 1) or self.headers.get("x-pages", 1)
         return int(pages)
+
+    @property
+    def body_json(self) -> Any | None:
+        """Parse the body text as JSON, if possible.
+
+        Returns:
+            The parsed JSON object, or None if parsing fails.
+        """
+        try:
+            return json.loads(self.body_text)
+        except ValueError:
+            return None
+
+    @property
+    def ratelimit(self) -> x_ratelimit | None:
+        """Extract the rate limit information from the X-RateLimit headers, if present."""
+        group = self.headers.get("X-Ratelimit-Group", "unknown")
+        limit = self.headers.get("X-Ratelimit-Limit", "unknown")
+        remaining = self.headers.get("X-Ratelimit-Remaining", "unknown")
+        used = self.headers.get("X-Ratelimit-Used", "unknown")
+        # if any(value == "unknown" for value in (group, limit, remaining, used)):
+        #     return None
+        return x_ratelimit(group=group, limit=limit, remaining=remaining, used=used)
 
 
 @dataclass(slots=True)
@@ -665,21 +697,27 @@ class CacheManagerProtocol:
         """
         ...
 
-    def set(self, key: UUID, http_response: HttpResponse) -> None:
+    def set(self, key: UUID, http_response: HttpResponse) -> CachedResponse:
         """Set a cached response in the cache.
 
         Args:
             key: The UUID key for the cached response.
             http_response: The new HttpResponse to store in the cache.
+
+        Returns:
+            The CachedResponse instance that was set in the cache.
         """
         ...
 
-    def refresh(self, key: UUID, new_http_response: HttpResponse) -> None:
+    def refresh(self, key: UUID, new_http_response: HttpResponse) -> CachedResponse:
         """Refresh an existing cached response with new response data.
 
         Args:
             key: The UUID key for the cached response to refresh.
             new_http_response: The new HttpResponse to update the cached response with.
+
+        Returns:
+            The updated CachedResponse instance after refreshing.
 
         Raises:
             KeyError: If no cached response exists for the given cache key.

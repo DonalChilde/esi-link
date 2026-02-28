@@ -1,6 +1,7 @@
 """Module for executing ESI requests, including handling HTTP requests, caching, and rate limiting."""
 
 import asyncio
+import logging
 from collections.abc import Iterable
 from copy import deepcopy
 from time import perf_counter
@@ -19,6 +20,8 @@ from esi_link.v2.models import (
     HttpResponse,
     Metrics,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class EsiRequestExecutor(EsiRequestExecutorProtocol):
@@ -257,12 +260,12 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
             params=query_parameters,
             headers=request.runtime_info.headers,
         ) as response:
-            response_data = await response.json()
+            response_text = await response.text()
             http_response = HttpResponse(
                 status_code=response.status,
                 url=str(response.url),
                 headers=dict(response.headers),
-                body=response_data,
+                body_text=response_text,
             )
             esi_response = EsiResponse(
                 request=request.request,
@@ -284,9 +287,14 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
                             "Received 304 Not Modified response for a request with no cache key"
                         )
                     metrics.cache_stale_status_code = 304
-                    # FIXME this logic incorrect. 304 signal we still have good data in the cache.
-                    self.cache_manager.refresh(cache_key, http_response)
+                    cached_response = self.cache_manager.refresh(
+                        cache_key, http_response
+                    )
+                    esi_response.http_response = deepcopy(cached_response.http_response)
                 case _:
+                    logger.error(
+                        f"Received unexpected status code {response.status} for request {request.request.request_id}"
+                    )
                     response.raise_for_status()
             return esi_response
 

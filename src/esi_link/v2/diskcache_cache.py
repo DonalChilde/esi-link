@@ -65,7 +65,7 @@ class DiskCache(CacheManagerProtocol):
             return response, CachedResponseStatus.STALE
         return response, CachedResponseStatus.HIT
 
-    def set(self, key: UUID, http_response: HttpResponse) -> None:
+    def set(self, key: UUID, http_response: HttpResponse) -> CachedResponse:
         """Set a value in the disk cache."""
         cached_response = CachedResponse(
             cache_key=key,
@@ -74,10 +74,22 @@ class DiskCache(CacheManagerProtocol):
             expires_at=http_response.expires_at,
         )
         self.cache.set(str(key), cached_response)  # type: ignore
+        return cached_response
 
-    def refresh(self, key: UUID, new_http_response: HttpResponse) -> None:
+    def refresh(self, key: UUID, new_http_response: HttpResponse) -> CachedResponse:
         """Refresh a value in the disk cache."""
-        self.set(key, new_http_response)
+        cached_response, _ = self.get(key)
+        if cached_response is None:
+            raise KeyError(f"No cached response found for key {key} to refresh.")
+        data = cached_response.http_response.body_text
+        updated_http_response = HttpResponse(
+            status_code=new_http_response.status_code,
+            url=new_http_response.url,
+            headers=new_http_response.headers,
+            body_text=data,
+            received_at=new_http_response.received_at,
+        )
+        return self.set(key, updated_http_response)
 
     def clear(self, only_stale: bool = False) -> int:
         """Clear all cached responses from the cache."""
