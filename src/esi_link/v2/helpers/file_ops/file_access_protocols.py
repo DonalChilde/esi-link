@@ -45,6 +45,9 @@ class FileWriterProtocol[T](Protocol):
     def __enter__(self) -> Self:
         """Enter context and return the writer instance."""
         mode = self._get_mode()
+        self.path_out.parent.mkdir(
+            parents=True, exist_ok=True
+        )  # Ensure parent directories exist
         self.fp = open(self.path_out, mode)
         return self
 
