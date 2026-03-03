@@ -64,7 +64,7 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
                         metrics.primary_request_started = perf_counter()
                         response = await self._get(request, session, metrics)
                         metrics.primary_request_completed = perf_counter()
-                        if await self.is_paged_response_required(response):
+                        if self.is_paged_response_required(response):
                             await self.complete_paged_response(
                                 response, session, metrics
                             )
@@ -130,7 +130,7 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
             results = await asyncio.gather(*tasks)
             return results
 
-    async def is_paged_response_required(self, response: EsiResponse) -> bool:
+    def is_paged_response_required(self, response: EsiResponse) -> bool:
         """Determine if a paged request requires additional requests to retrieve all pages of data.
 
         If the current page is page 1, and there are more than one page of data (as
@@ -145,78 +145,75 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
         # page defaults to 1 if not present, so we can assume it's always an int
         current_page = int(response.runtime_info.additional_query_params.get("page", 1))
         x_page_count = response.http_response.pages
-        if all(
-            (
-                "X-Pages" in response.http_response.headers,
-                x_page_count > 1,
-                current_page == 1,
-            )
-        ):
+        if x_page_count > 1 and current_page == 1:
             return True
         return False
 
+    def _check_for_valid_paged_reponses(
+        self, response: EsiResponse, paged_responses: list[EsiResponse]
+    ) -> None:
+        """Check if the paged responses are valid.
+
+        Rasies an exception if any of the paged responses are invalid, such as having a
+        different Last-Modified header than the original response, or having a non-200
+        status code.
+        """
+        check_for_valid_paged_reponses(response, paged_responses)
+
+    def _combine_paged_response_strings(
+        self, response: EsiResponse, paged_responses: list[EsiResponse]
+    ) -> str:
+        """Combine the body text from the original response and the paged responses into a single string."""
+        try:
+            paged_strings = collect_paged_response_strings(paged_responses)
+            combined_string = combine_paged_response_strings(
+                response.http_response.body_text if response.http_response else "",
+                paged_strings,
+            )
+        except Exception as e:
+            raise ValueError(
+                f"Failed to combine paged response strings for request {response.request.request_id}: {str(e)}"
+            ) from e
+        return combined_string
+
     async def complete_paged_response(
-        self, response: EsiResponse, session: aiohttp.ClientSession, metrics: Metrics
+        self, first_page: EsiResponse, session: aiohttp.ClientSession, metrics: Metrics
     ) -> EsiResponse:
         """Complete a paged request by making additional HTTP requests to retrieve all pages of data.
 
         When the requests are complete, combine the paged data into the first response and return it.
         """
-        paged_requests = self.assemble_paged_requests(response)
-        assert response.metrics is not None, (
-            "Metrics should be initialized in the response before completing paged requests"
-        )
-        response.metrics.paged_requests_start = perf_counter()
+        if first_page.http_response is None:
+            raise ValueError(
+                "Cannot complete paged response for a response with no HTTP response"
+            )
+        if first_page.metrics is None:
+            raise ValueError(
+                "Metrics should be initialized in the response before completing paged requests"
+            )
+        paged_requests = self._assemble_paged_runtime_requests(first_page)
+        first_page.metrics.paged_requests_start = perf_counter()
         paged_responses = await asyncio.gather(
             *[self.execute_request(request, session) for request in paged_requests]
         )
-        response.metrics.paged_requests_completed = perf_counter()
-        # Combine the paged data into the first response
-        for paged_response in paged_responses:
-            if (
-                paged_response.http_response is not None
-                and response.http_response is not None
-                and response.http_response.body is not None  # type: ignore
-            ):
-                # This logic assumes that the body of the response is a list of items,
-                # which is true for many ESI endpoints, but may not be universally true.
-                # We may need to make this logic more robust in the future.
-                if isinstance(response.http_response.body, list) and isinstance(  # type: ignore
-                    paged_response.http_response.body, list
-                ):
-                    response.http_response.body.extend(  # type: ignore
-                        paged_response.http_response.body  # type: ignore
-                    )
-                else:
-                    raise ValueError(
-                        "Cannot combine paged response data: response bodies are not lists"
-                    )
-            else:
-                raise ValueError(
-                    "Cannot combine paged response data: one of the responses has no HTTP response or body"
-                )
-        return response
-
-    def assemble_paged_requests(self, response: EsiResponse) -> list[EsiRuntimeRequest]:
-        """Assemble the additional EsiRuntimeRequest instances required to complete a paged request."""
-        if response.http_response is None:
-            raise ValueError(
-                "Cannot assemble paged requests for a response with no HTTP response"
-            )
-        total_pages = response.http_response.pages
-        assert response.metrics is not None, (
-            "Metrics should be initialized in the response before assembling paged requests"
+        first_page.metrics.paged_requests_completed = perf_counter()
+        self._check_for_valid_paged_reponses(first_page, paged_responses)
+        combined_response_string = self._combine_paged_response_strings(
+            first_page, paged_responses
         )
-        response.metrics.paged_request_count = total_pages
-        paged_runtime_requests: list[EsiRuntimeRequest] = []
-        for page in range(2, total_pages + 1):
-            new_request = EsiRuntimeRequest(
-                request=deepcopy(response.request),
-                runtime_info=deepcopy(response.runtime_info),
-            )
-            new_request.runtime_info.additional_query_params["page"] = str(page)
-            paged_runtime_requests.append(new_request)
-        return paged_runtime_requests
+        first_page.http_response.body_text = combined_response_string
+        return first_page
+
+    def _assemble_paged_runtime_requests(
+        self, response: EsiResponse
+    ) -> list[EsiRuntimeRequest]:
+        """Assemble the additional EsiRuntimeRequest instances required to complete a paged request."""
+        try:
+            return assemble_paged_runtime_requests(response)
+        except Exception as e:
+            raise ValueError(
+                f"Failed to assemble paged requests for response to request {response.request.request_id}: {str(e)}"
+            ) from e
 
     async def _get(
         self,
@@ -277,6 +274,11 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
             # Handle response status codes
             match response.status:
                 case 200:
+                    if self.is_paged_response_required(esi_response):
+                        # Don't cache the response yet, since we need to get the paged responses first
+                        response = await self.complete_paged_response(
+                            esi_response, session, metrics
+                        )
                     if cache_key is not None:
                         if metrics.cache_response_status == CachedResponseStatus.STALE:
                             metrics.cache_stale_status_code = 200
@@ -340,3 +342,105 @@ def set_stale_cache_headers(
 
 # TODO merge paged data
 # TODO validate last-modified for paged data.
+
+
+def assemble_paged_runtime_requests(response: EsiResponse) -> list[EsiRuntimeRequest]:
+    """Assemble the additional EsiRuntimeRequest instances required to complete a paged request."""
+    if response.http_response is None:
+        raise ValueError(
+            "Cannot assemble paged requests for a response with no HTTP response"
+        )
+    total_pages = response.http_response.pages
+    if response.metrics is not None:
+        response.metrics.paged_request_count = total_pages
+    paged_runtime_requests: list[EsiRuntimeRequest] = []
+    for page in range(2, total_pages + 1):
+        new_request = EsiRuntimeRequest(
+            request=deepcopy(response.request),
+            runtime_info=deepcopy(response.runtime_info),
+        )
+        new_request.runtime_info.additional_query_params["page"] = str(page)
+        paged_runtime_requests.append(new_request)
+    return paged_runtime_requests
+
+
+def check_for_valid_paged_reponses(
+    response: EsiResponse, paged_responses: list[EsiResponse]
+) -> None:
+    """Check that the paged responses are valid and can be combined with the original response."""
+    if response.http_response is None:
+        raise ValueError(
+            "Cannot check paged responses for a response with no HTTP response"
+        )
+    for paged_response in paged_responses:
+        page_num = paged_response.runtime_info.additional_query_params.get(
+            "page", "unknown"
+        )
+        if paged_response.http_response is None:
+            raise ValueError(
+                f"Invalid paged response: page {page_num} has no HTTP response"
+            )
+        if paged_response.http_response.status_code != 200:
+            raise ValueError(
+                f"Invalid paged response: page {page_num} has an unexpected status code {paged_response.http_response.status_code}"
+            )
+        if (
+            paged_response.http_response.last_modified
+            != response.http_response.last_modified
+        ):
+            raise ValueError(
+                f"Invalid paged response: page {page_num} has a different Last-Modified header than the original response"
+            )
+
+
+def collect_paged_response_strings(paged_responses: list[EsiResponse]) -> list[str]:
+    """Collect the body text from a list of paged responses."""
+    response_strings: list[str] = []
+    for paged_response in paged_responses:
+        page_num = paged_response.runtime_info.additional_query_params.get(
+            "page", "unknown"
+        )
+        if paged_response.http_response is None:
+            raise ValueError(
+                f"Cannot collect response string from a paged response with no HTTP response: page {page_num}"
+            )
+        if not paged_response.http_response.body_text:
+            raise ValueError(
+                f"Cannot collect response string from a paged response with no body text: page {page_num}"
+            )
+        response_strings.append(paged_response.http_response.body_text)
+    return response_strings
+
+
+def combine_paged_response_strings(first_page: str, paged_strings: list[str]) -> str:
+    """Combine the body text from the original response and the paged responses into a single string."""
+    # This logic assumes that the body of the response is a JSON array of items,
+    # which is true for many ESI endpoints, but may not be universally true.
+    # We may need to make this logic more robust in the future.
+
+    if first_page.startswith("[") and first_page.endswith("]"):
+        return combine_list_of_array_strings(first_page, paged_strings)
+    else:
+        raise ValueError(
+            "Cannot combine paged response strings: original string is not a JSON array"
+        )
+
+
+def combine_list_of_array_strings(first_page: str, paged_strings: list[str]) -> str:
+    """Combine the body text from the original response and the paged responses into a single json string list of items."""
+    fragments: list[str] = []
+    if first_page.startswith("[") and first_page.endswith("]"):
+        fragments.append(first_page[1:-1])  # Remove the brackets
+        for page_num, paged_string in enumerate(paged_strings, start=2):
+            if paged_string.startswith("[") and paged_string.endswith("]"):
+                fragments.append(paged_string[1:-1])  # Remove the brackets
+            else:
+                raise ValueError(
+                    f"Cannot combine paged response strings: paged string is not a JSON array: page {page_num}"
+                )
+        combined_string = f"[{','.join(fragments)}]"  # Add the brackets back
+        return combined_string
+    else:
+        raise ValueError(
+            "Cannot combine paged response strings: original string is not a JSON array"
+        )

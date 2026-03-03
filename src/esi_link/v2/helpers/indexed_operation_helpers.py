@@ -11,6 +11,7 @@ class IndexedOperationSummary(TypedDict):
     description: str
     tags: list[str]
     auth_required: bool
+    is_paged: bool
 
 
 def collect_operation_summaries(
@@ -25,6 +26,7 @@ def collect_operation_summaries(
             description=operation.description,
             tags=operation.tags,
             auth_required=operation.auth_required,
+            is_paged=operation.is_paged,
         )
         operation_summaries.append(summary)
     return operation_summaries

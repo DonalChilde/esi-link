@@ -686,6 +686,14 @@ class CacheManagerProtocol:
         Local max age allows the caller to specify a max age for staleness that is
         different from the max age received from the server.
 
+        Returned CachedResponse must be treated as immutable. If the caller needs to
+        modify the CachedResponse, they should create a copy of it before making any
+        modifications, to avoid unintended side effects on the cached response stored in
+        the cache manager. Modifying the returned CachedResponse directly may lead to
+        issues such as stale data being returned for other requests that share the same
+        cache key, or inconsistencies in the cache state if the CachedResponse is updated
+        with new data while it is being modified by the caller.
+
         Args:
             key: The UUID key for the cached response.
             local_max_age: The maximum age of the cached response in seconds. If the cached
@@ -700,6 +708,14 @@ class CacheManagerProtocol:
     def set(self, key: UUID, http_response: HttpResponse) -> CachedResponse:
         """Set a cached response in the cache.
 
+        Returned CachedResponse must be treated as immutable. If the caller needs to
+        modify the CachedResponse, they should create a copy of it before making any
+        modifications, to avoid unintended side effects on the cached response stored in
+        the cache manager. Modifying the returned CachedResponse directly may lead to
+        issues such as stale data being returned for other requests that share the same
+        cache key, or inconsistencies in the cache state if the CachedResponse is updated
+        with new data while it is being modified by the caller.
+
         Args:
             key: The UUID key for the cached response.
             http_response: The new HttpResponse to store in the cache.
@@ -711,6 +727,14 @@ class CacheManagerProtocol:
 
     def refresh(self, key: UUID, new_http_response: HttpResponse) -> CachedResponse:
         """Refresh an existing cached response with new response data.
+
+        Returned CachedResponse must be treated as immutable. If the caller needs to
+        modify the CachedResponse, they should create a copy of it before making any
+        modifications, to avoid unintended side effects on the cached response stored in
+        the cache manager. Modifying the returned CachedResponse directly may lead to
+        issues such as stale data being returned for other requests that share the same
+        cache key, or inconsistencies in the cache state if the CachedResponse is updated
+        with new data while it is being modified by the caller.
 
         Args:
             key: The UUID key for the cached response to refresh.

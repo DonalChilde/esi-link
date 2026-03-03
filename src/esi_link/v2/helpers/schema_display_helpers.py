@@ -15,14 +15,18 @@ def display_operations_by_tag(
         table = Table(title=f"Operations with tag: {tag}")
         table.add_column("Operation ID", style="cyan", no_wrap=True)
         table.add_column("Method", style="magenta")
+        table.add_column("Auth", style="red")
+        table.add_column("Paged", style="yellow")
         table.add_column("Description", style="green")
-        table.add_column("Auth Required", style="red")
+
         for summary in summaries:
             auth_required_str = "Yes" if summary["auth_required"] else "No"
+            paged_str = "Yes" if summary["is_paged"] else "No"
             table.add_row(
                 summary["operation_id"],
                 summary["method"],
-                summary.get("description", "").replace("\n", "--"),
                 auth_required_str,
+                paged_str,
+                summary.get("description", "").replace("\n", "--"),
             )
         console.print(table)
