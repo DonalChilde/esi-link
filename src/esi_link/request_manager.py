@@ -6,7 +6,6 @@ from time import perf_counter
 
 from esi_link.auth_provider import DummyAuthProvider
 from esi_link.esi_schema import load_schema_store
-from esi_link.handler_manager import DummyHandlerManager
 from esi_link.json_disk_cache import JsonDiskCache
 from esi_link.models import (
     CacheManagerProtocol,
@@ -22,6 +21,7 @@ from esi_link.models import (
 )
 from esi_link.request_executor import EsiRequestExecutor
 from esi_link.request_validation import RequestValidator
+from esi_link.response_handlers import DummyHandlerManager
 from esi_link.runtime_request_generator import RuntimeRequestGenerator
 from esi_link.settings import EsiLinkSettings
 from esi_link.url_generator import UrlGenerator
@@ -66,7 +66,7 @@ class EsiLink(EsiRequestExecutionManagerProtocol):
         Raises:
             ValidationError: If the request is invalid.
         """
-        self.validator.validate(request)
+        self.validator.validate_request(request)
 
     def _make_esi_runtime_request(self, request: EsiRequest) -> EsiRuntimeRequest:
         """Convert an EsiRequest to an EsiRuntimeRequest by populating the runtime info."""
@@ -99,6 +99,7 @@ class EsiLink(EsiRequestExecutionManagerProtocol):
         """Handle the response."""
         for handler_config in response.request.response_handlers:
             try:
+                handler = self.handler_manager.get_handler(handler_config)
                 await self.handler_manager.get_handler(handler_config).handle_response(
                     response
                 )

@@ -17,7 +17,7 @@ from esi_link.models import (
     HandlerConfig,
     HandlerConfigError,
     HandlerManagerProtocol,
-    InvalidHandlerError,
+    InvalidHandlerConfigError,
     ResponseHandlerError,
     ResponseHandlerProtocol,
 )
@@ -338,7 +338,7 @@ class HandlerManager(HandlerManagerProtocol):
     ) -> None:
         """Register a handler class with the manager."""
         if not issubclass(handler_cls, ResponseHandlerProtocol):  # pyright: ignore[reportUnnecessaryIsInstance]
-            raise InvalidHandlerError(
+            raise InvalidHandlerConfigError(
                 f"Handler class must implement ResponseHandlerProtocol: {name}"
             )
         self.handlers[name] = handler_cls

@@ -11,10 +11,10 @@ from rich.console import Console
 from whenever import Instant
 
 from esi_link import example_requests
-from esi_link.handler_manager import DummyHandlerManager
 from esi_link.logging_config import setup_logging
 from esi_link.models import EsiRequests, EsiResponse
 from esi_link.request_manager import EsiLink
+from esi_link.response_handlers import HandlerManager
 from esi_link.schema_manager import SchemaManager
 from esi_link.settings import get_settings
 
@@ -27,11 +27,12 @@ def main() -> None:
     settings = get_settings()
     schema_manager = SchemaManager(settings=settings)
     schema = schema_manager.get_latest_schema()
-    handler_manager = DummyHandlerManager()
+    handler_manager = HandlerManager()
     esi_link = EsiLink(
         settings=settings, schema=schema, handler_manager=handler_manager
     )
-    requests = build_requests()
+    output_dir = f"~/tmp/esi-link-scripts/{SCRIPT_NAME}"
+    requests = build_requests(output_dir=output_dir)
     responses = execute_requests(esi_link, requests)
     save_responses(responses)
     display_responses(responses)
@@ -121,11 +122,16 @@ def display_responses(responses: list[EsiResponse]) -> None:
                 f"remaining: {response.http_response.ratelimit.remaining}, "
                 f"used: {response.http_response.ratelimit.used}"
             )
+        if response.exception_messages:
+            console.print(
+                f"\tExceptions: {'\n\t\t'.join(response.exception_messages)}",
+                style="red",
+            )
         if response.http_response:
-            console.print(response.http_response.body_json, overflow="crop")
+            console.print(response.http_response.body_text, overflow="ellipsis")
 
 
-def build_requests() -> EsiRequests:
+def build_requests(output_dir: str) -> EsiRequests:
     """Build ESI requests for testing.
 
     This function creates an EsiRequests object containing a single ESI request
@@ -134,7 +140,10 @@ def build_requests() -> EsiRequests:
     Returns:
         EsiRequests: An object containing the constructed ESI requests.
     """
-    status_request = example_requests.esi_status()
+    simple_handler_config = example_requests.simple_save_response(
+        output_dir=output_dir, overwrite=False
+    )
+    status_request = example_requests.esi_status(handlers=[simple_handler_config])
     requests = EsiRequests(
         requests_id=uuid4(),
         created_on=Instant.now(),

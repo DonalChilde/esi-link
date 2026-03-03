@@ -93,7 +93,7 @@ class RequestValidator(RequestValidatorProtocol):
         self.schema = schema
         self.handler_manager = handler_manager
 
-    def validate(self, request: EsiRequest) -> None:
+    def validate_request(self, request: EsiRequest) -> None:
         """Validate an ESI request against the indexed schema."""
         try:
             if request.operation_id not in self.schema.operations:

@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from types import TracebackType
 from typing import Any, Literal, Self, cast
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import aiohttp
 from pydantic import BaseModel, ConfigDict, Field
@@ -37,10 +37,37 @@ class SchemaDownload:
 
 
 class HandlerConfig(BaseModel):
-    """Configuration for a response handler."""
+    """Configuration for a response handler.
+
+    Handler names are namespaced, with the format <namespace>:<handler_name>. Namespaces
+    are case insensitive, so "esi-link" and "ESI-LINK" would be considered the same
+    namespace. The esi-link namespace is reserved for built-in handlers,
+    e.g., esi-link:BuiltinHandler. Custom handlers should use a different namespace to
+    avoid conflicts. For example, a handler named "my_handler" could be registered under
+    the name "my_namespace.my_handler" to avoid conflicts with any built-in handlers or
+    other custom handlers that may be registered in the future.
+
+    Runtime values for handlers can be included in the config dictionary, and will be
+    passed to the handler when it is initialized. e.g. {"my_namespace.my_parameter": "value"}
+
+    It is the responsibility of the handler implementation to parse the config and
+    extract any needed values from it. The config dictionary is not interpreted by the
+    core ESI Link code, and is validated only by the handler implementation.
+
+    Example:
+    ```python
+    HandlerConfig(
+        name="my_namespace.my_handler",
+        config={
+            "type_id": "EsiRequest.query_parameters.type_id",
+            "download_date": "EsiResponse.http_response.date",
+        },
+    )
+    ```
+    """
 
     name: str
-    """Name of the handler. Handler names are namespaced. The esi-link.foo namespace is reserved."""
+    """Name of the handler."""
     config: dict[str, Any] = {}
     """Configuration specific to the handler."""
 
@@ -77,7 +104,7 @@ class RuntimeRequestInfo(BaseModel):
 class EsiRequest(BaseModelToDisk):
     """Represents a single ESI request to be executed."""
 
-    request_id: UUID
+    request_id: UUID = Field(default_factory=uuid4)
     operation_id: str
     path_parameters: dict[str, str | int | float] = {}
     query_parameters: dict[str, str | int | float] = {}
@@ -106,7 +133,7 @@ class EsiRequests(BaseModelToDisk):
 
 
 @dataclass(slots=True)
-class x_ratelimit:
+class X_ratelimit:
     group: str
     limit: str
     remaining: str
@@ -205,7 +232,7 @@ class HttpResponse(BaseModel):
             return None
 
     @property
-    def ratelimit(self) -> x_ratelimit | None:
+    def ratelimit(self) -> X_ratelimit | None:
         """Extract the rate limit information from the X-RateLimit headers, if present."""
         group = self.headers.get("X-Ratelimit-Group", "unknown")
         limit = self.headers.get("X-Ratelimit-Limit", "unknown")
@@ -213,7 +240,7 @@ class HttpResponse(BaseModel):
         used = self.headers.get("X-Ratelimit-Used", "unknown")
         # if any(value == "unknown" for value in (group, limit, remaining, used)):
         #     return None
-        return x_ratelimit(group=group, limit=limit, remaining=remaining, used=used)
+        return X_ratelimit(group=group, limit=limit, remaining=remaining, used=used)
 
 
 @dataclass(slots=True)
@@ -477,16 +504,16 @@ class EsiRequestError(EsiLinkException):
 class HandlerException(EsiLinkException):
     """Base exception class for response handler errors."""
 
-    def __init__(self, message: str, config: dict[str, Any]):
+    def __init__(self, message: str, config: HandlerConfig | None = None):
         """Base exception class for response handler errors."""
         super().__init__(message)
         self.config = config
 
 
-class InvalidHandlerError(HandlerException):
+class InvalidHandlerConfigError(HandlerException):
     """Exception raised when a response handler configuration is invalid."""
 
-    def __init__(self, message: str, config: dict[str, Any]):
+    def __init__(self, message: str, config: HandlerConfig):
         """Exception raised when a response handler configuration is invalid."""
         super().__init__(message, config)
 
@@ -494,7 +521,7 @@ class InvalidHandlerError(HandlerException):
 class HandlerNotFoundError(HandlerException):
     """Exception raised when a response handler is not found."""
 
-    def __init__(self, message: str, config: dict[str, Any]):
+    def __init__(self, message: str, config: HandlerConfig):
         """Exception raised when a response handler is not found."""
         super().__init__(message, config)
 
@@ -502,7 +529,7 @@ class HandlerNotFoundError(HandlerException):
 class HandlerExecutionError(HandlerException):
     """Exception raised when a response handler fails during execution."""
 
-    def __init__(self, message: str, config: dict[str, Any], request_id: UUID):
+    def __init__(self, message: str, config: HandlerConfig, request_id: UUID):
         """Exception raised when a response handler fails during execution."""
         super().__init__(message, config)
         self.request_id = request_id
@@ -538,7 +565,7 @@ class ResponseHandlerProtocol:
     """Protocol for response handlers."""
 
     name: str
-    config: dict[str, Any]
+    config: HandlerConfig | None
     """The HandlerConfig used to create the handler instance."""
 
     async def handle_response(self, response: EsiResponse) -> None:
@@ -550,11 +577,16 @@ class ResponseHandlerProtocol:
         Raises:
             HandlerExecutionError: If an error occurs during handling.
         """
-        ...
+        raise NotImplementedError(
+            "handle_response method must be implemented by subclass"
+        )
 
     @classmethod
     def from_config(cls, config: HandlerConfig) -> Self:
         """Factory method to create a handler instance from a HandlerConfig.
+
+        The config should be validated before creating the handler instance.
+
 
         Args:
             config: The HandlerConfig instance containing the configuration for the handler.
@@ -562,27 +594,26 @@ class ResponseHandlerProtocol:
         Raises:
             InvalidHandlerError: If the configuration is invalid for this handler.
         """
-        ...
-
-    @classmethod
-    def example_config(cls) -> tuple[HandlerConfig, str]:
-        """Return an example configuration for this handler, with a text description.
-
-        Example does not have to be a valid config, but should illustrate the main options.
-        """
-        ...
+        raise NotImplementedError("from_config method must be implemented by subclass")
 
     @classmethod
     def validate_config(cls, config: HandlerConfig) -> None:
-        """Validate the handler configuration.
+        """Validate a HandlerConfig for this handler.
+
+        This method should be called before creating a handler instance from a config,
+        to ensure that the values in the config are valid for this handler.
+
+        This is only required to validate the presence of the required config values,
+        and that they are of the correct type. The actual values might not be valid until
+        runtime, e.g., if the config includes a reference to a value in the EsiResponse
+        that is not present until the response is received.
 
         Args:
-            config: The HandlerConfig instance containing the configuration.
-
-        Raises:
-            InvalidHandlerError: If the configuration is invalid.
+            config: The HandlerConfig instance to validate.
         """
-        ...
+        raise NotImplementedError(
+            "validate_config method must be implemented by subclass"
+        )
 
 
 class HandlerManagerProtocol:
@@ -598,31 +629,30 @@ class HandlerManagerProtocol:
         Raises:
             HandlerNotFoundError: If the handler is not found.
         """
-        ...
+        raise NotImplementedError("get_handler method must be implemented by subclass")
 
-    def register_handler(
-        self, name: str, handler_cls: type[ResponseHandlerProtocol]
-    ) -> None:
-        """Register a handler class with a name.
-
-        Validates the handler class before registering.
+    def register_handler(self, handler_cls: type[ResponseHandlerProtocol]) -> None:
+        """Register a handler class by its name.
 
         Args:
-            name: The name of the handler.
             handler_cls: The handler class to register.
 
         Raises:
             InvalidHandlerError: If the handler class is invalid.
         """
-        ...
+        raise NotImplementedError(
+            "register_handler method must be implemented by subclass"
+        )
 
-    def get_all_handlers(self) -> list[type[ResponseHandlerProtocol]]:
-        """Get a list of all registered handlers.
+    def registered_handlers(self) -> dict[str, type[ResponseHandlerProtocol]]:
+        """Get a dictionary of registered handler classes by their names.
 
         Returns:
-            A list of all registered handler instances.
+            A dictionary mapping handler names to their corresponding handler classes.
         """
-        ...
+        raise NotImplementedError(
+            "registered_handlers method must be implemented by subclass"
+        )
 
     def validate_handler_config(self, config: HandlerConfig) -> None:
         """Validate a handler configuration against the registered handler.
@@ -634,7 +664,9 @@ class HandlerManagerProtocol:
             InvalidHandlerError: If the configuration is invalid for the specified handler.
             HandlerNotFoundError: If the specified handler is not found.
         """
-        ...
+        raise NotImplementedError(
+            "validate_handler_config method must be implemented by subclass"
+        )
 
 
 class AuthProviderProtocol:
@@ -659,6 +691,19 @@ class AuthProviderProtocol:
         self, character_id: int, client_alias: str | None = None
     ) -> dict[str, str]:
         """Get authentication headers based on the provided authentication parameters."""
+        ...
+
+
+class RequestValidatorProtocol:
+    def validate_request(self, request: EsiRequest) -> None:
+        """Validate an ESI request against the schema for the given compatibility date.
+
+        Args:
+            request: The EsiRequest to validate.
+
+        Raises:
+            ValidationError: If the request is invalid according to the schema for the given compatibility date.
+        """
         ...
 
 
@@ -979,24 +1024,6 @@ class RuntimeRequestGeneratorProtocol:
         This should deep copy the request to avoid mutation issues with handlers and retries.
         """
         ...
-
-
-class RequestValidatorProtocol:
-    def validate(self, request: EsiRequest) -> None:
-        """Validate an ESI request before execution.
-
-        This method should perform all necessary validation checks on the EsiRequest
-        to ensure that it is well-formed and can be executed successfully. This may include
-        checks such as verifying that required fields are present, that parameter values
-        are of the correct type and format, and that any referenced operation IDs or handler
-        configurations are valid.
-
-        Args:
-            request: The EsiRequest instance to validate.
-
-        Raises:
-            ValueError: If the request is invalid for any reason, with a message describing the issue.
-        """
 
 
 class SchemaManagerProtocol:

@@ -47,6 +47,7 @@ class RuntimeRequestGenerator(RuntimeRequestGeneratorProtocol):
             headers=self._generate_headers(request),
             timeout=10,
             cache_key=url_info.cache_key if self.operation.is_cached else None,
+            response_handlers=[],
         )
         return runtime_info
 

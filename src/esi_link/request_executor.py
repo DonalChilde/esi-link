@@ -72,7 +72,7 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
                         metrics.primary_request_started = perf_counter()
                         response = await self._post(request, session, metrics)
                         metrics.primary_request_completed = perf_counter()
-                        if await self.is_paged_response_required(response):
+                        if self.is_paged_response_required(response):
                             await self.complete_paged_response(
                                 response, session, metrics
                             )
@@ -80,7 +80,7 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
                         metrics.primary_request_started = perf_counter()
                         response = await self._put(request, session, metrics)
                         metrics.primary_request_completed = perf_counter()
-                        if await self.is_paged_response_required(response):
+                        if self.is_paged_response_required(response):
                             await self.complete_paged_response(
                                 response, session, metrics
                             )
@@ -88,7 +88,7 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
                         metrics.primary_request_started = perf_counter()
                         response = await self._delete(request, session, metrics)
                         metrics.primary_request_completed = perf_counter()
-                        if await self.is_paged_response_required(response):
+                        if self.is_paged_response_required(response):
                             await self.complete_paged_response(
                                 response, session, metrics
                             )
