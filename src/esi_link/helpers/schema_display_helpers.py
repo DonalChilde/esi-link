@@ -1,7 +1,7 @@
 from rich.console import Console
 from rich.table import Table
 
-from esi_link.v2.helpers.indexed_operation_helpers import (
+from esi_link.helpers.indexed_operation_helpers import (
     IndexedOperationSummary,
 )
 

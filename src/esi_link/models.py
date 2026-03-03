@@ -12,8 +12,8 @@ import aiohttp
 from pydantic import BaseModel, ConfigDict, Field
 from whenever import Instant
 
-from esi_link.v2.helpers.pydantic.save_to_disk import BaseModelToDisk
-from esi_link.v2.helpers.resolve_json_ref import resolve_internal_refs
+from esi_link.helpers.pydantic.save_to_disk import BaseModelToDisk
+from esi_link.helpers.resolve_json_ref import resolve_internal_refs
 
 
 def _get_current_instant() -> Instant:

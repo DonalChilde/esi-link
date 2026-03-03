@@ -1,6 +1,6 @@
 from typing import TypedDict
 
-from esi_link.v2.models import IndexedEsiSchema
+from esi_link.models import IndexedEsiSchema
 
 
 class IndexedOperationSummary(TypedDict):

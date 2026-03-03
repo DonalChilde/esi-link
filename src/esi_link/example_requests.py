@@ -2,7 +2,7 @@
 
 from uuid import uuid4
 
-from esi_link.v2.runtime_request_generator import EsiRequest
+from esi_link.runtime_request_generator import EsiRequest
 
 
 def esi_status() -> EsiRequest:

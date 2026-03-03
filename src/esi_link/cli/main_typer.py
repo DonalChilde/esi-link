@@ -6,12 +6,12 @@ import typer
 from rich.console import Console
 from rich.text import Text
 
+from esi_link import __app_name__, __version__
 from esi_link.cli import STYLE_INFO
-from esi_link.v2 import __app_name__, __version__
-from esi_link.v2.cli.cache import app as cache_app
-from esi_link.v2.cli.esi_schema import app as esi_schema_app
-from esi_link.v2.logging_config import setup_logging
-from esi_link.v2.settings import get_settings
+from esi_link.cli.cache import app as cache_app
+from esi_link.cli.esi_schema import app as esi_schema_app
+from esi_link.logging_config import setup_logging
+from esi_link.settings import get_settings
 
 logger = logging.getLogger(__name__)
 app = typer.Typer(no_args_is_help=True)

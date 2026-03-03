@@ -2,9 +2,9 @@
 
 from uuid import UUID, uuid5
 
-from esi_link.v2 import ESI_LINK_NAMESPACE
-from esi_link.v2.helpers.canonicalize_url import canonicalize_url
-from esi_link.v2.models import (
+from esi_link import ESI_LINK_NAMESPACE
+from esi_link.helpers.canonicalize_url import canonicalize_url
+from esi_link.models import (
     EsiRequest,
     GeneratedUrlInfo,
     IndexedEsiSchema,

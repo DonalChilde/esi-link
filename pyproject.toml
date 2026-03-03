@@ -31,8 +31,8 @@ description = "A command line first interface to the Eve Online API"
 [project.scripts]
 # script entry-points
 # COMMAND_NAME = "PATH.TO.ENTRY.MODULE:ENTRY_FUNCTION"
+esi-link-old = "esi_link.old.cli.main_typer:app"
 esi-link = "esi_link.cli.main_typer:app"
-esi-link2 = "esi_link.v2.cli.main_typer:app"
 
 [project.urls]
 Documentation = "https://github.com/DonalChilde/esi-link#readme"

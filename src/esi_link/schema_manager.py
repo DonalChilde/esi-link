@@ -4,18 +4,18 @@ from typing import Any
 
 from whenever import Instant
 
-from esi_link.v2.esi_schema import (
+from esi_link.esi_schema import (
     add_schema_to_store,
     download_schema,
     load_schema_store,
 )
-from esi_link.v2.models import (
+from esi_link.models import (
     IndexedEsiSchema,
     IndexedSchemaStore,
     SchemaDownload,
     SchemaManagerProtocol,
 )
-from esi_link.v2.settings import EsiLinkSettings, get_settings
+from esi_link.settings import EsiLinkSettings, get_settings
 
 
 class SchemaManager(SchemaManagerProtocol):

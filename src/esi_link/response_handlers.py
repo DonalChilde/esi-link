@@ -1,6 +1,6 @@
 """Pre-defined response handlers."""
 
-from esi_link.v2.models import EsiResponse, ResponseHandlerProtocol
+from esi_link.models import EsiResponse, ResponseHandlerProtocol
 
 
 class DummyResponseHandler(ResponseHandlerProtocol):

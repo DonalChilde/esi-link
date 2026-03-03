@@ -10,7 +10,7 @@ from typing import Any
 import aiohttp
 from aiolimiter import AsyncLimiter
 
-from esi_link.v2.models import (
+from esi_link.models import (
     CachedResponse,
     CachedResponseStatus,
     CacheManagerProtocol,

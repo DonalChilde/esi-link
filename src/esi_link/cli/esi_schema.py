@@ -8,21 +8,21 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from esi_link.v2 import example_requests
-from esi_link.v2.esi_schema import (
+from esi_link import example_requests
+from esi_link.esi_schema import (
     add_schema_to_store,
     download_schema,
     load_schema_store,
     save_schemas_to_file,
 )
-from esi_link.v2.helpers.eve_dates import compatibility_date
-from esi_link.v2.helpers.indexed_operation_helpers import (
+from esi_link.helpers.eve_dates import compatibility_date
+from esi_link.helpers.indexed_operation_helpers import (
     IndexedOperationSummary,
     collect_operation_summaries,
     summaries_by_tag,
 )
-from esi_link.v2.helpers.schema_display_helpers import display_operations_by_tag
-from esi_link.v2.models import IndexedEsiSchema
+from esi_link.helpers.schema_display_helpers import display_operations_by_tag
+from esi_link.models import IndexedEsiSchema
 
 app = typer.Typer(no_args_is_help=True, help="Commands related to the ESI schema.")
 

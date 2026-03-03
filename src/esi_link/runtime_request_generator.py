@@ -3,8 +3,8 @@
 import logging
 from copy import deepcopy
 
-from esi_link.v2 import USER_AGENT
-from esi_link.v2.models import (
+from esi_link import USER_AGENT
+from esi_link.models import (
     AuthProviderProtocol,
     EsiRequest,
     EsiRequestError,

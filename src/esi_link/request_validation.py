@@ -2,7 +2,7 @@
 
 import logging
 
-from esi_link.v2.models import (
+from esi_link.models import (
     EsiRequest,
     HandlerManagerProtocol,
     IndexedEsiSchema,

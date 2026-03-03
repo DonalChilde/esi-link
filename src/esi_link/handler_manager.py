@@ -1,11 +1,11 @@
 """Response handler manager implementation."""
 
-from esi_link.v2.models import (
+from esi_link.models import (
     HandlerConfig,
     HandlerManagerProtocol,
     ResponseHandlerProtocol,
 )
-from esi_link.v2.response_handlers import DummyResponseHandler
+from esi_link.response_handlers import DummyResponseHandler
 
 
 class DummyHandlerManager(HandlerManagerProtocol):

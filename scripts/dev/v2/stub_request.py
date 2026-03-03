@@ -10,13 +10,13 @@ from uuid import uuid4
 from rich.console import Console
 from whenever import Instant
 
-from esi_link.v2 import example_requests
-from esi_link.v2.handler_manager import DummyHandlerManager
-from esi_link.v2.logging_config import setup_logging
-from esi_link.v2.models import EsiRequests, EsiResponse
-from esi_link.v2.request_manager import EsiLink
-from esi_link.v2.schema_manager import SchemaManager
-from esi_link.v2.settings import get_settings
+from esi_link import example_requests
+from esi_link.handler_manager import DummyHandlerManager
+from esi_link.logging_config import setup_logging
+from esi_link.models import EsiRequests, EsiResponse
+from esi_link.request_manager import EsiLink
+from esi_link.schema_manager import SchemaManager
+from esi_link.settings import get_settings
 
 logger = logging.getLogger(__name__)
 SCRIPT_NAME = "NOT_DEFINED"

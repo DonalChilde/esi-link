@@ -8,8 +8,8 @@ from uuid import UUID
 from diskcache import Cache  # type: ignore
 from whenever import Instant
 
-from esi_link.v2.helpers.stale_cache_check import is_stale
-from esi_link.v2.models import (
+from esi_link.helpers.stale_cache_check import is_stale
+from esi_link.models import (
     CachedResponse,
     CachedResponseStatus,
     CacheManagerProtocol,

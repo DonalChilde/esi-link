@@ -1,6 +1,6 @@
 """Auth provider implementations for ESI Link."""
 
-from esi_link.v2.models import AuthProviderProtocol
+from esi_link.models import AuthProviderProtocol
 
 
 class DummyAuthProvider(AuthProviderProtocol):

@@ -2,7 +2,7 @@
 
 from uuid import NAMESPACE_URL, UUID, uuid5
 
-from esi_link.v2.helpers.canonicalize_url import canonicalize_url
+from esi_link.helpers.canonicalize_url import canonicalize_url
 
 ESI_LINK_NAMESPACE = uuid5(NAMESPACE_URL, "esi-link")
 

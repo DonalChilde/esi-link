@@ -6,7 +6,7 @@ import typer
 
 __author__ = "Chad Lowe"
 __email__ = "pfmsoft.dev@gmail.com"
-__app_name__ = "esi-link"
+__app_name__ = "esi-link-old"
 __version__ = "0.1.0"
 __description__ = "A command line first interface to the Eve Online API"
 __license__ = "MIT"

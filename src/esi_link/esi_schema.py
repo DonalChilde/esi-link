@@ -6,11 +6,11 @@ from typing import Any
 
 from whenever import Instant
 
-from esi_link.v2.helpers.download_file import download_json
-from esi_link.v2.helpers.eve_dates import compatibility_date as get_compatibility_date
-from esi_link.v2.helpers.resolve_json_ref import resolve_internal_refs
-from esi_link.v2.models import IndexedEsiSchema, IndexedSchemaStore, SchemaDownload
-from esi_link.v2.settings import EsiLinkSettings, get_settings
+from esi_link.helpers.download_file import download_json
+from esi_link.helpers.eve_dates import compatibility_date as get_compatibility_date
+from esi_link.helpers.resolve_json_ref import resolve_internal_refs
+from esi_link.models import IndexedEsiSchema, IndexedSchemaStore, SchemaDownload
+from esi_link.settings import EsiLinkSettings, get_settings
 
 
 def download_schema(

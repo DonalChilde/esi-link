@@ -4,11 +4,11 @@ import asyncio
 import logging
 from time import perf_counter
 
-from esi_link.v2.auth_provider import DummyAuthProvider
-from esi_link.v2.esi_schema import load_schema_store
-from esi_link.v2.handler_manager import DummyHandlerManager
-from esi_link.v2.json_disk_cache import JsonDiskCache
-from esi_link.v2.models import (
+from esi_link.auth_provider import DummyAuthProvider
+from esi_link.esi_schema import load_schema_store
+from esi_link.handler_manager import DummyHandlerManager
+from esi_link.json_disk_cache import JsonDiskCache
+from esi_link.models import (
     CacheManagerProtocol,
     EsiLinkException,
     EsiRequest,
@@ -20,11 +20,11 @@ from esi_link.v2.models import (
     RequestValidatorProtocol,
     UrlGeneratorProtocol,
 )
-from esi_link.v2.request_executor import EsiRequestExecutor
-from esi_link.v2.request_validation import RequestValidator
-from esi_link.v2.runtime_request_generator import RuntimeRequestGenerator
-from esi_link.v2.settings import EsiLinkSettings, get_settings
-from esi_link.v2.url_generator import UrlGenerator
+from esi_link.request_executor import EsiRequestExecutor
+from esi_link.request_validation import RequestValidator
+from esi_link.runtime_request_generator import RuntimeRequestGenerator
+from esi_link.settings import EsiLinkSettings, get_settings
+from esi_link.url_generator import UrlGenerator
 
 logger = logging.getLogger(__name__)
 
