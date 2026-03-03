@@ -23,7 +23,7 @@ from esi_link.models import (
 from esi_link.request_executor import EsiRequestExecutor
 from esi_link.request_validation import RequestValidator
 from esi_link.runtime_request_generator import RuntimeRequestGenerator
-from esi_link.settings import EsiLinkSettings, get_settings
+from esi_link.settings import EsiLinkSettings
 from esi_link.url_generator import UrlGenerator
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ class EsiLink(EsiRequestExecutionManagerProtocol):
     def __init__(
         self,
         *,
-        settings: EsiLinkSettings | None = None,
+        settings: EsiLinkSettings,
         schema: IndexedEsiSchema | None = None,
         handler_manager: HandlerManagerProtocol | None = None,
         validator: RequestValidatorProtocol | None = None,
@@ -42,8 +42,10 @@ class EsiLink(EsiRequestExecutionManagerProtocol):
         language: str = "en",
     ) -> None:
         """Initialize the EsiLink instance."""
-        self.settings = settings or get_settings()
-        self.schema = schema or load_schema_store().latest_schema()
+        self.settings = settings
+        self.schema = (
+            schema or load_schema_store(settings=self.settings).latest_schema()
+        )
         if not self.schema:
             raise EsiLinkException(
                 "The schema store is empty, download a schema and try again."

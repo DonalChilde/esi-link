@@ -10,11 +10,11 @@ from esi_link.helpers.download_file import download_json
 from esi_link.helpers.eve_dates import compatibility_date as get_compatibility_date
 from esi_link.helpers.resolve_json_ref import resolve_internal_refs
 from esi_link.models import IndexedEsiSchema, IndexedSchemaStore, SchemaDownload
-from esi_link.settings import EsiLinkSettings, get_settings
+from esi_link.settings import EsiLinkSettings
 
 
 def download_schema(
-    compatibility_date: str | None = None,
+    settings: EsiLinkSettings, compatibility_date: str | None = None
 ) -> SchemaDownload:
     """Download the latest ESI schema from the official source.
 
@@ -25,7 +25,6 @@ def download_schema(
         # Get the current compatibility date for ESI schema downloads.
         compatibility_date = get_compatibility_date()
     params = {"compatibility_date": compatibility_date}
-    settings = get_settings()
     url = settings.esi_schema_url
     schema = download_json(url, params=params)
     if "error" in schema:
@@ -58,15 +57,8 @@ def save_schemas_to_file(
     return raw_schema_path, dereferenced_schema_path
 
 
-# def is_local_schema() -> bool:
-#     """Check if the ESI schema is available locally in the app directory."""
-#     settings = get_settings()
-#     return settings.indexed_esi_schema_path.exists()
-
-
-def load_schema_store(settings: EsiLinkSettings | None = None) -> IndexedSchemaStore:
+def load_schema_store(settings: EsiLinkSettings) -> IndexedSchemaStore:
     """Load the ESI schema store from a local file in the app directory."""
-    settings = settings or get_settings()
     schema_path = settings.schema_store_path
     if not schema_path.exists():
         schema_store = IndexedSchemaStore(schemas={})
@@ -79,10 +71,9 @@ def load_schema_store(settings: EsiLinkSettings | None = None) -> IndexedSchemaS
 
 
 def add_schema_to_store(
-    indexed_schema: IndexedEsiSchema, settings: EsiLinkSettings | None = None
+    settings: EsiLinkSettings, indexed_schema: IndexedEsiSchema
 ) -> IndexedSchemaStore:
     """Add an indexed ESI schema to the schema store."""
-    settings = settings or get_settings()
     schema_store = load_schema_store(settings=settings)
     schema_date = indexed_schema.version
     schema_store.schemas[schema_date] = indexed_schema

@@ -15,13 +15,13 @@ from esi_link.models import (
     SchemaDownload,
     SchemaManagerProtocol,
 )
-from esi_link.settings import EsiLinkSettings, get_settings
+from esi_link.settings import EsiLinkSettings
 
 
 class SchemaManager(SchemaManagerProtocol):
-    def __init__(self, settings: EsiLinkSettings | None = None):
+    def __init__(self, settings: EsiLinkSettings):
         """Initialize the SchemaManager instance."""
-        self._settings = settings or get_settings()
+        self._settings = settings
         self._schema_store: IndexedSchemaStore = load_schema_store(
             settings=self._settings
         )
@@ -48,7 +48,7 @@ class SchemaManager(SchemaManagerProtocol):
 
     def add_schema(self, schema: IndexedEsiSchema) -> None:
         """Add a new schema to the schema store."""
-        add_schema_to_store(schema, settings=self._settings)
+        add_schema_to_store(settings=self._settings, indexed_schema=schema)
         self._schema_store = load_schema_store(settings=self._settings)
 
     def transform_schema(
@@ -62,5 +62,7 @@ class SchemaManager(SchemaManagerProtocol):
 
     def download_schema(self, compatibility_date: str | None = None) -> SchemaDownload:
         """Download the ESI schema for the given compatibility date."""
-        schema_download = download_schema(compatibility_date=compatibility_date)
+        schema_download = download_schema(
+            settings=self._settings, compatibility_date=compatibility_date
+        )
         return schema_download
