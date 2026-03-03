@@ -68,6 +68,10 @@ class RuntimeRequestInfo(BaseModel):
     timeout: int = 10
     cache_key: UUID | None = None
     """Cache key for the request, if applicable. This is used to identify cached responses."""
+    response_handlers: list["ResponseHandlerProtocol"] = Field(..., exclude=True)
+    """The list of response handler instances to run for this request, in the order they should be run."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class EsiRequest(BaseModelToDisk):
