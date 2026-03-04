@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from copy import deepcopy
 from time import perf_counter
 from typing import Any
+from uuid import uuid4
 
 import aiohttp
 from aiolimiter import AsyncLimiter
@@ -18,7 +19,6 @@ from esi_link.models import (
     EsiResponse,
     EsiRuntimeRequest,
     HttpResponse,
-    Metrics,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
 
         """
         response: EsiResponse | None = None
-        metrics = Metrics()
+        metrics = request.runtime_info.metrics  # a convenience for shorter lines.
         metrics.task_started = perf_counter()
         try:
             async with self.async_limiter:
@@ -62,55 +62,45 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
                 match request.runtime_info.method:
                     case "GET":
                         metrics.primary_request_started = perf_counter()
-                        response = await self._get(request, session, metrics)
+                        response = await self._get(request, session)
                         metrics.primary_request_completed = perf_counter()
-                        if self.is_paged_response_required(response):
-                            await self.complete_paged_response(
-                                response, session, metrics
-                            )
+                        # if self.is_paged_response_required(response):
+                        #     await self.complete_paged_response(response, session)
                     case "POST":
                         metrics.primary_request_started = perf_counter()
-                        response = await self._post(request, session, metrics)
+                        response = await self._post(request, session)
                         metrics.primary_request_completed = perf_counter()
-                        if self.is_paged_response_required(response):
-                            await self.complete_paged_response(
-                                response, session, metrics
-                            )
+                        # if self.is_paged_response_required(response):
+                        #     await self.complete_paged_response(response, session)
                     case "PUT":
                         metrics.primary_request_started = perf_counter()
-                        response = await self._put(request, session, metrics)
+                        response = await self._put(request, session)
                         metrics.primary_request_completed = perf_counter()
-                        if self.is_paged_response_required(response):
-                            await self.complete_paged_response(
-                                response, session, metrics
-                            )
+                        # if self.is_paged_response_required(response):
+                        #     await self.complete_paged_response(response, session)
                     case "DELETE":
                         metrics.primary_request_started = perf_counter()
-                        response = await self._delete(request, session, metrics)
+                        response = await self._delete(request, session)
                         metrics.primary_request_completed = perf_counter()
-                        if self.is_paged_response_required(response):
-                            await self.complete_paged_response(
-                                response, session, metrics
-                            )
+                        # if self.is_paged_response_required(response):
+                        #     await self.complete_paged_response(response, session)
                     case _:
                         raise ValueError(
                             f"Unsupported HTTP method: {request.runtime_info.method}"
                         )
         except Exception as e:
-            metrics.task_completed = perf_counter()
             if response is None:
                 response = EsiResponse(
                     request=request.request,
                     runtime_info=request.runtime_info,
                     http_response=None,
-                    metrics=metrics,
                     exception_messages=[str(e)],
                     exceptions=[e],
                 )
             else:
                 response.exception_messages.append(str(e))
                 response.exceptions.append(e)
-        metrics.task_completed = perf_counter()
+
         return response
 
     async def execute_requests(
@@ -177,7 +167,7 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
         return combined_string
 
     async def complete_paged_response(
-        self, first_page: EsiResponse, session: aiohttp.ClientSession, metrics: Metrics
+        self, first_page: EsiResponse, session: aiohttp.ClientSession
     ) -> EsiResponse:
         """Complete a paged request by making additional HTTP requests to retrieve all pages of data.
 
@@ -187,16 +177,14 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
             raise ValueError(
                 "Cannot complete paged response for a response with no HTTP response"
             )
-        if first_page.metrics is None:
-            raise ValueError(
-                "Metrics should be initialized in the response before completing paged requests"
-            )
+        metrics = first_page.runtime_info.metrics  # a convenience for shorter lines.
+
         paged_requests = self._assemble_paged_runtime_requests(first_page)
-        first_page.metrics.paged_requests_start = perf_counter()
+        metrics.paged_requests_start = perf_counter()
         paged_responses = await asyncio.gather(
             *[self.execute_request(request, session) for request in paged_requests]
         )
-        first_page.metrics.paged_requests_completed = perf_counter()
+        metrics.paged_requests_completed = perf_counter()
         self._check_for_valid_paged_reponses(first_page, paged_responses)
         combined_response_string = self._combine_paged_response_strings(
             first_page, paged_responses
@@ -219,11 +207,11 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
         self,
         request: EsiRuntimeRequest,
         session: aiohttp.ClientSession,
-        metrics: Metrics,
     ) -> EsiResponse:
         """Execute a GET request and return the response."""
         cache_key = request.runtime_info.cache_key
         cached_response: CachedResponse | None = None
+        metrics = request.runtime_info.metrics  # a convenience for shorter lines.
         if cache_key is not None:
             metrics.cache_check_started = perf_counter()
             cached_response, status = self.cache_manager.get(cache_key)
@@ -233,23 +221,34 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
                     assert cached_response is not None
                     metrics.cache_response_status = CachedResponseStatus.HIT
                     http_response = deepcopy(cached_response.http_response)
+                    logger.info(
+                        f"Cache hit for request {request.request.request_id} with cache key {cache_key}"
+                    )
                     return EsiResponse(
                         request=request.request,
                         runtime_info=request.runtime_info,
                         http_response=http_response,
-                        metrics=metrics,
                         exceptions=[],
                     )
                 case CachedResponseStatus.MISS:
                     # update from esi
+                    logger.info(
+                        f"Cache miss for request {request.request.request_id} with cache key {cache_key}"
+                    )
                     metrics.cache_response_status = CachedResponseStatus.MISS
                 case CachedResponseStatus.STALE:
+                    logger.info(
+                        f"Stale cache entry for request {request.request.request_id} with cache key {cache_key}"
+                    )
                     assert cached_response is not None
                     metrics.cache_response_status = CachedResponseStatus.STALE
                     set_stale_cache_headers(request, cached_response)
         query_parameters: dict[str, Any] = (
             request.request.query_parameters
             | request.runtime_info.additional_query_params
+        )
+        logger.info(
+            f"Executing GET request {request.request.request_id}{f' for Parent_id:{request.runtime_info.parent_id}' if request.runtime_info.parent_id else ''} to URL {request.runtime_info.path_url} with query parameters {query_parameters} and headers {request.runtime_info.headers}"
         )
 
         async with session.get(
@@ -268,8 +267,10 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
                 request=request.request,
                 runtime_info=request.runtime_info,
                 http_response=http_response,
-                metrics=metrics,
                 exceptions=[],
+            )
+            logger.info(
+                f"Received response for request {request.request.request_id} with status code {response.status} and headers {response.headers}"
             )
             # Handle response status codes
             match response.status:
@@ -277,11 +278,14 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
                     if self.is_paged_response_required(esi_response):
                         # Don't cache the response yet, since we need to get the paged responses first
                         response = await self.complete_paged_response(
-                            esi_response, session, metrics
+                            esi_response, session
                         )
                     if cache_key is not None:
                         if metrics.cache_response_status == CachedResponseStatus.STALE:
                             metrics.cache_stale_status_code = 200
+                        logger.info(
+                            f"Caching response for request {request.request.request_id} with cache key {cache_key}"
+                        )
                         self.cache_manager.set(cache_key, http_response)
                 case 304:
                     if cache_key is None:
@@ -289,6 +293,9 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
                             "Received 304 Not Modified response for a request with no cache key"
                         )
                     metrics.cache_stale_status_code = 304
+                    logger.info(
+                        f"Received 304 Not Modified for request {request.request.request_id} with cache key {cache_key}, refreshing cache entry"
+                    )
                     cached_response = self.cache_manager.refresh(
                         cache_key, http_response
                     )
@@ -304,7 +311,6 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
         self,
         request: EsiRuntimeRequest,
         session: aiohttp.ClientSession,
-        metrics: Metrics,
     ) -> EsiResponse:
         """Execute a POST request and return the response."""
         ...
@@ -313,7 +319,6 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
         self,
         request: EsiRuntimeRequest,
         session: aiohttp.ClientSession,
-        metrics: Metrics,
     ) -> EsiResponse:
         """Execute a PUT request and return the response."""
         ...
@@ -322,7 +327,6 @@ class EsiRequestExecutor(EsiRequestExecutorProtocol):
         self,
         request: EsiRuntimeRequest,
         session: aiohttp.ClientSession,
-        metrics: Metrics,
     ) -> EsiResponse:
         """Execute a DELETE request and return the response."""
         ...
@@ -340,26 +344,27 @@ def set_stale_cache_headers(
         request.runtime_info.headers["If-Modified-Since"] = last_modified
 
 
-# TODO merge paged data
-# TODO validate last-modified for paged data.
-
-
 def assemble_paged_runtime_requests(response: EsiResponse) -> list[EsiRuntimeRequest]:
     """Assemble the additional EsiRuntimeRequest instances required to complete a paged request."""
     if response.http_response is None:
         raise ValueError(
             "Cannot assemble paged requests for a response with no HTTP response"
         )
+    metrics = response.runtime_info.metrics  # a convenience for shorter lines.
     total_pages = response.http_response.pages
-    if response.metrics is not None:
-        response.metrics.paged_request_count = total_pages
+    metrics.paged_request_count = total_pages
     paged_runtime_requests: list[EsiRuntimeRequest] = []
     for page in range(2, total_pages + 1):
         new_request = EsiRuntimeRequest(
             request=deepcopy(response.request),
             runtime_info=deepcopy(response.runtime_info),
         )
+        new_request.runtime_info.parent_id = response.request.request_id
+        new_request.request.request_id = uuid4()
         new_request.runtime_info.additional_query_params["page"] = str(page)
+        new_request.runtime_info.cache_key = (
+            None  # paged requests are not cached individually
+        )
         paged_runtime_requests.append(new_request)
     return paged_runtime_requests
 
@@ -381,6 +386,11 @@ def check_for_valid_paged_reponses(
                 f"Invalid paged response: page {page_num} has no HTTP response"
             )
         if paged_response.http_response.status_code != 200:
+            logger.error(
+                f"Received unexpected status code {paged_response.http_response.status_code} "
+                f"for paged response to request {response.request.request_id} page {page_num}"
+                f"\n{paged_response.model_dump_json(indent=2)}"
+            )
             raise ValueError(
                 f"Invalid paged response: page {page_num} has an unexpected status code {paged_response.http_response.status_code}"
             )

@@ -10,6 +10,7 @@ from esi_link.models import (
     EsiRequestError,
     EsiRuntimeRequest,
     IndexedOperation,
+    Metrics,
     RuntimeRequestGeneratorProtocol,
     RuntimeRequestInfo,
     UrlGeneratorProtocol,
@@ -48,6 +49,7 @@ class RuntimeRequestGenerator(RuntimeRequestGeneratorProtocol):
             timeout=10,
             cache_key=url_info.cache_key if self.operation.is_cached else None,
             response_handlers=[],
+            metrics=Metrics(),
         )
         return runtime_info
 

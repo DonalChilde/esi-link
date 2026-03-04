@@ -8,6 +8,7 @@ from esi_link.esi_schema import (
     add_schema_to_store,
     download_schema,
     load_schema_store,
+    save_schema_store,
 )
 from esi_link.models import (
     IndexedEsiSchema,
@@ -48,8 +49,8 @@ class SchemaManager(SchemaManagerProtocol):
 
     def add_schema(self, schema: IndexedEsiSchema) -> None:
         """Add a new schema to the schema store."""
-        add_schema_to_store(settings=self._settings, indexed_schema=schema)
-        self._schema_store = load_schema_store(settings=self._settings)
+        store = add_schema_to_store(settings=self._settings, indexed_schema=schema)
+        self._schema_store = store
 
     def transform_schema(
         self, raw_schema: dict[str, Any], download_date: Instant

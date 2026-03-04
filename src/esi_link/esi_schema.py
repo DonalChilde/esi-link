@@ -70,17 +70,28 @@ def load_schema_store(settings: EsiLinkSettings) -> IndexedSchemaStore:
     return IndexedSchemaStore.model_validate_json(schema)
 
 
-def add_schema_to_store(
-    settings: EsiLinkSettings, indexed_schema: IndexedEsiSchema
-) -> IndexedSchemaStore:
-    """Add an indexed ESI schema to the schema store."""
-    schema_store = load_schema_store(settings=settings)
-    schema_date = indexed_schema.version
-    schema_store.schemas[schema_date] = indexed_schema
+def save_schema_store(
+    settings: EsiLinkSettings, schema_store: IndexedSchemaStore
+) -> None:
+    """Save the ESI schema store to a local file in the app directory."""
     schema_path = settings.schema_store_path
     schema_path.parent.mkdir(parents=True, exist_ok=True)
     with schema_path.open("w") as f:
         f.write(schema_store.model_dump_json(indent=2))
+
+
+def add_schema_to_store(
+    settings: EsiLinkSettings, indexed_schema: IndexedEsiSchema
+) -> IndexedSchemaStore:
+    """Add an indexed ESI schema to the schema store.
+
+    Loads the current schema store, adds the new schema, saves the updated store,
+    and returns the updated store.
+    """
+    schema_store = load_schema_store(settings=settings)
+    schema_date = indexed_schema.version
+    schema_store.schemas[schema_date] = indexed_schema
+    save_schema_store(settings=settings, schema_store=schema_store)
     return schema_store
 
 

@@ -3,6 +3,7 @@
 # dependencies = []
 # ///
 
+import asyncio
 import logging
 from pathlib import Path
 from uuid import uuid4
@@ -53,7 +54,7 @@ def execute_requests(esi_link: EsiLink, requests: EsiRequests) -> list[EsiRespon
     Returns:
         list[EsiResponse]: A list containing the responses for the executed requests.
     """
-    responses = esi_link.execute_requests(list(requests.requests.values()))
+    responses = asyncio.run(esi_link.execute_requests(list(requests.requests.values())))
     return responses
 
 
@@ -103,13 +104,19 @@ def display_responses(responses: list[EsiResponse]) -> None:
             )
             console.print(f"\tError: {response.exception_messages}")
             continue
+        metrics = response.runtime_info.metrics
         console.print(f"Response for request ID {response.request.request_id}:")
         console.print(f"\trequest url: {response.http_response.url}")
         console.print(f"\tcache_key: {response.runtime_info.cache_key}")
-        console.print(f"\tcache status: {response.metrics.cache_response_status}")
+        console.print(f"\tcache status: {metrics.cache_response_status}")
         console.print(f"\thttp status: {response.http_response.status_code}")
+        console.print(f"\tTask took {metrics.task_duration:.4f} seconds")
+        console.print(f"\tRequest took: {metrics.primary_request_duration:.4f} seconds")
         console.print(
-            f"\trequest took {response.metrics.task_completed - response.metrics.task_started:.4f} seconds"
+            f"\tPages took: {metrics.paged_requests_duration:.4f} seconds for {metrics.paged_request_count} pages"
+        )
+        console.print(
+            f"\tHandlers took: {metrics.handlers_duration:.4f} seconds for {len(response.request.response_handlers)} handlers"
         )
         if response.http_response and response.http_response.expires_at:
             expires_in = (
@@ -129,7 +136,7 @@ def display_responses(responses: list[EsiResponse]) -> None:
                 style="red",
             )
         if response.http_response:
-            console.print(response.http_response.body_json, overflow="crop")
+            console.print(response.http_response.body_text, overflow="ellipsis")
 
 
 def build_requests(output_dir: str) -> EsiRequests:

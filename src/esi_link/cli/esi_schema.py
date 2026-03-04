@@ -23,6 +23,8 @@ from esi_link.helpers.indexed_operation_helpers import (
 )
 from esi_link.helpers.schema_display_helpers import display_operations_by_tag
 from esi_link.models import IndexedEsiSchema
+from esi_link.schema_manager import SchemaManager
+from esi_link.settings import get_settings
 
 app = typer.Typer(no_args_is_help=True, help="Commands related to the ESI schema.")
 
@@ -53,7 +55,15 @@ def download(
     """Download the ESI schema to the app directory."""
     console = Console()
     compat_date = compatibility_date()
-    schema_download = download_schema(compatibility_date=compat_date)
+    settings = get_settings()
+    schema_manager = SchemaManager(settings=settings)
+    schema_download = schema_manager.download_schema(compatibility_date=compat_date)
+    indexed_schema = schema_manager.transform_schema(
+        raw_schema=schema_download.raw_schema,
+        download_date=schema_download.download_date,
+    )
+    schema_manager.add_schema(indexed_schema)
+
     if dir_out:
         raw_path, deref_path = save_schemas_to_file(
             schema_download.raw_schema,
@@ -63,11 +73,7 @@ def download(
         console.print(
             f"ESI schema downloaded and saved to {raw_path} and {deref_path}."
         )
-    indexed_schema = IndexedEsiSchema.from_raw_schema(
-        schema_download.raw_schema,
-        schema_download.download_date,
-    )
-    add_schema_to_store(indexed_schema)
+
     console.print(f"ESI schema downloaded and added to app schema store.")
 
 

@@ -24,7 +24,7 @@ __version__ = "0.1.0"
 __release__ = __version__
 #######################################################################################
 APP_NAMESPACE = "pfmsoft"
-APPLICATION_NAME = "esi-link2"
+APPLICATION_NAME = "esi-link"
 DEFAULT_APP_DIR = Path(typer.get_app_dir(f"{APP_NAMESPACE}-{APPLICATION_NAME}"))
 USER_AGENT = f"{__app_name__}/{__version__} (+{__url__})"
 ESI_LINK_NAMESPACE = uuid5(NAMESPACE_URL, "esi-link")

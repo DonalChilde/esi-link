@@ -94,9 +94,12 @@ class RuntimeRequestInfo(BaseModel):
     """Includes UserAgent,If-None-Match,If-Modified-Since, X-Compatibility-Date, and auth if required."""
     timeout: int = 10
     cache_key: UUID | None = None
-    """Cache key for the request, if applicable. This is used to identify cached responses."""
+    """Cache key for the request, if applicable. This is used to identify cached responses. Paged requests only have a cache key for the first page."""
     response_handlers: list["ResponseHandlerProtocol"] = Field(..., exclude=True)
     """The list of response handler instances to run for this request, in the order they should be run."""
+    metrics: "Metrics"
+    parent_id: UUID | None = None
+    """The request_id of the parent request if this request is a sub-request, e.g. a paged request or a retry."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -254,10 +257,56 @@ class Metrics:
     paged_requests_start: float | None = None
     paged_requests_completed: float | None = None
     paged_request_count: int = 0
+    handlers_started: float | None = None
+    handlers_completed: float | None = None
     cache_response_status: "CachedResponseStatus | None" = None
     cache_stale_status_code: int = 0
     cache_check_started: float | None = None
     cache_check_completed: float | None = None
+
+    @property
+    def task_duration(self) -> float:
+        """Calculate the total duration of the task."""
+        if self.task_started is not None and self.task_completed is not None:
+            return self.task_completed - self.task_started
+        return -1.0
+
+    @property
+    def primary_request_duration(self) -> float:
+        """Calculate the duration of the primary request."""
+        if (
+            self.primary_request_started is not None
+            and self.primary_request_completed is not None
+        ):
+            return self.primary_request_completed - self.primary_request_started
+        return -1.0
+
+    @property
+    def paged_requests_duration(self) -> float:
+        """Calculate the total duration of the paged requests."""
+        if (
+            self.paged_requests_start is not None
+            and self.paged_requests_completed is not None
+        ):
+            return self.paged_requests_completed - self.paged_requests_start
+        return -1.0
+
+    @property
+    def cache_check_duration(self) -> float:
+        """Calculate the duration of the cache check."""
+        if (
+            self.cache_check_started is not None
+            and self.cache_check_completed is not None
+        ):
+            return self.cache_check_completed - self.cache_check_started
+        return -1.0
+
+    @property
+    def handlers_duration(self) -> float:
+        """Calculate the total duration of the response handlers."""
+        if self.handlers_started is not None and self.handlers_completed is not None:
+            return self.handlers_completed - self.handlers_started
+        return -1.0
 
 
 class EsiResponse(BaseModelToDisk):
@@ -266,7 +315,6 @@ class EsiResponse(BaseModelToDisk):
     request: EsiRequest
     runtime_info: RuntimeRequestInfo
     http_response: HttpResponse | None = None
-    metrics: Metrics | None = None
     exception_messages: list[str] = Field(default_factory=list)
     exceptions: list[Exception] = Field(..., exclude=True)
 
@@ -934,7 +982,7 @@ class EsiRequestExecutionManagerProtocol:
         """
         ...
 
-    def execute_requests(
+    async def execute_requests(
         self,
         requests: list[EsiRequest],
         *,

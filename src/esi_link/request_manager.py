@@ -81,35 +81,24 @@ class EsiLink(EsiRequestExecutionManagerProtocol):
         )
         return runtime_info_generator.get_runtime_request(request)
 
-    # def _get_runtime_info(self, request: EsiRequest) -> RuntimeRequestInfo:
-    #     """Get runtime information for the request."""
-    #     if self.schema is None:
-    #         raise EsiLinkException("Schema must be loaded to set runtime info")
-    #     runtime_info_generator = RuntimeInfoGenerator(
-    #         operation=self.schema.operations[request.operation_id],
-    #         compatibility_date=self.schema.version,
-    #         auth_provider=self.auth_provider,
-    #         url_generator=self.url_generator,
-    #         language=self.language,
-    #     )
-    #     request_info = runtime_info_generator.generate_runtime_info(request)
-    #     return request_info
-
     async def _handle_response(self, response: EsiResponse) -> EsiResponse:
         """Handle the response."""
+        response.runtime_info.metrics.handlers_started = perf_counter()
         for handler_config in response.request.response_handlers:
             try:
-                handler = self.handler_manager.get_handler(handler_config)
                 await self.handler_manager.get_handler(handler_config).handle_response(
                     response
                 )
             except Exception as e:
+                # Capture exceptions from handlers to prevent them from crashing the
+                # entire response handling process.
                 logger.error(
                     f"Error handling response to request {response.request.request_id} with handler {handler_config}: {e}"
                 )
                 response.exceptions.append(e)
                 response.exception_messages.append(str(e))
-
+        response.runtime_info.metrics.handlers_completed = perf_counter()
+        response.runtime_info.metrics.task_completed = perf_counter()
         return response
 
     async def handle_responses(self, responses: list[EsiResponse]) -> list[EsiResponse]:
@@ -120,8 +109,8 @@ class EsiLink(EsiRequestExecutionManagerProtocol):
             f"{sum(len(r.request.response_handlers) for r in responses)}."
         )
         start = perf_counter()
-        for response in responses:
-            await self._handle_response(response)
+        tasks = [self._handle_response(response) for response in responses]
+        responses = await asyncio.gather(*tasks)
         logger.info(
             f"Finished handling responses in {perf_counter() - start:.4f} seconds."
         )
@@ -161,7 +150,7 @@ class EsiLink(EsiRequestExecutionManagerProtocol):
         # - exception rates
         ...
 
-    def execute_requests(
+    async def execute_requests(
         self,
         requests: list[EsiRequest],
         *,
@@ -174,12 +163,30 @@ class EsiLink(EsiRequestExecutionManagerProtocol):
         for request in requests:
             self.validate(request)
             runtime_requests.append(self._make_esi_runtime_request(request))
-        responses = asyncio.run(
-            self.send_runtime_requests(
-                runtime_requests, max_rate=max_rate, period=period, timeout=timeout
-            )
+
+        responses = await self._response_then_handle(
+            runtime_requests,
+            max_rate=max_rate,
+            period=period,
+            timeout=timeout,
         )
-        responses = asyncio.run(self.handle_responses(responses))
+        return responses
+
+    async def _response_then_handle(
+        self,
+        requests: list[EsiRuntimeRequest],
+        *,
+        max_rate: int = 100,
+        period: float = 60.0,
+        timeout: float = 10.0,
+    ) -> list[EsiResponse]:
+
+        responses = await self.send_runtime_requests(
+            requests, max_rate=max_rate, period=period, timeout=timeout
+        )
+
+        responses = await self.handle_responses(responses)
+
         return responses
 
     def _init_cache(self) -> CacheManagerProtocol:
