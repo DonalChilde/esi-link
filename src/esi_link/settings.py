@@ -2,6 +2,7 @@
 
 from os import environ
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -38,6 +39,10 @@ class EsiLinkSettings(BaseSettings):
     cache_directory: Path = Field(
         default=DEFAULT_APP_DIR / "cache",
         description="The directory for ESI Link cache files.",
+    )
+    cache_type: Literal["diskcache", "json"] = Field(
+        default="json",
+        description="The type of cache to use for ESI Link.",
     )
     diskcache_directory: Path = Field(
         default=DEFAULT_APP_DIR / "cache" / "disk_cache",

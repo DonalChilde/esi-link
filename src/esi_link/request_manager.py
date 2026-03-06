@@ -8,6 +8,7 @@ from esi_link.auth_provider import DummyAuthProvider
 from esi_link.esi_schema import load_schema_store
 from esi_link.json_disk_cache import JsonDiskCache
 from esi_link.models import (
+    AuthProviderProtocol,
     CacheManagerProtocol,
     EsiLinkException,
     EsiRequest,
@@ -36,8 +37,10 @@ class EsiLink(EsiRequestExecutionManagerProtocol):
         settings: EsiLinkSettings,
         schema: IndexedEsiSchema | None = None,
         handler_manager: HandlerManagerProtocol | None = None,
+        auth_provider: AuthProviderProtocol | None = None,
         validator: RequestValidatorProtocol | None = None,
         url_generator: UrlGeneratorProtocol | None = None,
+        cache_manager: CacheManagerProtocol | None = None,
         # runtime_info_generator: RuntimeInfoGeneratorProtocol | None = None,
         language: str = "en",
     ) -> None:
@@ -50,10 +53,11 @@ class EsiLink(EsiRequestExecutionManagerProtocol):
             raise EsiLinkException(
                 "The schema store is empty, download a schema and try again."
             )
-        self.auth_provider = DummyAuthProvider()
+        self.auth_provider = auth_provider or DummyAuthProvider()
         self.handler_manager = handler_manager or DummyHandlerManager()
-        self.cache = self._init_cache()
-        self.handler_manager: HandlerManagerProtocol
+        self.cache = cache_manager or JsonDiskCache(
+            cache_directory=self.settings.json_cache_directory
+        )
         self.validator = validator or RequestValidator(
             schema=self.schema, handler_manager=self.handler_manager
         )
