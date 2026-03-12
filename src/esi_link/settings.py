@@ -1,5 +1,6 @@
 """Settings for the ESI Link application."""
 
+from dataclasses import dataclass
 from os import environ
 from pathlib import Path
 from typing import Literal
@@ -11,6 +12,31 @@ from whenever import Instant
 from esi_link import DEFAULT_APP_DIR, __app_name__, __version__
 
 _app_env_prefix = "PFMSOFT_ESI_LINK_"
+
+
+@dataclass(slots=True)
+class OauthSettings:
+    audience: str
+    metadata_endpoint: str
+    authorization_endpoint: str
+    token_endpoint: str
+    jwks_uri: str
+    revocation_endpoint: str
+    issuers: list[str]
+
+
+# These settings are current as of 2026-03-04, and are not likely to change much.
+# They are included here for convenience, but can also be fetched dynamically from the metadata endpoint if needed.
+# The current settings can be found at https://login.eveonline.com/.well-known/oauth-authorization-server
+DEFAULT_OAUTH_SETTINGS = OauthSettings(
+    audience="EVE Online",
+    metadata_endpoint="https://login.eveonline.com/.well-known/oauth-authorization-server",
+    authorization_endpoint="https://login.eveonline.com/v2/oauth/authorize",
+    token_endpoint="https://login.eveonline.com/v2/oauth/token",
+    jwks_uri="https://login.eveonline.com/oauth/jwks",
+    revocation_endpoint="https://login.eveonline.com/v2/oauth/revoke",
+    issuers=["https://login.eveonline.com"],
+)
 
 
 class EsiLinkSettings(BaseSettings):

@@ -1,0 +1,95 @@
+# """Settings for the ESI Auth application."""
+
+# from dataclasses import dataclass
+# from pathlib import Path
+
+# import typer
+# from pydantic import Field
+# from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# from esi_auth import __app_name__, __url__, __version__
+
+# _app_env_prefix = "PFMSOFT_ESI_AUTH_"
+# USER_AGENT = f"{__app_name__}/{__version__} (+{__url__})"
+# NAMESPACE = "pfmsoft"
+# APPLICATION_NAME = "esi-auth"
+# DEFAULT_APP_DIR = Path(typer.get_app_dir(f"{NAMESPACE}-{APPLICATION_NAME}"))
+
+
+# @dataclass(slots=True)
+# class OauthSettings:
+#     audience: str
+#     metadata_endpoint: str
+#     authorization_endpoint: str
+#     token_endpoint: str
+#     jwks_uri: str
+#     revocation_endpoint: str
+#     issuers: list[str]
+
+
+# # These settings are current as of 2026-03-04, and are not likely to change much.
+# # They are included here for convenience, but can also be fetched dynamically from the metadata endpoint if needed.
+# # The current settings can be found at https://login.eveonline.com/.well-known/oauth-authorization-server
+# DEFAULT_OAUTH_SETTINGS = OauthSettings(
+#     audience="EVE Online",
+#     metadata_endpoint="https://login.eveonline.com/.well-known/oauth-authorization-server",
+#     authorization_endpoint="https://login.eveonline.com/v2/oauth/authorize",
+#     token_endpoint="https://login.eveonline.com/v2/oauth/token",
+#     jwks_uri="https://login.eveonline.com/oauth/jwks",
+#     revocation_endpoint="https://login.eveonline.com/v2/oauth/revoke",
+#     issuers=["https://login.eveonline.com"],
+# )
+
+
+# # TODO
+# class EsiAuthSettings(BaseSettings):
+#     """Settings for the ESI Auth application."""
+
+#     app_dir: Path = Field(
+#         default=DEFAULT_APP_DIR, description="Directory for application data."
+#     )
+#     log_dir: Path = Field(
+#         default=DEFAULT_APP_DIR / "logs", description="Directory for log files."
+#     )
+#     app_credentials_file: Path = Field(
+#         default=DEFAULT_APP_DIR / "credentials.json",
+#         description="Path to the application credential JSON file.",
+#     )
+#     tokens_dir: Path = Field(
+#         default=DEFAULT_APP_DIR / "tokens",
+#         description="Directory for the application ESI token JSON files.",
+#     )
+#     oauth_settings_file: Path = Field(
+#         default=DEFAULT_APP_DIR / "oauth_settings.json",
+#         description="Path to the OAuth settings JSON file.",
+#     )
+#     oauth_settings_url: str = Field(
+#         default="https://login.eveonline.com/.well-known/oauth-authorization-server",
+#         description="URL to fetch OAuth settings from the ESI auth server.",
+#     )
+#     auth_server_timeout: int = Field(
+#         default=300,
+#         description="Timeout in seconds for the auth server to respond.",
+#         ge=1,
+#         le=300,  # Max 5 minutes
+#     )
+
+#     model_config = SettingsConfigDict(
+#         env_prefix=_app_env_prefix,
+#         env_file=(f"{DEFAULT_APP_DIR.resolve()}/.esi-auth.env", ".esi-auth.env"),
+#         env_file_encoding="utf-8",
+#     )
+
+
+# def get_settings() -> EsiAuthSettings:
+#     """Get the application settings, ensuring that necessary directories exist."""
+#     settings = EsiAuthSettings()
+
+#     # Ensure that the necessary directories exist
+#     settings.app_dir.mkdir(parents=True, exist_ok=True)
+#     settings.log_dir.mkdir(parents=True, exist_ok=True)
+#     settings.app_credentials_file.parent.mkdir(parents=True, exist_ok=True)
+#     settings.tokens_dir.mkdir(parents=True, exist_ok=True)
+#     return settings
+
+
