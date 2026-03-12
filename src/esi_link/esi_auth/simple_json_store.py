@@ -11,11 +11,11 @@ import aiohttp
 from esi_link import USER_AGENT
 from esi_link.esi_auth.authenticator import Authenticator
 from esi_link.esi_auth.models import CharacterToken
+from esi_link.esi_auth.oauth_metadata import TOKEN_ENDPOINT
 from esi_link.esi_auth.protocols import (
     CharacterTokenManagerProtocol,
     CharacterTokenProviderProtocol,
 )
-from esi_link.settings import DEFAULT_OAUTH_SETTINGS
 
 
 class CharacterTokenProvider(CharacterTokenProviderProtocol):
@@ -28,7 +28,7 @@ class CharacterTokenProvider(CharacterTokenProviderProtocol):
         self,
         tokens_dir: Path,
         authenticator: Authenticator,
-        token_endpoint: str = DEFAULT_OAUTH_SETTINGS.token_endpoint,
+        token_endpoint: str = TOKEN_ENDPOINT,
         user_agent: str = USER_AGENT,
     ):
         """Initialize the CharacterTokenProvider with the given tokens directory and optional app credential provider.

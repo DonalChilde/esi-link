@@ -10,11 +10,10 @@ from esi_link.helpers.download_file import download_json
 from esi_link.helpers.eve_dates import compatibility_date as get_compatibility_date
 from esi_link.helpers.resolve_json_ref import resolve_internal_refs
 from esi_link.models import IndexedEsiSchema, IndexedSchemaStore, SchemaDownload
-from esi_link.settings import EsiLinkSettings
 
 
 def download_schema(
-    settings: EsiLinkSettings, compatibility_date: str | None = None
+    schema_url: str, compatibility_date: str | None = None
 ) -> SchemaDownload:
     """Download the latest ESI schema from the official source.
 
@@ -25,8 +24,7 @@ def download_schema(
         # Get the current compatibility date for ESI schema downloads.
         compatibility_date = get_compatibility_date()
     params = {"compatibility_date": compatibility_date}
-    url = settings.esi_schema_url
-    schema = download_json(url, params=params)
+    schema = download_json(schema_url, params=params)
     if "error" in schema:
         raise ValueError(f"Error downloading schema: {schema['error']}")
     if not validate_schema(schema):
@@ -57,41 +55,39 @@ def save_schemas_to_file(
     return raw_schema_path, dereferenced_schema_path
 
 
-def load_schema_store(settings: EsiLinkSettings) -> IndexedSchemaStore:
+def load_schema_store(schema_store_path: Path) -> IndexedSchemaStore:
     """Load the ESI schema store from a local file in the app directory."""
-    schema_path = settings.schema_store_path
-    if not schema_path.exists():
+    if not schema_store_path.exists():
         schema_store = IndexedSchemaStore(schemas={})
-        schema_path.parent.mkdir(parents=True, exist_ok=True)
-        with schema_path.open("w") as f:
+        schema_store_path.parent.mkdir(parents=True, exist_ok=True)
+        with schema_store_path.open("w") as f:
             f.write(schema_store.model_dump_json(indent=2))
         return schema_store
-    schema = schema_path.read_text()
+    schema = schema_store_path.read_text()
     return IndexedSchemaStore.model_validate_json(schema)
 
 
 def save_schema_store(
-    settings: EsiLinkSettings, schema_store: IndexedSchemaStore
+    schema_store_path: Path, schema_store: IndexedSchemaStore
 ) -> None:
     """Save the ESI schema store to a local file in the app directory."""
-    schema_path = settings.schema_store_path
-    schema_path.parent.mkdir(parents=True, exist_ok=True)
-    with schema_path.open("w") as f:
+    schema_store_path.parent.mkdir(parents=True, exist_ok=True)
+    with schema_store_path.open("w") as f:
         f.write(schema_store.model_dump_json(indent=2))
 
 
 def add_schema_to_store(
-    settings: EsiLinkSettings, indexed_schema: IndexedEsiSchema
+    schema_store_path: Path, indexed_schema: IndexedEsiSchema
 ) -> IndexedSchemaStore:
     """Add an indexed ESI schema to the schema store.
 
     Loads the current schema store, adds the new schema, saves the updated store,
     and returns the updated store.
     """
-    schema_store = load_schema_store(settings=settings)
+    schema_store = load_schema_store(schema_store_path=schema_store_path)
     schema_date = indexed_schema.version
     schema_store.schemas[schema_date] = indexed_schema
-    save_schema_store(settings=settings, schema_store=schema_store)
+    save_schema_store(schema_store_path=schema_store_path, schema_store=schema_store)
     return schema_store
 
 

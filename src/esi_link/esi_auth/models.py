@@ -42,6 +42,13 @@ class OauthMetadata(TypedDict):
     code_challenge_methods_supported: list[str]
 
 
+class CachedMetadata(TypedDict):
+    """Cached OAuth2 server metadata."""
+
+    metadata: OauthMetadata
+    fetched_at: int
+
+
 class EveAppCredentials(BaseModel):
     """EVE application credentials.
 

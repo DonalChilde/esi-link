@@ -9,6 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from esi_link import example_requests
+from esi_link.cli.helpers import get_settings_from_context
 from esi_link.esi_schema import (
     add_schema_to_store,
     download_schema,
@@ -24,7 +25,6 @@ from esi_link.helpers.indexed_operation_helpers import (
 from esi_link.helpers.schema_display_helpers import display_operations_by_tag
 from esi_link.models import IndexedEsiSchema
 from esi_link.schema_manager import SchemaManager
-from esi_link.settings import get_settings
 
 app = typer.Typer(no_args_is_help=True, help="Commands related to the ESI schema.")
 
@@ -55,7 +55,7 @@ def download(
     """Download the ESI schema to the app directory."""
     console = Console()
     compat_date = compatibility_date()
-    settings = get_settings()
+    settings = get_settings_from_context(ctx)
     schema_manager = SchemaManager(settings=settings)
     schema_download = schema_manager.download_schema(compatibility_date=compat_date)
     indexed_schema = schema_manager.transform_schema(
@@ -109,7 +109,8 @@ def operations(
     """List the operations available in the ESI schema."""
     console = Console()
     # TODO Needs refinement.
-    schema_store = load_schema_store()
+    settings = get_settings_from_context(ctx)
+    schema_store = load_schema_store(schema_store_path=settings.schema_store_path)
     latest_schema = schema_store.latest_schema()
     if not latest_schema:
         console.print(

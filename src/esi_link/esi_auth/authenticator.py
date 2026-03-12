@@ -22,6 +22,16 @@ from esi_link.esi_auth.models import (
     RequestParams,
     ValidatedToken,
 )
+from esi_link.esi_auth.oauth_metadata import (
+    AUDIENCE,
+    AUTHORIZATION_ENDPOINT,
+    ISSUER,
+    JWKS_URI,
+    METADATA_ENDPOINT,
+    REVOCATION_ENDPOINT,
+    TOKEN_ALGORITHM,
+    TOKEN_ENDPOINT,
+)
 from esi_link.esi_auth.protocols import AuthenticatorProtocol
 
 logger = logging.getLogger(__name__)
@@ -57,14 +67,14 @@ class Authenticator(AuthenticatorProtocol):
         client_id: str,
         scopes: list[str],
         callback_url: str,
-        audience: str = "EVE Online",
-        metadata_endpoint: str = "https://login.eveonline.com/.well-known/oauth-authorization-server",
-        authorization_endpoint: str = "https://login.eveonline.com/v2/oauth/authorize",
-        token_endpoint: str = "https://login.eveonline.com/v2/oauth/token",
-        jwks_uri: str = "https://login.eveonline.com/oauth/jwks",
-        revocation_endpoint: str = "https://login.eveonline.com/v2/oauth/revoke",
-        issuer: str = "https://login.eveonline.com",
-        token_alg: str = "RS256",
+        audience: str = AUDIENCE,
+        metadata_endpoint: str = METADATA_ENDPOINT,
+        authorization_endpoint: str = AUTHORIZATION_ENDPOINT,
+        token_endpoint: str = TOKEN_ENDPOINT,
+        jwks_uri: str = JWKS_URI,
+        revocation_endpoint: str = REVOCATION_ENDPOINT,
+        issuer: str = ISSUER,
+        token_alg: str = TOKEN_ALGORITHM,
     ) -> None:
         self.metadata_endpoint = metadata_endpoint
         self.authorization_endpoint = authorization_endpoint
@@ -174,7 +184,11 @@ class Authenticator(AuthenticatorProtocol):
         callback_url: str,
         config_dict: OauthMetadata,
     ) -> Self:
-        """Create an Authenticator instance from a dictionary of parameters."""
+        """Create an Authenticator instance from a dictionary of parameters.
+
+        The OauthMetadata dict does not contain the audience, or token_alg. Use a different
+        constructor if you want to change from default values for those args..
+        """
         return cls(
             client_id=client_id,
             scopes=scopes,
@@ -192,7 +206,7 @@ class Authenticator(AuthenticatorProtocol):
         client_id: str,
         scopes: list[str],
         callback_url: str,
-        metadata_endpoint: str = "https://login.eveonline.com/.well-known/oauth-authorization-server",
+        metadata_endpoint: str = METADATA_ENDPOINT,
     ) -> Self:
         """Create an Authenticator instance by fetching the OAuth metadata from the specified endpoint."""
         async with aiohttp.ClientSession() as client_session:

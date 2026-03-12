@@ -1,14 +1,15 @@
 """CLI commands for managing app credentials."""
 
 from pathlib import Path
-from typing import Annotated, cast
+from typing import Annotated
 
 import typer
 from rich.console import Console
 from rich.json import JSON
 from rich.prompt import Confirm
 
-from esi_link.cli.esi_auth.helpers import EsiAuthSettings, load_credentials
+from esi_link.cli.esi_auth.helpers import load_credentials
+from esi_link.cli.helpers import get_settings_from_context
 from esi_link.esi_auth.models import EveAppCredentials
 
 app = typer.Typer(no_args_is_help=True)
@@ -17,10 +18,9 @@ app = typer.Typer(no_args_is_help=True)
 @app.command()
 def show(ctx: typer.Context):
     """Show the stored app credentials."""
-    settings = ctx.obj["esi-auth-settings"]
-    settings = cast(EsiAuthSettings, settings)
+    settings = get_settings_from_context(ctx)
     console = Console()
-    credentials = load_credentials(settings, console)
+    credentials = load_credentials(settings.app_credentials_file, console)
     console.print(JSON.from_data(credentials.model_dump(mode="json")))
 
 
@@ -36,12 +36,11 @@ def add(
     Expects a JSON file in the format of EveAppCredentials. The file is read
     and validated, and then stored in the app.
     """
-    settings = ctx.obj["esi-auth-settings"]
-    settings = cast(EsiAuthSettings, settings)
+    settings = get_settings_from_context(ctx)
     console = Console()
-    if settings.credentials_file.exists():
+    if settings.app_credentials_file.exists():
         console.print(
-            f"[red]Warning: App credentials file already exists at {settings.credentials_file}. "
+            f"[red]Warning: App credentials file already exists at {settings.app_credentials_file}. "
             "It must be removed first.[/red]"
         )
         raise typer.Exit(code=1)
@@ -53,32 +52,31 @@ def add(
     except Exception as e:
         console.print(f"[red]Error reading credential file: {e}[/red]")
         raise typer.Exit(code=1) from e
-    settings.credentials_file.parent.mkdir(parents=True, exist_ok=True)
-    settings.credentials_file.write_text(credential.model_dump_json(indent=2))
-    console.print(f"App credentials added to {settings.credentials_file}")
+    settings.app_credentials_file.parent.mkdir(parents=True, exist_ok=True)
+    settings.app_credentials_file.write_text(credential.model_dump_json(indent=2))
+    console.print(f"App credentials added to {settings.app_credentials_file}")
 
 
 @app.command()
 def remove(ctx: typer.Context):
     """Remove the stored app credentialsand associated token files."""
-    settings = ctx.obj["esi-auth-settings"]
-    settings = cast(EsiAuthSettings, settings)
+    settings = get_settings_from_context(ctx)
     console = Console()
-    if not settings.credentials_file.exists():
+    if not settings.app_credentials_file.exists():
         console.print(
-            f"[red]App credentials file not found at {settings.credentials_file}[/red]"
+            f"[red]App credentials file not found at {settings.app_credentials_file}[/red]"
         )
         raise typer.Exit(code=1)
     is_confirmed = Confirm.ask(
-        f"Are you sure you want to remove the app credentials at {settings.credentials_file}?\n"
+        f"Are you sure you want to remove the app credentials at {settings.app_credentials_file}?\n"
         f"This will also remove any associated token files in {settings.tokens_dir}."
     )
     if not is_confirmed:
         console.print("Aborting app credential removal.")
         raise typer.Exit()
     try:
-        settings.credentials_file.unlink()
-        console.print(f"App credentials removed from {settings.credentials_file}")
+        settings.app_credentials_file.unlink()
+        console.print(f"App credentials removed from {settings.app_credentials_file}")
     except Exception as e:
         console.print(f"[red]Error removing app credentials: {e}[/red]")
         raise typer.Exit(code=1) from e

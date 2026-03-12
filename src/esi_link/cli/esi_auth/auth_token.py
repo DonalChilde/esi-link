@@ -1,7 +1,7 @@
 """CLI commands for managing CharacterTokens."""
 
 import asyncio
-from typing import Annotated, Any, cast
+from typing import Annotated, Any
 
 import aiohttp
 import typer
@@ -10,10 +10,12 @@ from rich.json import JSON
 
 from esi_link import USER_AGENT
 from esi_link.cli.esi_auth.helpers import (
-    EsiAuthSettings,
-    config_authenticator,
+    load_cached_oauth_metadata,
+    load_credentials,
 )
+from esi_link.cli.helpers import get_settings_from_context
 from esi_link.esi_auth.auth_provider import AuthProvider
+from esi_link.esi_auth.authenticator import Authenticator
 from esi_link.esi_auth.simple_json_store import CharacterTokenManager
 
 app = typer.Typer(no_args_is_help=True)
@@ -32,11 +34,21 @@ def add(
     ] = False,
 ):
     """Add a new CharacterToken."""
-    settings = ctx.obj["esi-auth-settings"]
-    settings = cast(EsiAuthSettings, settings)
+    settings = get_settings_from_context(ctx)
     console = Console()
-
-    authenticator = config_authenticator(settings, console)
+    creds = load_credentials(settings.app_credentials_file, console)
+    oauth_metadata = load_cached_oauth_metadata(
+        file_path=settings.cached_oauth_metadata_file,
+        max_age=settings.cached_metadata_max_age,
+        url=settings.oauth_metadata_url,
+        console=console,
+    )
+    authenticator = Authenticator.from_dict(
+        client_id=creds.clientId,
+        scopes=creds.scopes,
+        callback_url=creds.callbackUrl,
+        config_dict=oauth_metadata["metadata"],
+    )
     token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
     request_params = authenticator.prepare_for_request()
 
@@ -84,10 +96,21 @@ def list(
     ctx: typer.Context,
 ):
     """List all CharacterTokens, optionally filtered by app alias."""
-    settings = ctx.obj["esi-auth-settings"]
-    settings = cast(EsiAuthSettings, settings)
+    settings = get_settings_from_context(ctx)
     console = Console()
-    authenticator = config_authenticator(settings, console)
+    creds = load_credentials(settings.app_credentials_file, console)
+    oauth_metadata = load_cached_oauth_metadata(
+        file_path=settings.cached_oauth_metadata_file,
+        max_age=settings.cached_metadata_max_age,
+        url=settings.oauth_metadata_url,
+        console=console,
+    )
+    authenticator = Authenticator.from_dict(
+        client_id=creds.clientId,
+        scopes=creds.scopes,
+        callback_url=creds.callbackUrl,
+        config_dict=oauth_metadata["metadata"],
+    )
 
     token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
 
@@ -116,10 +139,21 @@ def auth_headers(
     ],
 ):
     """Show the auth headers for a CharacterToken by character ID."""
-    settings = ctx.obj["esi-auth-settings"]
-    settings = cast(EsiAuthSettings, settings)
+    settings = get_settings_from_context(ctx)
     console = Console()
-    authenticator = config_authenticator(settings, console)
+    creds = load_credentials(settings.app_credentials_file, console)
+    oauth_metadata = load_cached_oauth_metadata(
+        file_path=settings.cached_oauth_metadata_file,
+        max_age=settings.cached_metadata_max_age,
+        url=settings.oauth_metadata_url,
+        console=console,
+    )
+    authenticator = Authenticator.from_dict(
+        client_id=creds.clientId,
+        scopes=creds.scopes,
+        callback_url=creds.callbackUrl,
+        config_dict=oauth_metadata["metadata"],
+    )
     token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
 
     try:
@@ -146,11 +180,21 @@ def remove(
     ],
 ):
     """Remove and revoke a CharacterToken by character ID."""
-    settings = ctx.obj["esi-auth-settings"]
-    settings = cast(EsiAuthSettings, settings)
+    settings = get_settings_from_context(ctx)
     console = Console()
-
-    authenticator = config_authenticator(settings, console)
+    creds = load_credentials(settings.app_credentials_file, console)
+    oauth_metadata = load_cached_oauth_metadata(
+        file_path=settings.cached_oauth_metadata_file,
+        max_age=settings.cached_metadata_max_age,
+        url=settings.oauth_metadata_url,
+        console=console,
+    )
+    authenticator = Authenticator.from_dict(
+        client_id=creds.clientId,
+        scopes=creds.scopes,
+        callback_url=creds.callbackUrl,
+        config_dict=oauth_metadata["metadata"],
+    )
     token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
 
     try:
@@ -179,10 +223,21 @@ def refresh(
     ],
 ):
     """Refresh a CharacterToken by character ID."""
-    settings = ctx.obj["esi-auth-settings"]
-    settings = cast(EsiAuthSettings, settings)
+    settings = get_settings_from_context(ctx)
     console = Console()
-    authenticator = config_authenticator(settings, console)
+    creds = load_credentials(settings.app_credentials_file, console)
+    oauth_metadata = load_cached_oauth_metadata(
+        file_path=settings.cached_oauth_metadata_file,
+        max_age=settings.cached_metadata_max_age,
+        url=settings.oauth_metadata_url,
+        console=console,
+    )
+    authenticator = Authenticator.from_dict(
+        client_id=creds.clientId,
+        scopes=creds.scopes,
+        callback_url=creds.callbackUrl,
+        config_dict=oauth_metadata["metadata"],
+    )
     token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
 
     try:
@@ -210,10 +265,21 @@ def refresh_all(
     ctx: typer.Context,
 ):
     """Refresh all CharacterTokens."""
-    settings = ctx.obj["esi-auth-settings"]
-    settings = cast(EsiAuthSettings, settings)
+    settings = get_settings_from_context(ctx)
     console = Console()
-    authenticator = config_authenticator(settings, console)
+    creds = load_credentials(settings.app_credentials_file, console)
+    oauth_metadata = load_cached_oauth_metadata(
+        file_path=settings.cached_oauth_metadata_file,
+        max_age=settings.cached_metadata_max_age,
+        url=settings.oauth_metadata_url,
+        console=console,
+    )
+    authenticator = Authenticator.from_dict(
+        client_id=creds.clientId,
+        scopes=creds.scopes,
+        callback_url=creds.callbackUrl,
+        config_dict=oauth_metadata["metadata"],
+    )
     token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
 
     try:

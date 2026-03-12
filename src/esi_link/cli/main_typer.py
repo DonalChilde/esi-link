@@ -3,11 +3,8 @@
 import logging
 
 import typer
-from rich.console import Console
-from rich.text import Text
 
 from esi_link import __app_name__, __version__
-from esi_link.cli import STYLE_INFO
 from esi_link.cli.cache import app as cache_app
 from esi_link.cli.config_info import app as config_info_app
 from esi_link.cli.esi_auth.main_typer import app as esi_auth_app
@@ -35,4 +32,7 @@ def default_options(ctx: typer.Context):
     """
     settings = get_settings()
     setup_logging(log_dir=settings.log_dir)
-    logger.info(f"Starting {__app_name__} v{__version__}")
+    ctx.obj = {"esi-link-settings": settings}
+    logger.info(
+        f"Starting {__app_name__} v{__version__} with settings: {settings.model_dump_json()}"
+    )

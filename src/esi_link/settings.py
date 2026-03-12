@@ -1,7 +1,5 @@
 """Settings for the ESI Link application."""
 
-from dataclasses import dataclass
-from os import environ
 from pathlib import Path
 from typing import Literal
 
@@ -12,31 +10,6 @@ from whenever import Instant
 from esi_link import DEFAULT_APP_DIR, __app_name__, __version__
 
 _app_env_prefix = "PFMSOFT_ESI_LINK_"
-
-
-@dataclass(slots=True)
-class OauthSettings:
-    audience: str
-    metadata_endpoint: str
-    authorization_endpoint: str
-    token_endpoint: str
-    jwks_uri: str
-    revocation_endpoint: str
-    issuers: list[str]
-
-
-# These settings are current as of 2026-03-04, and are not likely to change much.
-# They are included here for convenience, but can also be fetched dynamically from the metadata endpoint if needed.
-# The current settings can be found at https://login.eveonline.com/.well-known/oauth-authorization-server
-DEFAULT_OAUTH_SETTINGS = OauthSettings(
-    audience="EVE Online",
-    metadata_endpoint="https://login.eveonline.com/.well-known/oauth-authorization-server",
-    authorization_endpoint="https://login.eveonline.com/v2/oauth/authorize",
-    token_endpoint="https://login.eveonline.com/v2/oauth/token",
-    jwks_uri="https://login.eveonline.com/oauth/jwks",
-    revocation_endpoint="https://login.eveonline.com/v2/oauth/revoke",
-    issuers=["https://login.eveonline.com"],
-)
 
 
 class EsiLinkSettings(BaseSettings):
@@ -50,10 +23,11 @@ class EsiLinkSettings(BaseSettings):
         default=DEFAULT_APP_DIR / "logs",
         description="The log directory for ESI Link.",
     )
-    # config_file: Path = Field(
-    #     default=DEFAULT_APP_DIR / "esi_link_config.json",
-    #     description="The configuration file for ESI Link.",
-    # )
+
+    # -----------------------------------------------------------------------------------
+    # Schema settings
+    # -----------------------------------------------------------------------------------
+
     esi_schema_url: str = Field(
         default="https://esi.evetech.net/meta/openapi.json",
         description="The URL to download the ESI schema from.",
@@ -62,6 +36,11 @@ class EsiLinkSettings(BaseSettings):
         default=DEFAULT_APP_DIR / "schema-store.json",
         description="The path to the store of indexed ESI schema files.",
     )
+
+    # -----------------------------------------------------------------------------------
+    # Cache settings
+    # -----------------------------------------------------------------------------------
+
     cache_directory: Path = Field(
         default=DEFAULT_APP_DIR / "cache",
         description="The directory for ESI Link cache files.",
@@ -79,6 +58,10 @@ class EsiLinkSettings(BaseSettings):
         description="The directory for ESI Link JSON cache files.",
     )
 
+    # -----------------------------------------------------------------------------------
+    # Rate limiting settings
+    # -----------------------------------------------------------------------------------
+
     connection_period: int = Field(
         default=60,
         description="Period (in seconds) for ESI Link connection rate limiting.",
@@ -89,16 +72,37 @@ class EsiLinkSettings(BaseSettings):
         description="Maximum number of requests per period for ESI Link connections.",
     )
     """Maximum number of concurrent connections to ESI per period."""
-    auth_connection_string: str = Field(
-        default=f"esi-auth-file:{DEFAULT_APP_DIR.resolve()}/esi-auth/esi-auth-store.json",
-        description="The connection string for esi-auth integration.",
+
+    # -----------------------------------------------------------------------------------
+    # ESI Auth settings
+    # -----------------------------------------------------------------------------------
+
+    app_credentials_file: Path = Field(
+        default=DEFAULT_APP_DIR / "esi-auth" / "credentials.json",
+        description="Path to the application credential JSON file.",
     )
-    """Connection string for esi-auth integration."""
-    auth_app_dir: Path = Field(
-        default=DEFAULT_APP_DIR / "esi-auth",
-        description="The application directory for esi-auth integration.",
+    """Path to the application credential JSON file."""
+    tokens_dir: Path = Field(
+        default=DEFAULT_APP_DIR / "esi-auth" / "tokens",
+        description="Directory for the application ESI token JSON files.",
     )
-    """The application directory for esi-auth integration."""
+    """Directory for the application ESI token JSON files."""
+    oauth_metadata_url: str = Field(
+        default="https://login.eveonline.com/.well-known/oauth-authorization-server",
+        description="URL to fetch OAuth metadata from the ESI auth server.",
+    )
+    """URL to fetch OAuth metadata from the ESI auth server."""
+    cached_oauth_metadata_file: Path = Field(
+        default=DEFAULT_APP_DIR / "esi-auth" / "oauth_metadata.json",
+        description="Path to the cached OAuth metadata JSON file.",
+    )
+    """Path to the cached OAuth metadata JSON file."""
+    cached_metadata_max_age: int = Field(
+        default=86400,
+        description="Maximum age (in seconds) for cached OAuth metadata before it is considered expired.",
+    )
+    """Maximum age (in seconds) for cached OAuth metadata before it is considered expired."""
+
     auth_server_timeout: int = Field(
         default=300,
         description="Timeout (in seconds) for the local auth server used by esi-auth.",
@@ -106,12 +110,16 @@ class EsiLinkSettings(BaseSettings):
         le=300,  # Max 5 minutes
     )
     """Timeout (in seconds) for the local auth server used by esi-auth."""
-
-    # def auth_connection_string(self) -> str:
-    #     """Get the auth connection string for esi-auth integration."""
-    #     env_var_name = f"PFMSOFT_ESI_AUTH_AUTH_CONNECTION_STRING"
-    #     # GET from environment variable if set
-    #     return getenv(env_var_name, "")
+    audience: str = Field(
+        default="EVE Online",
+        description="The audience to use for ESI Auth tokens.",
+    )
+    """The audience to use for ESI Auth tokens."""
+    issuer: str = Field(
+        default="https://login.eveonline.com",
+        description="The issuer to use for ESI Auth tokens.",
+    )
+    """The issuer to use for ESI Auth tokens."""
 
     model_config = SettingsConfigDict(
         env_file=(
@@ -125,16 +133,13 @@ class EsiLinkSettings(BaseSettings):
 def get_settings() -> EsiLinkSettings:
     """Get the ESI Link settings."""
     settings = EsiLinkSettings()
-    environ["PFMSOFT_ESI_AUTH_APP_DIR"] = str(settings.auth_app_dir.resolve())
-    environ["PFMSOFT_ESI_AUTH_CONNECTION_STRING"] = settings.auth_connection_string
-    environ["PFMSOFT_ESI_AUTH_AUTH_SERVER_TIMEOUT"] = str(settings.auth_server_timeout)
 
     # Ensure application directories exist
     settings.app_dir.mkdir(parents=True, exist_ok=True)
     settings.cache_directory.mkdir(parents=True, exist_ok=True)
     settings.diskcache_directory.mkdir(parents=True, exist_ok=True)
     settings.json_cache_directory.mkdir(parents=True, exist_ok=True)
-    settings.auth_app_dir.mkdir(parents=True, exist_ok=True)
+    settings.cached_oauth_metadata_file.parent.mkdir(parents=True, exist_ok=True)
     return settings
 
 
