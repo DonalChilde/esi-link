@@ -21,14 +21,7 @@ def show(ctx: typer.Context):
     """
     settings = get_settings_from_context(ctx)
     console = Console()
-
-    cached_metadata = load_cached_oauth_metadata(
-        file_path=settings.cached_oauth_metadata_file,
-        max_age=settings.cached_metadata_max_age,
-        url=settings.oauth_metadata_url,
-        console=console,
-    )
-
+    cached_metadata = load_cached_oauth_metadata(settings, console)
     expires_in = (
         cached_metadata["fetched_at"]
         + settings.cached_metadata_max_age

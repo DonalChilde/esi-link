@@ -4,7 +4,13 @@ from typing import Protocol
 
 import aiohttp
 
-from esi_link.esi_auth.models import CharacterAuth, CharacterToken, RequestParams
+from esi_link.esi_auth.models import (
+    CachedMetadata,
+    CharacterAuth,
+    CharacterToken,
+    EveAppCredentials,
+    RequestParams,
+)
 
 
 class AuthenticatorProtocol(Protocol):
@@ -120,4 +126,61 @@ class AuthProviderProtocol(Protocol):
 
     async def available_characters(self) -> list[int]:
         """Return a list of character IDs for which authentication information is available."""
+        ...
+
+
+class CachedOauthMetadataProviderProtocol(Protocol):
+    """Protocol for providing cached OAuth metadata."""
+
+    async def get_cached_metadata(self, max_age: int = 86400) -> CachedMetadata:
+        """Return the cached OAuth metadata.
+
+        If the cached metadata is expired, this method requests new metadata and updates the cache.
+
+        Args:
+            max_age: The maximum age of the cached metadata, in seconds, before automatic
+                update. -1 to disable update of expired metadata. Default is 86400 (1 day).
+
+        Returns:
+            The cached OAuth metadata.
+
+        Raises:
+            ValueError: If the cached metadata does not exist, and update is disabled.
+        """
+        ...
+
+
+class AppCredentialsProviderProtocol(Protocol):
+    """Protocol for providing application credentials."""
+
+    # def get_client_id(self) -> str:
+    #     """Return the client ID for the application."""
+    #     ...
+
+    # def get_scopes(self) -> list[str]:
+    #     """Return the list of scopes required for the application."""
+    #     ...
+
+    # def get_redirect_uri(self) -> str:
+    #     """Return the redirect URI for the application."""
+    #     ...
+
+    def add_credentials(self, credentials: EveAppCredentials) -> None:
+        """Add the application credentials to the provider."""
+        ...
+
+    def remove_credentials(self) -> None:
+        """Remove the application credentials from the provider."""
+        ...
+
+    def has_credentials(self) -> bool:
+        """Return True if the provider has application credentials, False otherwise."""
+        ...
+
+    def get_credentials(self) -> EveAppCredentials:
+        """Return the application credentials.
+
+        Raises:
+            ValueError: If the provider does not have application credentials.
+        """
         ...

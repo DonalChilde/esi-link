@@ -16,6 +16,7 @@ import aiohttp
 from whenever import Instant
 
 from esi_link.esi_auth.models import CachedMetadata
+from esi_link.esi_auth.protocols import CachedOauthMetadataProviderProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,7 @@ def _load_cached_oauth_metadata(file_path: Path) -> CachedMetadata:
     return CachedMetadata(**data)
 
 
-async def oauth_metadata_cache(
+async def _oauth_metadata_cache(
     file_path: Path, *, max_age: int = 86400, url: str = METADATA_ENDPOINT
 ) -> CachedMetadata:
     """Load the OAuth metadata from a JSON file, or fetch it if the file does not exist."""
@@ -122,3 +123,47 @@ async def oauth_metadata_cache(
         file_path,
     )
     return cached_metadata
+
+
+class MetadataProvider(CachedOauthMetadataProviderProtocol):
+    def __init__(self, cache_file: Path, metadata_url: str) -> None:
+        """OAuth metadata provider.
+
+        Args:
+            cache_file: The file path to store the cached metadata.
+            metadata_url: The URL to fetch the metadata from if the cache is expired or does not exist.
+        """
+        self.cache_file = cache_file
+        self.metadata_url = metadata_url
+
+    async def get_cached_metadata(self, max_age: int = 86400) -> CachedMetadata:
+        """Return the cached OAuth metadata.
+
+        If the cached metadata is expired, this method requests new metadata and updates the cache.
+
+        Args:
+            max_age: The maximum age of the cached metadata, in seconds, before automatic
+                update. -1 to disable update of expired metadata. Default is 86400 (1 day).
+
+        Returns:
+            The cached OAuth metadata.
+
+        Raises:
+            ValueError: If the cached metadata does not exist, and update is disabled.
+        """
+        if max_age < 0 and not self.cache_file.exists():
+            raise ValueError(
+                "Cached OAuth metadata does not exist, and update is disabled."
+            )
+        try:
+            cached_metadata = await _oauth_metadata_cache(
+                self.cache_file, max_age=max_age, url=self.metadata_url
+            )
+        except Exception as e:
+            logger.error(
+                "Failed to fetch OAuth metadata from %s: %s", self.metadata_url, e
+            )
+            raise ValueError(
+                f"Failed to fetch OAuth metadata from file {self.cache_file} or url {self.metadata_url}: {e}"
+            ) from e
+        return cached_metadata

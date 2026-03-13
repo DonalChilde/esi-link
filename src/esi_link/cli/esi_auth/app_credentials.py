@@ -20,7 +20,7 @@ def show(ctx: typer.Context):
     """Show the stored app credentials."""
     settings = get_settings_from_context(ctx)
     console = Console()
-    credentials = load_credentials(settings.app_credentials_file, console)
+    credentials = load_credentials(settings, console)
     console.print(JSON.from_data(credentials.model_dump(mode="json")))
 
 
