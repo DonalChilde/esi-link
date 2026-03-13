@@ -13,7 +13,7 @@ from whenever import Instant
 
 from esi_link import example_requests
 from esi_link.logging_config import setup_logging
-from esi_link.models import EsiRequests, EsiResponse
+from esi_link.models import EsiResponse, RequestGroup
 from esi_link.request_manager import EsiLink
 from esi_link.response_handlers import HandlerManager
 from esi_link.schema_manager import SchemaManager
@@ -39,7 +39,7 @@ def main() -> None:
     display_responses(responses)
 
 
-def execute_requests(esi_link: EsiLink, requests: EsiRequests) -> list[EsiResponse]:
+def execute_requests(esi_link: EsiLink, requests: RequestGroup) -> list[EsiResponse]:
     """Execute ESI requests asynchronously.
 
     This function takes an EsiRequests object containing multiple ESI requests,
@@ -138,7 +138,7 @@ def display_responses(responses: list[EsiResponse]) -> None:
             console.print(response.http_response.body_text, overflow="ellipsis")
 
 
-def build_requests(output_dir: str) -> EsiRequests:
+def build_requests(output_dir: str) -> RequestGroup:
     """Build ESI requests for testing.
 
     This function creates an EsiRequests object containing a single ESI request
@@ -151,7 +151,7 @@ def build_requests(output_dir: str) -> EsiRequests:
         output_dir=output_dir, overwrite=False
     )
     status_request = example_requests.esi_status(handlers=[simple_handler_config])
-    requests = EsiRequests(
+    requests = RequestGroup(
         requests_id=uuid4(),
         created_on=Instant.now(),
         description="",

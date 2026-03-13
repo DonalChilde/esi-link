@@ -121,7 +121,7 @@ class EsiRuntimeRequest(BaseModelToDisk):
     runtime_info: RuntimeRequestInfo
 
 
-class EsiRequests(BaseModelToDisk):
+class RequestGroup(BaseModelToDisk):
     """Represents a batch of ESI requests to be executed.
 
     This model exists mostly for serialization puposes, with the imagined use being

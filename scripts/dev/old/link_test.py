@@ -7,13 +7,13 @@ import asyncio
 from pathlib import Path
 from uuid import uuid4
 
+from esi_link.esi_link import EsiLink
+from esi_link.helpers.esi_link_factory import esi_link_factory
 from rich.console import Console
 
 from esi_link import request_factory as RF
-from esi_link.esi_link import EsiLink
-from esi_link.helpers.esi_link_factory import esi_link_factory
 from esi_link.logging_config import setup_logging
-from esi_link.models import EsiRequests, EsiResponses
+from esi_link.models import EsiResponses, RequestGroup
 
 SCRIPT_NAME = "link_test"
 
@@ -43,7 +43,7 @@ def main() -> None:
     display_responses(responses)
 
 
-def execute_requests(esi_link: EsiLink, requests: EsiRequests) -> EsiResponses:
+def execute_requests(esi_link: EsiLink, requests: RequestGroup) -> EsiResponses:
     """Execute ESI requests asynchronously.
 
     This function takes an EsiRequests object containing multiple ESI requests,
@@ -90,7 +90,7 @@ def display_responses(responses: EsiResponses) -> None:
             console.print(http_response.json_data, overflow="crop")
 
 
-def build_requests() -> EsiRequests:
+def build_requests() -> RequestGroup:
     """Build ESI requests for testing.
 
     This function creates an EsiRequests object containing a single ESI request
@@ -100,7 +100,7 @@ def build_requests() -> EsiRequests:
         EsiRequests: An object containing the constructed ESI requests.
     """
     request = RF.status()
-    requests = EsiRequests(requests_id=uuid4(), requests={request.request_id: request})
+    requests = RequestGroup(requests_id=uuid4(), requests={request.request_id: request})
     return requests
 
 

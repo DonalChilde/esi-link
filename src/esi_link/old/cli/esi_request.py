@@ -15,8 +15,8 @@ from esi_link.helpers.esi_link_factory import esi_link_factory
 from esi_link.models import (
     AuthParams,
     EsiRequest,
-    EsiRequests,
     HandlerConfig,
+    RequestGroup,
     ResponseHandlerProtocol,
 )
 from esi_link.request_validator import ValidationError
@@ -68,7 +68,7 @@ def blank_request(
     """Display a blank ESI request template."""
     console = Console()
     blank_request = create_blank_request()
-    requests = EsiRequests(
+    requests = RequestGroup(
         requests_id=uuid4(),
         description="Blank ESI Request Template",
         requests={blank_request.request_id: blank_request},
@@ -111,7 +111,7 @@ def examples(
         post_universe_names_example(),
         get_character_attributes_example(),
     ]
-    esi_requests = EsiRequests(
+    esi_requests = RequestGroup(
         requests_id=uuid4(),
         description="Example ESI requests",
         requests={req.request_id: req for req in blank_requests},
@@ -139,7 +139,7 @@ def execute(
     console = Console()
     console.rule("[bold green]Execute ESI Requests[/bold green]")
     try:
-        requests = EsiRequests.load_from_file(path_in)
+        requests = RequestGroup.load_from_file(path_in)
     except Exception as e:
         console.print(
             f"[bold red]Error loading ESI requests from {path_in}:[/bold red] {e}"

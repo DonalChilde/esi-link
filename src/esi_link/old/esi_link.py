@@ -17,13 +17,13 @@ from esi_link.models import (
     EsiLinkError,
     EsiLinkProtocol,
     EsiRequest,
-    EsiRequests,
     EsiResponse,
     EsiResponses,
     EsiSchema,
     HandlerConfig,
     HandlerManagerProtocol,
     HttpRequest,
+    RequestGroup,
     ResponseHandlerProtocol,
 )
 from esi_link.request_validator import EsiRequestValidatorProtocol
@@ -84,7 +84,7 @@ class EsiLink(EsiLinkProtocol):
 
     async def execute_requests(
         self,
-        requests: EsiRequests,
+        requests: RequestGroup,
     ) -> EsiResponses:
         """Execute the given EsiRequests asynchronously.
 
@@ -166,7 +166,7 @@ class EsiLink(EsiLinkProtocol):
 
     async def get_auth_tokens_for_requests(
         self,
-        esi_requests: EsiRequests,
+        esi_requests: RequestGroup,
     ) -> dict[str, dict[int, CharacterToken]]:
         """Get the auth token for the given EsiRequest.
 
@@ -237,7 +237,7 @@ class EsiLink(EsiLinkProtocol):
 
     async def build_http_requests(
         self,
-        requests: EsiRequests,
+        requests: RequestGroup,
     ) -> list[HttpRequest]:
         """Build HttpRequest objects from EsiRequest objects."""
         http_requests: list[HttpRequest] = []

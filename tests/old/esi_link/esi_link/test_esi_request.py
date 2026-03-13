@@ -14,10 +14,10 @@ from esi_link.esi_http import EsiHttpRateLimited
 from esi_link.esi_link import EsiLink
 from esi_link.models import (
     EsiRequest,
-    EsiRequests,
     EsiResponse,
     EsiSchema,
     HandlerConfig,
+    RequestGroup,
 )
 from esi_link.response_handlers import EsiResponseToFile, HandlerManager
 
@@ -56,7 +56,7 @@ def test_simple_get_request(esi_schema: dict[str, Any], test_output_dir: Path) -
         handler_manager=handler_manager,
     )
 
-    esi_requests = EsiRequests(
+    esi_requests = RequestGroup(
         requests_id=uuid4(),
         requests={x.request_id: x for x in [esi_request]},
     )
@@ -101,7 +101,7 @@ def test_paged_request(esi_schema: dict[str, Any], test_output_dir: Path) -> Non
         esi_http=http_client,
         handler_manager=handler_manager,
     )
-    esi_requests = EsiRequests(
+    esi_requests = RequestGroup(
         requests_id=uuid4(),
         requests={x.request_id: x for x in [esi_request]},
     )
@@ -153,7 +153,7 @@ def test_post_request(esi_schema: dict[str, Any], test_output_dir: Path) -> None
         esi_http=http_client,
         handler_manager=handler_manager,
     )
-    esi_requests = EsiRequests(
+    esi_requests = RequestGroup(
         requests_id=uuid4(),
         requests={x.request_id: x for x in [esi_request]},
     )
@@ -192,7 +192,7 @@ def test_cached_request(esi_schema: dict[str, Any], test_output_dir: Path) -> No
         esi_http=http_client,
         handler_manager=handler_manager,
     )
-    esi_requests = EsiRequests(
+    esi_requests = RequestGroup(
         requests_id=uuid4(),
         requests={x.request_id: x for x in [esi_request]},
     )
