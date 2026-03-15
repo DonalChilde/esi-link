@@ -135,7 +135,7 @@ class Request(BaseModelToDisk):
     path_parameters: dict[str, str | int | float] = {}
     query_parameters: dict[str, str | int | float] = {}
     # auth_parameters: AuthParameters | None = None
-    body: Any | None = None
+    json_body: Any | None = None
     response_handlers: list[ResponseHandlerConfig] = []
 
 
