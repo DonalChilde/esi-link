@@ -1,0 +1,444 @@
+"""Protocols for ESI Link."""
+
+from types import TracebackType
+from typing import Any, Protocol, Self
+from uuid import UUID
+
+import aiohttp
+from whenever import Instant
+
+from esi_link.v3.models import (
+    CachedResponse,
+    CachedResponseStatus,
+    GeneratedUrlInfo,
+    HttpResponse,
+    IndexedEsiSchema,
+    Request,
+    RequestGroup,
+    Response,
+    ResponseGroup,
+    ResponseGroupHandlerConfig,
+    ResponseHandlerConfig,
+    RuntimeRequest,
+    RuntimeRequestInfo,
+    SchemaDownload,
+)
+
+
+class HttpRequestExecutorProtocol(Protocol):
+    async def __call__(
+        self,
+        request: RuntimeRequest,
+        session: aiohttp.ClientSession,
+    ) -> Response:
+        """Protocol for executing RuntimeRequests.
+
+        Rate limit management is left to the implementing class, to allow for flexibility
+        in how rate limiting is handled.
+        """
+        ...
+
+
+class RuntimeInfoGeneratorProtocol(Protocol):
+    def __call__(self, request: Request) -> RuntimeRequestInfo: ...
+
+
+class RequestValidatorProtocol(Protocol):
+    def __call__(self, request: Request) -> None:
+        """Validate a request.
+
+        Raises:
+            RequestValidationError
+        """
+        ...
+
+
+class RequestGroupExecutorProtocol(Protocol):
+    request_executor: HttpRequestExecutorProtocol | None
+    runtime_info: RuntimeInfoGeneratorProtocol | None
+    request_validator: RequestValidatorProtocol | None
+
+    async def __call__(self, request_group: RequestGroup) -> ResponseGroup:
+        """Execute a RequestGroup and return a ResponseGroup.
+
+        This function should handle the entire lifecycle of executing a RequestGroup,
+        including generating RuntimeRequests from the Requests in the group, validating
+        the Requests, executing the RuntimeRequests, and handling the Responses to produce
+        the final ResponseGroup.
+        """
+        ...
+
+
+class RequestGroupValidatorProtocol(Protocol):
+    def __call__(self, request_group: RequestGroup) -> None:
+        """Validate a RequestGroup.
+
+        Raises:
+            RequestValidationError
+        """
+        ...
+
+
+class ResponseHandlerProtocol(Protocol):
+    name: str
+    config: ResponseHandlerConfig
+
+    def __call__(self, response: Response) -> Response:
+        """Handle a response.
+
+        This can be used for things like error handling, response transformation,
+        persisting responses to disk, etc.
+
+        Args:
+            response: The response to handle.
+
+        Returns:
+            The handled response.
+
+        Raises:
+            ResponseHandlingError: If an error occurs while handling the response.
+        """
+        ...
+
+    @classmethod
+    def from_config(cls, config: ResponseHandlerConfig) -> Self:
+        """Factory method to create a handler instance from a ResponseHandlerConfig.
+
+        The config should be validated before creating the handler instance.
+
+
+        Args:
+            config: The ResponseHandlerConfig instance containing the configuration for the handler.
+
+        Raises:
+            InvalidHandlerError: If the configuration is invalid for this handler.
+        """
+        raise NotImplementedError("from_config method must be implemented by subclass")
+
+    @classmethod
+    def validate_config(cls, config: ResponseHandlerConfig) -> None:
+        """Validate a ResponseHandlerConfig for this handler.
+
+        This method should be called before creating a handler instance from a config,
+        to ensure that the values in the config are valid for this handler.
+
+        This is only required to validate the presence of the required config values,
+        and that they are of the correct type. The actual values might not be valid until
+        runtime, e.g., if the config includes a reference to a value in the EsiResponse
+        that is not present until the response is received.
+
+        Args:
+            config: The ResponseHandlerConfig instance to validate.
+
+        Raises:
+            InvalidHandlerConfigError: If the configuration is invalid for this handler.
+        """
+        raise NotImplementedError(
+            "validate_config method must be implemented by subclass"
+        )
+
+
+class ResponseGroupHandlerProtocol(Protocol):
+    def __call__(self, response_group: ResponseGroup) -> ResponseGroup: ...
+
+
+class ResponseHandlerManagerProtocol(Protocol):
+    def get_handler(self, config: ResponseHandlerConfig) -> ResponseHandlerProtocol:
+        """Get a handler by config.
+
+        Args:
+            config: The HandlerConfig instance containing the configuration.
+
+        Returns:
+            An instance of the handler.
+
+        Raises:
+            HandlerNotFoundError: If the handler is not found.
+        """
+        raise NotImplementedError("get_handler method must be implemented by subclass")
+
+    def register_handler(self, handler_cls: type[ResponseHandlerProtocol]) -> None:
+        """Register a handler class by its name.
+
+        Args:
+            handler_cls: The handler class to register.
+
+        Raises:
+            InvalidHandlerConfigError: If the handler class is invalid.
+        """
+        raise NotImplementedError(
+            "register_handler method must be implemented by subclass"
+        )
+
+    def registered_handlers(self) -> dict[str, type[ResponseHandlerProtocol]]:
+        """Get a dictionary of registered handler classes by their names.
+
+        Returns:
+            A dictionary mapping handler names to their corresponding handler classes.
+        """
+        raise NotImplementedError(
+            "registered_handlers method must be implemented by subclass"
+        )
+
+    def validate_handler_config(self, config: ResponseHandlerConfig) -> None:
+        """Validate a handler configuration against the registered handler.
+
+        Args:
+            config: The ResponseHandlerConfig instance containing the configuration.
+
+        Raises:
+            InvalidHandlerConfigError: If the configuration is invalid for the specified handler.
+            HandlerNotFoundError: If the specified handler is not found.
+        """
+        raise NotImplementedError(
+            "validate_handler_config method must be implemented by subclass"
+        )
+
+
+class ResponseGroupHandlerManagerProtocol(Protocol):
+    def get_handler(
+        self, config: ResponseGroupHandlerConfig
+    ) -> ResponseGroupHandlerProtocol: ...
+
+
+class CacheManagerProtocol:
+    def __enter__(self) -> Self:
+        """Enter the runtime context related to this object."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        """Exit the runtime context related to this object."""
+        ...
+
+    def get(
+        self, key: UUID, local_max_age: int | None = None
+    ) -> tuple[CachedResponse | None, CachedResponseStatus]:
+        """Get a cached response by cache key.
+
+        Local max age allows the caller to specify a max age for staleness that is
+        different from the max age received from the server.
+
+        Returned CachedResponse must be treated as immutable. If the caller needs to
+        modify the CachedResponse, they should create a copy of it before making any
+        modifications, to avoid unintended side effects on the cached response stored in
+        the cache manager. Modifying the returned CachedResponse directly may lead to
+        issues such as stale data being returned for other requests that share the same
+        cache key, or inconsistencies in the cache state if the CachedResponse is updated
+        with new data while it is being modified by the caller.
+
+        Args:
+            key: The UUID key for the cached response.
+            local_max_age: The maximum age of the cached response in seconds. If the cached
+                response is older than this, it will be considered stale.
+
+        Returns:
+            A tuple containing the CachedResponse if found, or None if not found, and
+                the CachedResponseStatus.
+        """
+        ...
+
+    def set(self, key: UUID, http_response: HttpResponse) -> CachedResponse:
+        """Set a cached response in the cache.
+
+        Returned CachedResponse must be treated as immutable. If the caller needs to
+        modify the CachedResponse, they should create a copy of it before making any
+        modifications, to avoid unintended side effects on the cached response stored in
+        the cache manager. Modifying the returned CachedResponse directly may lead to
+        issues such as stale data being returned for other requests that share the same
+        cache key, or inconsistencies in the cache state if the CachedResponse is updated
+        with new data while it is being modified by the caller.
+
+        Args:
+            key: The UUID key for the cached response.
+            http_response: The new HttpResponse to store in the cache.
+
+        Returns:
+            The CachedResponse instance that was set in the cache.
+        """
+        ...
+
+    def refresh(self, key: UUID, new_http_response: HttpResponse) -> CachedResponse:
+        """Refresh an existing cached response with new response data.
+
+        Returned CachedResponse must be treated as immutable. If the caller needs to
+        modify the CachedResponse, they should create a copy of it before making any
+        modifications, to avoid unintended side effects on the cached response stored in
+        the cache manager. Modifying the returned CachedResponse directly may lead to
+        issues such as stale data being returned for other requests that share the same
+        cache key, or inconsistencies in the cache state if the CachedResponse is updated
+        with new data while it is being modified by the caller.
+
+        Args:
+            key: The UUID key for the cached response to refresh.
+            new_http_response: The new HttpResponse to update the cached response with.
+
+        Returns:
+            The updated CachedResponse instance after refreshing.
+
+        Raises:
+            KeyError: If no cached response exists for the given cache key.
+        """
+        ...
+
+    def clear(self, only_stale: bool = False) -> int:
+        """Clear all cached responses from the cache.
+
+        Args:
+            only_stale: If True, only clear stale cached responses.
+
+        Returns:
+            The number of cached responses that were cleared.
+        """
+        ...
+
+    def cache_info(self) -> dict[str, Any]:
+        """Get information about the cache, such as size, number of entries, etc.
+
+        Returns:
+            A dictionary containing information about the cache.
+        """
+        ...
+
+
+class CacheFactoryProtocol:
+    def __call__(
+        self, cache_name: str, cache_config: dict[str, Any]
+    ) -> CacheManagerProtocol:
+        """Factory protocol for creating CacheManagerProtocol instances.
+
+        Args:
+            cache_name: The name of the cache to create.
+            cache_config: A dictionary of configuration options for the cache.
+
+        Returns:
+            An instance of CacheManagerProtocol.
+
+        Raises:
+            ValueError: If the cache cannot be created with the given name and configuration.
+
+        """
+        ...
+
+
+class UrlGeneratorProtocol:
+    def generate_path_url(self, request: Request) -> str:
+        """Generate the url path for an ESI request based on its parameters.\
+            
+        This url does not contain query parameters, and is not suitable for generateing 
+        a cache key. It is used as the url argument for http requests, assuming that 
+        query parameters are sent separately.
+        """
+        ...
+
+    def generate_cache_url(self, request: Request) -> str:
+        """Generate the url to use for cache key generation for an ESI request based on its parameters.
+
+        This url should contain all path and most query parameters, and should be
+        consistent for requests that should share a cache key. It is used for generating
+        cache keys, and is not necessarily the same as the url used for making the http request.
+
+        NOTE: Validate the request before generating the cache url, to ensure that all
+        required parameters are present and correctly formatted, to avoid generating
+        different cache urls for requests that should share a cache key.
+        """
+        ...
+
+    def generate_cache_key(self, request: Request) -> UUID:
+        """Generate a cache key for an ESI request based on its parameters.
+
+        The key is usually generated by hashing the url generated by generate_cache_url,
+        but can be any UUID that is consistently generated for requests that should share
+        a cache key.
+        """
+        ...
+
+    def generate_url_info(self, request: Request) -> GeneratedUrlInfo:
+        """Generate all url related information for an ESI request.
+
+        This is a convenience method that generates the path url, cache url, and cache key
+        for an ESI request in one call, since these values are often needed together
+        and share intermediate calculations.
+
+        NOTE: Validate the request before generating the cache url, to ensure that all
+        required parameters are present and correctly formatted, to avoid generating
+        different cache urls for requests that should share a cache key.
+        """
+        ...
+
+
+class SchemaManagerProtocol:
+    def get_schema_for_date(self, compatibility_date: str) -> IndexedEsiSchema:
+        """Get the appropriate schema for a given date.
+
+        Args:
+            compatibility_date: The ISO 8601 string representing the date for which to retrieve the schema.
+
+        Returns:
+            The IndexedEsiSchema instance that is appropriate for the given date.
+
+        Raises:
+            ValueError: If no appropriate schema is found for the given date.
+        """
+        ...
+
+    def get_latest_schema(self) -> IndexedEsiSchema:
+        """Get the latest schema available in the store.
+
+        Returns:
+            The IndexedEsiSchema instance with the most recent download date.
+
+        Raises:
+            ValueError: If no schemas are available in the store.
+        """
+        ...
+
+    def available_schemas(self) -> list[str]:
+        """Get a list of all available schemas in the store.
+
+        Returns:
+            A list of the compatibility dates for all IndexedEsiSchema instances available in the store.
+        """
+        ...
+
+    def add_schema(self, schema: IndexedEsiSchema) -> None:
+        """Add a new schema to the store.
+
+        Args:
+            schema: The IndexedEsiSchema instance to add to the store.
+        """
+        ...
+
+    def transform_schema(
+        self, raw_schema: dict[str, Any], download_date: Instant
+    ) -> IndexedEsiSchema:
+        """Transform a raw OpenAPI schema into an IndexedEsiSchema instance.
+
+        This method should handle the process of taking a raw OpenAPI schema as a dictionary,
+        dereferencing any internal references, and transforming it into an IndexedEsiSchema
+        instance that can be stored and used for request execution.
+
+        Args:
+            raw_schema: The raw OpenAPI schema as a dictionary.
+            download_date: The date the schema was downloaded.
+
+        Returns:
+            The transformed IndexedEsiSchema instance.
+        """
+        ...
+
+    def download_schema(self, compatibility_date: str | None = None) -> SchemaDownload:
+        """Download the raw OpenAPI schema from the ESI endpoint.
+
+        Args:
+            compatibility_date: The ISO 8601 string representing the date for which to
+                download the schema. If None, the latest schema will be downloaded.
+
+        Returns:
+            A SchemaDownload object containing the raw OpenAPI schema and the download date.
+        """
+        ...
