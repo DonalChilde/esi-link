@@ -11,7 +11,8 @@ from whenever import Instant
 
 from esi_link.helpers.pydantic.save_to_disk import BaseModelToDisk
 from esi_link.helpers.resolve_json_ref import resolve_internal_refs
-from esi_link.v3.protocols import ResponseHandlerProtocol
+from esi_link.v3.protocols import ResponseGroupHandlerProtocol, ResponseHandlerProtocol
+from esi_link.v3.type_defs import Lang
 
 
 def _get_current_instant() -> Instant:
@@ -114,17 +115,26 @@ class RuntimeRequestInfo(BaseModel):
     is_paged: bool = False
     is_auth: bool = False
     headers: dict[str, str] = {}
-    """Includes UserAgent,If-None-Match,If-Modified-Since, X-Compatibility-Date, and auth if required."""
+    """Includes UserAgent, If-None-Match, If-Modified-Since, X-Compatibility-Date, and auth if required."""
     timeout: int = 10
     cache_key: UUID | None = None
     """Cache key for the request, if applicable. This is used to identify cached responses. Paged requests only have a cache key for the first page."""
-    response_handlers: list["ResponseHandlerProtocol"] = Field(..., exclude=True)
+    response_handlers: list[ResponseHandlerProtocol] = Field(..., exclude=True)
     """The list of response handler instances to run for this request, in the order they should be run."""
     metrics: "Metrics"
     parent_id: UUID | None = None
     """The request_id of the parent request if this request is a sub-request, e.g. a paged request or a retry."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+
+class RuntimeGroupInfo(BaseModel):
+    """Represents the runtime information for a group of ESI requests."""
+
+    response_group_handlers: list[ResponseGroupHandlerProtocol] = Field(
+        ..., exclude=True
+    )
+    """The list of response group handler instances to run for this group of requests, in the order they should be run."""
 
 
 class Request(BaseModelToDisk):
@@ -134,7 +144,8 @@ class Request(BaseModelToDisk):
     operation_id: str
     path_parameters: dict[str, str | int | float] = {}
     query_parameters: dict[str, str | int | float] = {}
-    # auth_parameters: AuthParameters | None = None
+    auth_character_id: int | None = None
+    lang: Lang = "en"
     json_body: Any | None = None
     response_handlers: list[ResponseHandlerConfig] = []
 
@@ -156,6 +167,7 @@ class RequestGroup(BaseModelToDisk):
     group_id: UUID
     description: str = ""
     requests: dict[UUID, Request]
+    response_group_handlers: list[ResponseGroupHandlerConfig] = []
 
 
 @dataclass(slots=True)
@@ -348,6 +360,7 @@ class ResponseGroup(BaseModelToDisk):
     """Represents the responses to a group of ESI requests."""
 
     request_group: RequestGroup
+    runtime_info: RuntimeGroupInfo
     responses: dict[UUID, Response]
 
 
@@ -435,8 +448,12 @@ class IndexedOperation:
 class IndexedEsiSchema(BaseModelToDisk):
     """Represents the entire schema for ESI requests and responses, indexed for efficient access."""
 
+    # TODO rework this class with properties for accessing the various parts of the schema, rather than storing them all as dicts. This will allow for better type safety and easier access to the relevant information for each request.
     download_date: Instant
     """The date the schema was downloaded."""
+    compatibility_date: str
+    """The compatibility date for the schema, in ISO 8601 format (e.g. "2026-02-21"). 
+        This is used to version the EVE ESI."""
     operations: dict[str, IndexedOperation] = Field(default_factory=dict)
     """A mapping of operation IDs to IndexedOperation instances."""
     security_schemes: dict[str, Any] = Field(default_factory=dict)
@@ -500,8 +517,10 @@ class IndexedEsiSchema(BaseModelToDisk):
                         path=path,
                         operation=operation,
                     )
+        # FIXME verify acquisition of compatibility date from schema, and fallback to download date if not present
         return cls(
             download_date=download_date,
+            compatibility_date=dereferenced_schema.get("info", {}).get("version", ""),
             operations=operations,
             security_schemes=dereferenced_schema.get("components", {}).get(
                 "securitySchemes", {}

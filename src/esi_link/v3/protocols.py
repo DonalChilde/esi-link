@@ -1,7 +1,7 @@
 """Protocols for ESI Link."""
 
 from types import TracebackType
-from typing import Any, Protocol, Self
+from typing import Any, ClassVar, Protocol, Self
 from uuid import UUID
 
 import aiohttp
@@ -19,6 +19,7 @@ from esi_link.v3.models import (
     ResponseGroup,
     ResponseGroupHandlerConfig,
     ResponseHandlerConfig,
+    RuntimeGroupInfo,
     RuntimeRequest,
     RuntimeRequestInfo,
     SchemaDownload,
@@ -39,8 +40,12 @@ class HttpRequestExecutorProtocol(Protocol):
         ...
 
 
-class RuntimeInfoGeneratorProtocol(Protocol):
-    def __call__(self, request: Request) -> RuntimeRequestInfo: ...
+class RuntimeRequestInfoGeneratorProtocol(Protocol):
+    async def __call__(self, request: Request) -> RuntimeRequestInfo: ...
+
+
+class RuntimeGroupInfoGeneratorProtocol(Protocol):
+    def __call__(self, request_group: RequestGroup) -> RuntimeGroupInfo: ...
 
 
 class RequestValidatorProtocol(Protocol):
@@ -55,7 +60,7 @@ class RequestValidatorProtocol(Protocol):
 
 class RequestGroupExecutorProtocol(Protocol):
     request_executor: HttpRequestExecutorProtocol | None
-    runtime_info: RuntimeInfoGeneratorProtocol | None
+    runtime_info: RuntimeRequestInfoGeneratorProtocol | None
     request_validator: RequestValidatorProtocol | None
 
     async def __call__(self, request_group: RequestGroup) -> ResponseGroup:
@@ -80,10 +85,10 @@ class RequestGroupValidatorProtocol(Protocol):
 
 
 class ResponseHandlerProtocol(Protocol):
-    name: str
+    name: ClassVar[str]
     config: ResponseHandlerConfig
 
-    def __call__(self, response: Response) -> Response:
+    async def __call__(self, response: Response) -> Response:
         """Handle a response.
 
         This can be used for things like error handling, response transformation,
@@ -138,22 +143,20 @@ class ResponseHandlerProtocol(Protocol):
         )
 
 
-class ResponseGroupHandlerProtocol(Protocol):
-    def __call__(self, response_group: ResponseGroup) -> ResponseGroup: ...
-
-
 class ResponseHandlerManagerProtocol(Protocol):
-    def get_handler(self, config: ResponseHandlerConfig) -> ResponseHandlerProtocol:
+    def get_handler(
+        self, config: ResponseHandlerConfig
+    ) -> ResponseHandlerProtocol | None:
         """Get a handler by config.
 
         Args:
             config: The HandlerConfig instance containing the configuration.
 
         Returns:
-            An instance of the handler.
+            An instance of the handler or None if the handler is not found.
 
         Raises:
-            HandlerNotFoundError: If the handler is not found.
+            InvalidHandlerConfigError: If the config is invalid for the specified handler.
         """
         raise NotImplementedError("get_handler method must be implemented by subclass")
 
@@ -195,10 +198,28 @@ class ResponseHandlerManagerProtocol(Protocol):
         )
 
 
+class ResponseGroupHandlerProtocol(Protocol):
+    name: ClassVar[str]
+    config: ResponseGroupHandlerConfig
+
+    async def __call__(
+        self, request_group: RequestGroup, responses: list[Response]
+    ) -> list[Response]: ...
+    @classmethod
+    def from_config(cls, config: ResponseGroupHandlerConfig) -> Self: ...
+    @classmethod
+    def validate_config(cls, config: ResponseGroupHandlerConfig) -> None: ...
+
+
 class ResponseGroupHandlerManagerProtocol(Protocol):
     def get_handler(
         self, config: ResponseGroupHandlerConfig
     ) -> ResponseGroupHandlerProtocol: ...
+    def register_handler(
+        self, handler_cls: type[ResponseGroupHandlerProtocol]
+    ) -> None: ...
+    def registered_handlers(self) -> dict[str, type[ResponseGroupHandlerProtocol]]: ...
+    def validate_handler_config(self, config: ResponseGroupHandlerConfig) -> None: ...
 
 
 class CacheManagerProtocol:
@@ -326,16 +347,16 @@ class CacheFactoryProtocol:
 
 
 class UrlGeneratorProtocol:
-    def generate_path_url(self, request: Request) -> str:
+    def generate_path_url(self, request: Request, schema: IndexedEsiSchema) -> str:
         """Generate the url path for an ESI request based on its parameters.\
-            
-        This url does not contain query parameters, and is not suitable for generateing 
-        a cache key. It is used as the url argument for http requests, assuming that 
+
+        This url does not contain query parameters, and is not suitable for generateing
+        a cache key. It is used as the url argument for http requests, assuming that
         query parameters are sent separately.
         """
         ...
 
-    def generate_cache_url(self, request: Request) -> str:
+    def generate_cache_url(self, request: Request, schema: IndexedEsiSchema) -> str:
         """Generate the url to use for cache key generation for an ESI request based on its parameters.
 
         This url should contain all path and most query parameters, and should be
@@ -348,7 +369,7 @@ class UrlGeneratorProtocol:
         """
         ...
 
-    def generate_cache_key(self, request: Request) -> UUID:
+    def generate_cache_key(self, request: Request, schema: IndexedEsiSchema) -> UUID:
         """Generate a cache key for an ESI request based on its parameters.
 
         The key is usually generated by hashing the url generated by generate_cache_url,
@@ -357,7 +378,7 @@ class UrlGeneratorProtocol:
         """
         ...
 
-    def generate_url_info(self, request: Request) -> GeneratedUrlInfo:
+    def __call__(self, request: Request, schema: IndexedEsiSchema) -> GeneratedUrlInfo:
         """Generate all url related information for an ESI request.
 
         This is a convenience method that generates the path url, cache url, and cache key
@@ -440,5 +461,19 @@ class SchemaManagerProtocol:
 
         Returns:
             A SchemaDownload object containing the raw OpenAPI schema and the download date.
+        """
+        ...
+
+
+class AuthenticationHeaderProviderProtocol(Protocol):
+    async def header(self, character_id: int) -> dict[str, str] | None:
+        """Return the authentication header to be included in ESI requests.
+
+        Args:
+            character_id: The ID of the character for whom to generate the authentication header.
+
+        Returns:
+            A dictionary containing the authentication header, or None if no
+                authentication is available.
         """
         ...
