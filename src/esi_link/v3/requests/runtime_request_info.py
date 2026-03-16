@@ -1,10 +1,10 @@
 """Module for generating runtime request information from ESI requests."""
 
+from esi_link.esi_auth.protocols import AuthProviderProtocol
 from esi_link.v3 import USER_AGENT
 from esi_link.v3.handlers.response_handlers import ResponseHandlerManager
 from esi_link.v3.models import IndexedEsiSchema, Metrics, Request, RuntimeRequestInfo
 from esi_link.v3.protocols import (
-    AuthenticationHeaderProviderProtocol,
     ResponseHandlerManagerProtocol,
     ResponseHandlerProtocol,
     RuntimeRequestInfoGeneratorProtocol,
@@ -17,14 +17,16 @@ class RuntimeRequestInfoGenerator(RuntimeRequestInfoGeneratorProtocol):
     def __init__(
         self,
         indexed_schema: IndexedEsiSchema,
-        auth: AuthenticationHeaderProviderProtocol | None = None,
+        auth: AuthProviderProtocol,
+        auth_min_seconds: int = 300,
         url_generator: UrlGeneratorProtocol | None = None,
         response_handler_manager: ResponseHandlerManagerProtocol | None = None,
     ) -> None:
         """Initialize the RuntimeRequestInfoGenerator."""
-        # TODO When all protocols have been implemented, add default values, and remove is None checks.
         self.indexed_schema = indexed_schema
         self.auth = auth
+        self.auth_min_seconds = auth_min_seconds
+
         self.url_generator = url_generator or UrlGenerator()
         self.response_handler_manager = (
             response_handler_manager or ResponseHandlerManager()
@@ -32,10 +34,6 @@ class RuntimeRequestInfoGenerator(RuntimeRequestInfoGeneratorProtocol):
 
     async def __call__(self, request: Request) -> RuntimeRequestInfo:
         """Generate the RuntimeRequestInfo for a given Request."""
-        if request.auth_character_id is not None and self.auth is None:
-            raise ValueError(
-                "Authentication is required for this request, but no auth provider is set."
-            )
         url_info = self.url_generator(request, self.indexed_schema)
         headers = self._generate_headers(request)
         auth_headers = await self._auth_headers(request)
@@ -72,15 +70,16 @@ class RuntimeRequestInfoGenerator(RuntimeRequestInfoGeneratorProtocol):
     async def _auth_headers(self, request: Request) -> dict[str, str]:
         if request.auth_character_id is None:
             return {}
-        if self.auth is None:
-            raise ValueError(
-                f"Authentication is required for request {request.request_id}, but no auth provider is set."
+        try:
+            char_auth = await self.auth.character_auth(
+                request.auth_character_id, min_seconds=self.auth_min_seconds
             )
-        auth_headers = await self.auth.header(request.auth_character_id)
-        if auth_headers is None:
+        except KeyError as e:
             raise ValueError(
-                f"Authentication required for character ID {request.auth_character_id}, but no auth headers could be generated."
-            )
+                f"Authentication required for character ID {request.auth_character_id}, "
+                "but no authentication information is available."
+            ) from e
+        auth_headers = char_auth.auth_headers
         return auth_headers
 
     def _generate_headers(self, request: Request) -> dict[str, str]:

@@ -18,14 +18,17 @@ RequestExecutionStrategy = Callable[
 ]
 
 
+# TODO implement a factory function with default values for all the dependencies, so that users can easily create a GroupExecutor with default behavior, but also have the option to customize any of the dependencies if they want to.
+
+
 class GroupExecutor(RequestGroupExecutorProtocol):
     def __init__(
         self,
-        request_executor: HttpRequestExecutorProtocol | None = None,
-        runtime_request_info: RuntimeRequestInfoGeneratorProtocol | None = None,
-        runtime_group_info: RuntimeGroupInfoGeneratorProtocol | None = None,
-        request_validator: RequestValidatorProtocol | None = None,
-        request_group_validator: RequestGroupValidatorProtocol | None = None,
+        request_executor: HttpRequestExecutorProtocol,
+        runtime_request_info: RuntimeRequestInfoGeneratorProtocol,
+        runtime_group_info: RuntimeGroupInfoGeneratorProtocol,
+        request_validator: RequestValidatorProtocol,
+        request_group_validator: RequestGroupValidatorProtocol,
         execution_strategy: RequestExecutionStrategy | None = None,
     ) -> None:
         # TODO after full implementation, ensure default values set, then can remove the none checks in __call__
@@ -40,17 +43,6 @@ class GroupExecutor(RequestGroupExecutorProtocol):
 
     async def __call__(self, request_group: RequestGroup) -> ResponseGroup:
         """Execute a group of ESI requests and return their responses as a ResponseGroup."""
-        if self._runtime_request_info is None:
-            raise ValueError("No runtime info generator provided.")
-        if self._runtime_group_info is None:
-            raise ValueError("No runtime group info generator provided.")
-        if self._request_executor is None:
-            raise ValueError("No request executor provided.")
-        if self._request_group_validator is None:
-            raise ValueError("No request group validator provided.")
-        if self._request_validator is None:
-            raise ValueError("No request validator provided.")
-
         runtime_requests: list[RuntimeRequest] = []
         for request in request_group.requests.values():
             runtime_info = await self._runtime_request_info(request)

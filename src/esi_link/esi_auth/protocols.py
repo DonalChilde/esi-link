@@ -110,11 +110,15 @@ class CharacterTokenManagerProtocol(CharacterTokenProviderProtocol, Protocol):
 class AuthProviderProtocol(Protocol):
     """Protocol for providing authentication information."""
 
-    async def character_auth(self, character_id: int) -> CharacterAuth:
+    async def character_auth(
+        self, character_id: int, min_seconds: int = 300
+    ) -> CharacterAuth:
         """Return the authentication information for the given character ID.
 
         Args:
             character_id: The ID of the character for which to retrieve the authentication information.
+            min_seconds: The minimum number of seconds before a token expires to
+                trigger a refresh. -1 to disable refresh. Default is 300 (5 minutes).
 
         Returns:
             The authentication information for the given character ID.
@@ -124,8 +128,13 @@ class AuthProviderProtocol(Protocol):
         """
         ...
 
-    async def available_characters(self) -> list[int]:
-        """Return a list of character IDs for which authentication information is available."""
+    async def available_characters(self, min_seconds: int = 300) -> list[int]:
+        """Return a list of character IDs for which authentication information is available.
+
+        Args:
+            min_seconds: The minimum number of seconds before a token expires to
+                trigger a refresh. -1 to disable refresh. Default is 300 (5 minutes).
+        """
         ...
 
 
