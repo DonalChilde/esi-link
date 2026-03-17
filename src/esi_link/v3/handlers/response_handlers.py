@@ -79,16 +79,19 @@ class SimpleSaveToDiskResponseHandler(ResponseHandlerProtocol):
         self.config = config
         self.output_dir = output_dir
         self.overwrite = overwrite
+        self.output_file: Path | None = None
 
     @staticmethod
     def _check_directory(output_dir: str) -> Path:
         """Check if the output directory is valid, and create it if it doesn't exist."""
         if output_dir.startswith("/"):
-            msg = (
-                "output_dir must be a relative path - from home or current working directory, "
-                "not an absolute path. Try `~/output/dir` or `output/dir` instead of `/output/dir`."
-            )
-            raise ValueError(msg)
+            home_dir = str(Path.home())
+            if not output_dir.startswith(home_dir):
+                msg = (
+                    "output_dir must be a relative path - from home or current working directory, "
+                    "not an absolute path. Try `~/output/dir` or `output/dir` instead of `/output/dir`."
+                )
+                raise ValueError(msg)
         output_path = Path(output_dir).expanduser().resolve()
         if output_path.is_file():
             raise ValueError(
@@ -113,6 +116,7 @@ class SimpleSaveToDiskResponseHandler(ResponseHandlerProtocol):
             file_name=f"{request_id}-{operation_id}-{status_code}.json",
             overwrite=self.overwrite,
         )
+        self.output_file = file_path
         logger.info(
             "Response saved to %s for %s-%s-%s",
             file_path,
