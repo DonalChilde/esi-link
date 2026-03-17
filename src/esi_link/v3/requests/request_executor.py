@@ -13,6 +13,7 @@ import aiohttp
 from aiolimiter import AsyncLimiter
 
 from esi_link.v3.models_and_protocols import (
+    CacheAction,
     CachedResponse,
     CachedResponseStatus,
     CacheManagerProtocol,
@@ -39,12 +40,15 @@ class RequestExecutor(HttpRequestExecutorProtocol):
         self, request: RuntimeRequest, session: aiohttp.ClientSession
     ) -> Response:
         """Execute the given request, utilizing caching and rate limiting."""
-        request.runtime_info.metrics.task_started = perf_counter()
+        metrics = request.runtime_info.metrics
+        metrics.task_started = perf_counter()
         cached_response, cache_status = pre_check_cache(request, self.cache_manager)
         if cached_response is not None:
             return cached_response
         try:
+            metrics.primary_request_started = perf_counter()
             response = await execute_http_request(request, session, self.rate_limiter)
+            metrics.primary_request_completed = perf_counter()
         except Exception as e:
             logger.error(f"Error executing HTTP request: {e}")
             return Response(
@@ -114,7 +118,11 @@ def update_cache_if_needed(
     if response.http_response is None:
         raise ValueError("Cannot update cache for a response with no HTTP response")
     if response.runtime_info.cache_key is not None:
+        metrics = response.runtime_info.metrics
+        metrics.cache_update_started = perf_counter()
         cache_manager.set(response.runtime_info.cache_key, response.http_response)
+        metrics.cache_update_completed = perf_counter()
+        metrics.cache_action = CacheAction.ADDED_TO_CACHE
         return response.runtime_info.cache_key
     return None
 
@@ -146,10 +154,14 @@ async def check_for_pages(
     """Check if the response indicates pagination and handle it if necessary."""
     if not is_paged_response_required(response):
         return response
+    metrics = response.runtime_info.metrics
+    metrics.paged_request_count = response.http_response.pages  # type: ignore
     requests = assemble_paged_runtime_requests(response)
+    metrics.paged_requests_start = perf_counter()
     paged_responses = await asyncio.gather(
         *[execute_http_request(req, session, rate_limiter) for req in requests]
     )
+    metrics.paged_requests_completed = perf_counter()
 
     check_for_valid_paged_responses(response, paged_responses)
     response = combine_responses(response, paged_responses)
@@ -209,9 +221,13 @@ def handle_304_not_modified(
         and cache_status == CachedResponseStatus.STALE
         and response.runtime_info.cache_key is not None
     ):
+        metrics = response.runtime_info.metrics
+        metrics.cache_update_started = perf_counter()
         cached_response = cache_manager.refresh(
             response.runtime_info.cache_key, response.http_response
         )
+        metrics.cache_update_completed = perf_counter()
+        metrics.cache_action = CacheAction.CACHE_304_REFRESH
         response.http_response = cached_response.http_response
     return response
 
@@ -221,9 +237,16 @@ def pre_check_cache(
 ) -> tuple[Response | None, CachedResponseStatus]:
     """Check the cache for a response before making an HTTP request."""
     if request.runtime_info.cache_key is None:
+        # no cache_key means we can't cache this request,
+        # so we can skip the cache check entirely
         return None, CachedResponseStatus.MISS
+    metrics = request.runtime_info.metrics
+    metrics.cache_check_started = perf_counter()
     cached_response, status = cache_manager.get(request.runtime_info.cache_key)
+    metrics.cache_check_completed = perf_counter()
     if status == CachedResponseStatus.HIT and cached_response is not None:
+        metrics.cache_response_status = CachedResponseStatus.HIT
+        metrics.cache_action = CacheAction.CACHED_RESPONSE_USED
         logger.info(f"Cache hit for request {request.request.request_id}")
         return Response(
             request=request.request,
@@ -233,10 +256,12 @@ def pre_check_cache(
             exceptions=[],
         ), status
     if status == CachedResponseStatus.STALE and cached_response is not None:
+        metrics.cache_response_status = CachedResponseStatus.STALE
         logger.info(f"Stale cache hit for request {request.request.request_id}")
         set_stale_cache_headers(request, cached_response)
         return None, status
     if status == CachedResponseStatus.MISS and cached_response is None:
+        metrics.cache_response_status = CachedResponseStatus.MISS
         logger.info(f"Cache miss for request {request.request.request_id}")
         return None, status
     raise ValueError(

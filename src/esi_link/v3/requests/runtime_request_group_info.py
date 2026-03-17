@@ -3,6 +3,7 @@
 from esi_link.v3.handlers.response_group_handlers import ResponseGroupHandlerManager
 from esi_link.v3.models_and_protocols import (
     RequestGroup,
+    RequestGroupMetrics,
     ResponseGroupHandlerManagerProtocol,
     ResponseGroupHandlerProtocol,
     RuntimeGroupInfo,
@@ -29,6 +30,7 @@ class RuntimeRequestGroupInfoGenerator(RuntimeGroupInfoGeneratorProtocol):
             handler = self.response_group_handler_manager.get_handler(handler_config)
             handlers.append(handler)
         result = RuntimeGroupInfo(
+            metrics=RequestGroupMetrics(),
             response_group_handlers=handlers,
         )
         return result

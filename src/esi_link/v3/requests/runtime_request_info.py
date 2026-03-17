@@ -5,8 +5,8 @@ from esi_link.v3 import USER_AGENT
 from esi_link.v3.handlers.response_handlers import ResponseHandlerManager
 from esi_link.v3.models_and_protocols import (
     IndexedEsiSchema,
-    Metrics,
     Request,
+    RequestMetrics,
     ResponseHandlerManagerProtocol,
     ResponseHandlerProtocol,
     RuntimeRequestInfo,
@@ -66,7 +66,7 @@ class RuntimeRequestInfoGenerator(RuntimeRequestInfoGeneratorProtocol):
             timeout=10,
             cache_key=url_info.cache_key if operation and operation.is_cached else None,
             response_handlers=handlers,
-            metrics=Metrics(),
+            metrics=RequestMetrics(),
         )
         return runtime_info
 

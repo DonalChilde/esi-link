@@ -22,14 +22,26 @@ from esi_link.v3 import example_requests
 
 
 @app.command()
-def status(ctx: typer.Context):
+def status(
+    ctx: typer.Context,
+    output_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "-d", "--directory", help="Directory to save the status response to."
+        ),
+    ] = None,
+):
     """Run tests for ESI Link."""
     settings = get_settings_from_context(ctx)
     console = Console()
     console.print("Running tests...")
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
     schema = schema_manager.get_latest_schema()
-    request = example_requests.esi_status()
+    request = example_requests.esi_status(
+        handlers=[example_requests.simple_save_response(output_dir=output_dir)]
+        if output_dir
+        else None
+    )
     request_group = RequestGroup(
         group_id=uuid4(), requests={request.request_id: request}
     )
@@ -45,18 +57,32 @@ def status(ctx: typer.Context):
     group_executor = factory.group_executor()
     response_group = asyncio.run(group_executor(request_group))
     response = response_group.responses[request.request_id]
-    console.print(response.http_response)
+    console.print(JSON(response.http_response.body_text))  # type: ignore
+    if output_dir:
+        console.print(f"Status response saved to {output_dir}")
 
 
 @app.command()
-def pages(ctx: typer.Context):
+def pages(
+    ctx: typer.Context,
+    output_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "-d", "--directory", help="Directory to save the paged response to."
+        ),
+    ] = None,
+):
     """Test handling of paged requests."""
     settings = get_settings_from_context(ctx)
     console = Console()
     console.print("Running tests...")
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
     schema = schema_manager.get_latest_schema()
-    request = example_requests.market_types_with_active_orders()
+    request = example_requests.market_types_with_active_orders(
+        handlers=[example_requests.simple_save_response(output_dir=output_dir)]
+        if output_dir
+        else None
+    )
     request_group = RequestGroup(
         group_id=uuid4(), requests={request.request_id: request}
     )
@@ -79,6 +105,8 @@ def pages(ctx: typer.Context):
         raise typer.Exit(code=1) from e
     console.print(f"Total items: {len(data)}")
     console.print(JSON.from_data(data))
+    if output_dir:
+        console.print(f"Paged response saved to {output_dir}")
 
 
 @app.command()

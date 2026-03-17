@@ -34,6 +34,12 @@ class CachedResponseStatus(StrEnum):
     STALE = "STALE"
 
 
+class CacheAction(StrEnum):
+    ADDED_TO_CACHE = "ADDED_TO_CACHE"
+    CACHED_RESPONSE_USED = "CACHED_RESPONSE_USED"
+    CACHE_304_REFRESH = "CACHE_304_REFRESH"
+
+
 @dataclass(slots=True)
 class SchemaDownload:
     """A class representing a downloaded ESI schema and its associated metadata."""
@@ -124,7 +130,7 @@ class RuntimeRequestInfo(BaseModel):
         list["ResponseHandlerProtocol"], Field(..., exclude=True), SkipValidation
     ]
     """The list of response handler instances to run for this request, in the order they should be run."""
-    metrics: "Metrics"
+    metrics: "RequestMetrics"
     parent_id: UUID | None = None
     """The request_id of the parent request if this request is a sub-request, e.g. a paged request or a retry."""
 
@@ -134,6 +140,7 @@ class RuntimeRequestInfo(BaseModel):
 class RuntimeGroupInfo(BaseModel):
     """Represents the runtime information for a group of ESI requests."""
 
+    metrics: "RequestGroupMetrics"
     response_group_handlers: list[Any] = Field(..., exclude=True)
     """The list of response group handler instances to run for this group of requests, in the order they should be run."""
 
@@ -283,7 +290,37 @@ class HttpResponse(BaseModel):
 
 
 @dataclass(slots=True)
-class Metrics:
+class RequestGroupMetrics:
+    """Performance metrics for a RequestGroup."""
+
+    group_execution_started: float | None = None
+    group_execution_completed: float | None = None
+    group_handlers_started: float | None = None
+    group_handlers_completed: float | None = None
+
+    @property
+    def group_handlers_duration(self) -> float:
+        """Calculate the total duration of the group handlers."""
+        if (
+            self.group_handlers_started is not None
+            and self.group_handlers_completed is not None
+        ):
+            return self.group_handlers_completed - self.group_handlers_started
+        return -1.0
+
+    @property
+    def group_execution_duration(self) -> float:
+        """Calculate the total duration of the group execution."""
+        if (
+            self.group_execution_started is not None
+            and self.group_execution_completed is not None
+        ):
+            return self.group_execution_completed - self.group_execution_started
+        return -1.0
+
+
+@dataclass(slots=True)
+class RequestMetrics:
     """Performance metrics for a Request."""
 
     task_started: float | None = None
@@ -296,9 +333,30 @@ class Metrics:
     handlers_started: float | None = None
     handlers_completed: float | None = None
     cache_response_status: "CachedResponseStatus | None" = None
-    cache_stale_status_code: int = 0
+    cache_action: "CacheAction | None" = None
     cache_check_started: float | None = None
     cache_check_completed: float | None = None
+    cache_add_started: float | None = None
+    cache_add_completed: float | None = None
+    cache_update_started: float | None = None
+    cache_update_completed: float | None = None
+
+    @property
+    def cache_add_duration(self) -> float:
+        """Calculate the duration of adding a response to the cache."""
+        if self.cache_add_started is not None and self.cache_add_completed is not None:
+            return self.cache_add_completed - self.cache_add_started
+        return -1.0
+
+    @property
+    def cache_update_duration(self) -> float:
+        """Calculate the duration of updating a response in the cache."""
+        if (
+            self.cache_update_started is not None
+            and self.cache_update_completed is not None
+        ):
+            return self.cache_update_completed - self.cache_update_started
+        return -1.0
 
     @property
     def task_duration(self) -> float:
