@@ -1,7 +1,7 @@
 import logging
 
-from esi_link.v3.models import RequestGroup
-from esi_link.v3.protocols import (
+from esi_link.v3.models_and_protocols import (
+    RequestGroup,
     RequestGroupValidatorProtocol,
     ResponseGroupHandlerManagerProtocol,
 )

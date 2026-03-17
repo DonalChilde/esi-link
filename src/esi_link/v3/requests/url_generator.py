@@ -4,8 +4,12 @@ from uuid import UUID, uuid5
 
 from esi_link.v3 import ESI_LINK_NAMESPACE
 from esi_link.v3.helpers.canonicalize_url import canonicalize_url
-from esi_link.v3.models import GeneratedUrlInfo, IndexedEsiSchema, Request
-from esi_link.v3.protocols import UrlGeneratorProtocol
+from esi_link.v3.models_and_protocols import (
+    GeneratedUrlInfo,
+    IndexedEsiSchema,
+    Request,
+    UrlGeneratorProtocol,
+)
 
 
 class UrlGenerator(UrlGeneratorProtocol):

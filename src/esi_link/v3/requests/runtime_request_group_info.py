@@ -1,10 +1,11 @@
 """Module for generating runtime request group information from ESI request groups."""
 
 from esi_link.v3.handlers.response_group_handlers import ResponseGroupHandlerManager
-from esi_link.v3.models import RequestGroup, RuntimeGroupInfo
-from esi_link.v3.protocols import (
+from esi_link.v3.models_and_protocols import (
+    RequestGroup,
     ResponseGroupHandlerManagerProtocol,
     ResponseGroupHandlerProtocol,
+    RuntimeGroupInfo,
     RuntimeGroupInfoGeneratorProtocol,
 )
 

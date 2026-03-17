@@ -9,8 +9,10 @@ from esi_link.v3.handlers.errors import (
     HandlerNotFoundError,
     HandlerValidationError,
 )
-from esi_link.v3.models import RequestGroup, Response, ResponseGroupHandlerConfig
-from esi_link.v3.protocols import (
+from esi_link.v3.models_and_protocols import (
+    RequestGroup,
+    Response,
+    ResponseGroupHandlerConfig,
     ResponseGroupHandlerManagerProtocol,
     ResponseGroupHandlerProtocol,
 )

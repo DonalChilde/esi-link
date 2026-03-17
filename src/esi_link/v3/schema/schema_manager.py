@@ -9,8 +9,11 @@ from whenever import Instant
 
 from esi_link.v3.helpers.resolve_json_ref import resolve_internal_refs
 from esi_link.v3.helpers.save_text_file import save_text_file
-from esi_link.v3.models import IndexedEsiSchema, IndexedOperation
-from esi_link.v3.protocols import SchemaManagerProtocol
+from esi_link.v3.models_and_protocols import (
+    IndexedEsiSchema,
+    IndexedOperation,
+    SchemaManagerProtocol,
+)
 from esi_link.v3.schema.errors import (
     InvalidSchemaError,
     SchemaManagerError,
@@ -160,7 +163,9 @@ class SchemaManager(SchemaManagerProtocol):
             f"No schema found for compatibility date {compatibility_date} and timestamp {timestamp}"
         )
 
-    def get_latest_schema(self, compatibility_date: str | None) -> IndexedEsiSchema:
+    def get_latest_schema(
+        self, compatibility_date: str | None = None
+    ) -> IndexedEsiSchema:
         """Get the latest ESI schema available in the schema store.
 
         If compatibility_date is provided, return the latest schema for that compatibility date.

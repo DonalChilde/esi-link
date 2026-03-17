@@ -3,10 +3,13 @@
 from esi_link.esi_auth.protocols import AuthProviderProtocol
 from esi_link.v3 import USER_AGENT
 from esi_link.v3.handlers.response_handlers import ResponseHandlerManager
-from esi_link.v3.models import IndexedEsiSchema, Metrics, Request, RuntimeRequestInfo
-from esi_link.v3.protocols import (
+from esi_link.v3.models_and_protocols import (
+    IndexedEsiSchema,
+    Metrics,
+    Request,
     ResponseHandlerManagerProtocol,
     ResponseHandlerProtocol,
+    RuntimeRequestInfo,
     RuntimeRequestInfoGeneratorProtocol,
     UrlGeneratorProtocol,
 )

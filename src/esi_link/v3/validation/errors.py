@@ -1,5 +1,5 @@
 from esi_link.v3.errors import EsiLinkError
-from esi_link.v3.models import Request
+from esi_link.v3.models_and_protocols import Request
 
 
 class RequestValidationError(EsiLinkError):

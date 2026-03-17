@@ -1,24 +1,26 @@
+"""Module for executing groups of ESI requests."""
+
 import asyncio
 from collections.abc import Awaitable, Callable
 
 import aiohttp
 
-from esi_link.v3.models import RequestGroup, Response, ResponseGroup, RuntimeRequest
-from esi_link.v3.protocols import (
+from esi_link.v3.models_and_protocols import (
     HttpRequestExecutorProtocol,
+    RequestGroup,
     RequestGroupExecutorProtocol,
     RequestGroupValidatorProtocol,
     RequestValidatorProtocol,
+    Response,
+    ResponseGroup,
     RuntimeGroupInfoGeneratorProtocol,
+    RuntimeRequest,
     RuntimeRequestInfoGeneratorProtocol,
 )
 
 RequestExecutionStrategy = Callable[
     [list[RuntimeRequest], HttpRequestExecutorProtocol], Awaitable[list[Response]]
 ]
-
-
-# TODO implement a factory function with default values for all the dependencies, so that users can easily create a GroupExecutor with default behavior, but also have the option to customize any of the dependencies if they want to.
 
 
 class GroupExecutor(RequestGroupExecutorProtocol):
@@ -31,7 +33,6 @@ class GroupExecutor(RequestGroupExecutorProtocol):
         request_group_validator: RequestGroupValidatorProtocol,
         execution_strategy: RequestExecutionStrategy | None = None,
     ) -> None:
-        # TODO after full implementation, ensure default values set, then can remove the none checks in __call__
         self._request_executor = request_executor
         self._runtime_request_info = runtime_request_info
         self._runtime_group_info = runtime_group_info

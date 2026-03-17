@@ -1,6 +1,6 @@
 from whenever import Instant
 
-from esi_link.v3.models import CachedResponse
+from esi_link.v3.models_and_protocols import CachedResponse
 
 
 def is_stale(cached_response: CachedResponse, local_max_age_seconds: int) -> bool:

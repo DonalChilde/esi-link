@@ -11,8 +11,9 @@ from esi_link.v3.handlers.errors import (
     HandlerValidationError,
 )
 from esi_link.v3.helpers.save_text_file import save_text_file
-from esi_link.v3.models import Response, ResponseHandlerConfig
-from esi_link.v3.protocols import (
+from esi_link.v3.models_and_protocols import (
+    Response,
+    ResponseHandlerConfig,
     ResponseHandlerManagerProtocol,
     ResponseHandlerProtocol,
 )

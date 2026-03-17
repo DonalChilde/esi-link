@@ -6,7 +6,7 @@ from whenever import Instant
 
 from esi_link.v3 import USER_AGENT
 from esi_link.v3.helpers.aiohttp.download_files import download_json
-from esi_link.v3.models import SchemaDownload
+from esi_link.v3.models_and_protocols import SchemaDownload
 from esi_link.v3.schema.errors import InvalidSchemaError, SchemaManagerError
 from esi_link.v3.settings import ESI_SCHEMA_CHANGELOG_URL, ESI_SCHEMA_URL
 

@@ -3,8 +3,10 @@
 import logging
 
 from esi_link.esi_auth.protocols import AuthProviderProtocol
-from esi_link.v3.models import IndexedEsiSchema, IndexedOperation, Request
-from esi_link.v3.protocols import (
+from esi_link.v3.models_and_protocols import (
+    IndexedEsiSchema,
+    IndexedOperation,
+    Request,
     RequestValidatorProtocol,
     ResponseHandlerManagerProtocol,
 )

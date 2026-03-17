@@ -2,7 +2,7 @@
 
 from typing import TypedDict
 
-from esi_link.v3.models import IndexedEsiSchema
+from esi_link.v3.models_and_protocols import IndexedEsiSchema
 
 
 class IndexedOperationSummary(TypedDict):

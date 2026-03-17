@@ -9,12 +9,12 @@ from diskcache import Cache  # type: ignore
 from whenever import Instant
 
 from esi_link.v3.cache.stale_cache_check import is_stale
-from esi_link.v3.models import (
+from esi_link.v3.models_and_protocols import (
     CachedResponse,
     CachedResponseStatus,
+    CacheManagerProtocol,
     HttpResponse,
 )
-from esi_link.v3.protocols import CacheManagerProtocol
 
 
 class DiskCache(CacheManagerProtocol):

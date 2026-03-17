@@ -2,7 +2,7 @@
 
 from uuid import uuid4
 
-from esi_link.v3.models import Request, ResponseHandlerConfig
+from esi_link.v3.models_and_protocols import Request, ResponseHandlerConfig
 
 
 def simple_save_response(

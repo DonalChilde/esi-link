@@ -6,18 +6,16 @@ They can be used for testing or as placeholders until real implementations are p
 import logging
 from typing import Self
 
-from esi_link.v3.models import (
+from esi_link.v3.models_and_protocols import (
     Request,
     RequestGroup,
-    Response,
-    ResponseHandlerConfig,
-    RuntimeGroupInfo,
-)
-from esi_link.v3.protocols import (
     RequestGroupValidatorProtocol,
     RequestValidatorProtocol,
+    Response,
+    ResponseHandlerConfig,
     ResponseHandlerManagerProtocol,
     ResponseHandlerProtocol,
+    RuntimeGroupInfo,
     RuntimeGroupInfoGeneratorProtocol,
 )
 

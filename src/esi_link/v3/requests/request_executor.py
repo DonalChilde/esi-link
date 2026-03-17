@@ -12,14 +12,15 @@ from uuid import UUID, uuid4
 import aiohttp
 from aiolimiter import AsyncLimiter
 
-from esi_link.v3.models import (
+from esi_link.v3.models_and_protocols import (
     CachedResponse,
     CachedResponseStatus,
+    CacheManagerProtocol,
+    HttpRequestExecutorProtocol,
     HttpResponse,
     Response,
     RuntimeRequest,
 )
-from esi_link.v3.protocols import CacheManagerProtocol, HttpRequestExecutorProtocol
 
 logger = logging.getLogger(__name__)
 
