@@ -43,8 +43,10 @@ class GroupExecutor(RequestGroupExecutorProtocol):
 
     async def __call__(self, request_group: RequestGroup) -> ResponseGroup:
         """Execute a group of ESI requests and return their responses as a ResponseGroup."""
+        self._request_group_validator(request_group)
         runtime_requests: list[RuntimeRequest] = []
         for request in request_group.requests.values():
+            await self._request_validator(request)
             runtime_info = await self._runtime_request_info(request)
             runtime_requests.append(
                 RuntimeRequest(request=request, runtime_info=runtime_info)

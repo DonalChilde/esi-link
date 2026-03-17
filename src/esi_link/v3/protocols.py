@@ -22,7 +22,6 @@ from esi_link.v3.models import (
     RuntimeGroupInfo,
     RuntimeRequest,
     RuntimeRequestInfo,
-    SchemaDownload,
 )
 
 
@@ -49,7 +48,7 @@ class RuntimeGroupInfoGeneratorProtocol(Protocol):
 
 
 class RequestValidatorProtocol(Protocol):
-    def __call__(self, request: Request) -> None:
+    async def __call__(self, request: Request) -> None:
         """Validate a request.
 
         Raises:
@@ -393,87 +392,97 @@ class UrlGeneratorProtocol:
 
 
 class SchemaManagerProtocol:
-    def get_schema_for_date(self, compatibility_date: str) -> IndexedEsiSchema:
-        """Get the appropriate schema for a given date.
+    """Protocol for managing ESI schemas, including storing, retrieving, and adding schemas to the schema store.
 
-        Args:
-            compatibility_date: The ISO 8601 string representing the date for which to retrieve the schema.
+    While the Esi schema is versioned by its compatibility date, minor changes do not
+    trigger an update of the compatibility date. This means that multiple versions of
+    the schema can exist for the same compatibility date.
 
-        Returns:
-            The IndexedEsiSchema instance that is appropriate for the given date.
+    To avoid ambiguity when multiple versions of the schema exist for the same compatibility date,
+    schemas in the store are indexed by both their compatibility date and their download
+    timestamp, to allow for retrieval of specific versions of the schema.
+    """
 
-        Raises:
-            ValueError: If no appropriate schema is found for the given date.
-        """
-        ...
-
-    def get_latest_schema(self) -> IndexedEsiSchema:
-        """Get the latest schema available in the store.
-
-        Returns:
-            The IndexedEsiSchema instance with the most recent download date.
-
-        Raises:
-            ValueError: If no schemas are available in the store.
-        """
-        ...
-
-    def available_schemas(self) -> list[str]:
-        """Get a list of all available schemas in the store.
-
-        Returns:
-            A list of the compatibility dates for all IndexedEsiSchema instances available in the store.
-        """
-        ...
-
-    def add_schema(self, schema: IndexedEsiSchema) -> None:
-        """Add a new schema to the store.
-
-        Args:
-            schema: The IndexedEsiSchema instance to add to the store.
-        """
-        ...
-
-    def transform_schema(
-        self, raw_schema: dict[str, Any], download_date: Instant
+    def get_schema_for_date(
+        self, compatibility_date: str, timestamp: int
     ) -> IndexedEsiSchema:
-        """Transform a raw OpenAPI schema into an IndexedEsiSchema instance.
-
-        This method should handle the process of taking a raw OpenAPI schema as a dictionary,
-        dereferencing any internal references, and transforming it into an IndexedEsiSchema
-        instance that can be stored and used for request execution.
+        """Get the ESI schema corresponding to the given compatibility date and timestamp.
 
         Args:
-            raw_schema: The raw OpenAPI schema as a dictionary.
-            download_date: The date the schema was downloaded.
+            compatibility_date (str): The compatibility date of the schema to retrieve.
+            timestamp (int): The timestamp of the schema to retrieve.
 
         Returns:
-            The transformed IndexedEsiSchema instance.
+            IndexedEsiSchema: The ESI schema corresponding to the given compatibility date and timestamp.
+
+        Raises:
+            SchemaNotFoundError: If no schema is found for the given compatibility date and timestamp.
+            SchemaManagerError: If there is an error loading the schema file.
         """
         ...
 
-    def download_schema(self, compatibility_date: str | None = None) -> SchemaDownload:
-        """Download the raw OpenAPI schema from the ESI endpoint.
+    def get_latest_schema(self, compatibility_date: str | None) -> IndexedEsiSchema:
+        """Get the latest ESI schema available in the schema store.
+
+        If compatibility_date is provided, return the latest schema for that compatibility date.
+        If compatibility_date is None, return the latest schema across all compatibility dates.
 
         Args:
-            compatibility_date: The ISO 8601 string representing the date for which to
-                download the schema. If None, the latest schema will be downloaded.
+            compatibility_date (str | None): The compatibility date to filter schemas by,
+                or None to get the latest schema across all compatibility dates.
 
         Returns:
-            A SchemaDownload object containing the raw OpenAPI schema and the download date.
+            IndexedEsiSchema: The latest ESI schema available in the schema store.
+
+        Raises:
+            SchemaNotFoundError: If no schemas are found in the schema store.
+            SchemaManagerError: If there is an error loading the schema files.
+        """
+        ...
+
+    def available_schemas(self) -> list[tuple[str, int, str]]:
+        """Return a list of available compatibility dates for schemas in the store.
+
+        Available schemas are returned as a list of tuples, where each tuple contains:
+        - compatibility_date (str): The compatibility date of the schema.
+        - timestamp (int): The timestamp of the schema download.
+        - datetime (str): The download date and time of the schema as an ISO 8601 string.
+
+        Returns:
+            list[tuple[str, int, str]]: A list of available schemas in the store.
+
+        Raises:
+            SchemaManagerError: If there is an error loading the schema files.
+        """
+        ...
+
+    def add_schema(self, schema: dict[str, Any], download_date: Instant) -> None:
+        """Add a new schema to the schema store.
+
+        This method adds a raw OpenAPI schema to the schema store along with the
+        date and time when the schema was downloaded.
+
+        Args:
+            schema (dict[str, Any]): The raw OpenAPI schema to add to the store.
+            download_date (Instant): The date and time when the schema was downloaded.
+
+        Raises:
+            SchemaManagerError: If there is an error saving the schema to the store.
+            InvalidSchemaError: If the schema is invalid or cannot be processed.
+
         """
         ...
 
 
-class AuthenticationHeaderProviderProtocol(Protocol):
-    async def header(self, character_id: int) -> dict[str, str] | None:
-        """Return the authentication header to be included in ESI requests.
+# class AuthenticationHeaderProviderProtocol(Protocol):
+#     async def header(self, character_id: int) -> dict[str, str] | None:
+#         """Return the authentication header to be included in ESI requests.
 
-        Args:
-            character_id: The ID of the character for whom to generate the authentication header.
+#         Args:
+#             character_id: The ID of the character for whom to generate the authentication header.
 
-        Returns:
-            A dictionary containing the authentication header, or None if no
-                authentication is available.
-        """
-        ...
+#         Returns:
+#             A dictionary containing the authentication header, or None if no
+#                 authentication is available.
+#         """
+#         ...

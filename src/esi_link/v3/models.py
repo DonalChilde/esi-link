@@ -3,7 +3,7 @@
 import json
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any, Literal, Self, cast
+from typing import TYPE_CHECKING, Any, Literal, Self, cast
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -11,8 +11,13 @@ from whenever import Instant
 
 from esi_link.helpers.pydantic.save_to_disk import BaseModelToDisk
 from esi_link.helpers.resolve_json_ref import resolve_internal_refs
-from esi_link.v3.protocols import ResponseGroupHandlerProtocol, ResponseHandlerProtocol
 from esi_link.v3.type_defs import Lang
+
+if TYPE_CHECKING:
+    from esi_link.v3.protocols import (
+        ResponseGroupHandlerProtocol,
+        ResponseHandlerProtocol,
+    )
 
 
 def _get_current_instant() -> Instant:
@@ -119,7 +124,7 @@ class RuntimeRequestInfo(BaseModel):
     timeout: int = 10
     cache_key: UUID | None = None
     """Cache key for the request, if applicable. This is used to identify cached responses. Paged requests only have a cache key for the first page."""
-    response_handlers: list[ResponseHandlerProtocol] = Field(..., exclude=True)
+    response_handlers: list["ResponseHandlerProtocol"] = Field(..., exclude=True)
     """The list of response handler instances to run for this request, in the order they should be run."""
     metrics: "Metrics"
     parent_id: UUID | None = None
@@ -131,7 +136,7 @@ class RuntimeRequestInfo(BaseModel):
 class RuntimeGroupInfo(BaseModel):
     """Represents the runtime information for a group of ESI requests."""
 
-    response_group_handlers: list[ResponseGroupHandlerProtocol] = Field(
+    response_group_handlers: list["ResponseGroupHandlerProtocol"] = Field(
         ..., exclude=True
     )
     """The list of response group handler instances to run for this group of requests, in the order they should be run."""
@@ -377,10 +382,22 @@ class CachedResponse(BaseModelToDisk):
 
 @dataclass(slots=True)
 class IndexedOperation:
-    operation_id: str
     method: Literal["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
     path: str
     operation: dict[str, Any] = field(default_factory=dict[str, Any])
+    """The raw operation object from the OpenAPI schema, dereferenced and ready for use.
+    
+    This object contains all the details of the operation as defined in the OpenAPI schema,
+    including parameters, request body, responses, and security requirements.
+
+    <paths>:<path>:<method>:<operation> from the OpenAPI schema.
+
+    """
+
+    @property
+    def operation_id(self) -> str:
+        """Extract the operation ID from the operation object."""
+        return self.operation.get("operationId", "")
 
     @property
     def tags(self) -> list[str]:
@@ -448,12 +465,10 @@ class IndexedOperation:
 class IndexedEsiSchema(BaseModelToDisk):
     """Represents the entire schema for ESI requests and responses, indexed for efficient access."""
 
-    # TODO rework this class with properties for accessing the various parts of the schema, rather than storing them all as dicts. This will allow for better type safety and easier access to the relevant information for each request.
     download_date: Instant
     """The date the schema was downloaded."""
-    compatibility_date: str
-    """The compatibility date for the schema, in ISO 8601 format (e.g. "2026-02-21"). 
-        This is used to version the EVE ESI."""
+    esi_schema: dict[str, Any]
+    """The raw OpenAPI schema as a dictionary."""
     operations: dict[str, IndexedOperation] = Field(default_factory=dict)
     """A mapping of operation IDs to IndexedOperation instances."""
     security_schemes: dict[str, Any] = Field(default_factory=dict)
@@ -474,6 +489,11 @@ class IndexedEsiSchema(BaseModelToDisk):
             f"openapi={self.openapi}, operations={len(self.operations)}, "
             f"download_date={self.download_date})"
         )
+
+    @property
+    def compatibility_date(self) -> str:
+        """Get the compatibility date of the ESI schema from the info section."""
+        return self.version
 
     @property
     def version(self) -> str:
@@ -512,15 +532,13 @@ class IndexedEsiSchema(BaseModelToDisk):
                 operation_id = operation.get("operationId")
                 if operation_id:
                     operations[operation_id] = IndexedOperation(
-                        operation_id=operation_id,
                         method=method.upper(),
                         path=path,
                         operation=operation,
                     )
-        # FIXME verify acquisition of compatibility date from schema, and fallback to download date if not present
         return cls(
             download_date=download_date,
-            compatibility_date=dereferenced_schema.get("info", {}).get("version", ""),
+            esi_schema=dereferenced_schema,
             operations=operations,
             security_schemes=dereferenced_schema.get("components", {}).get(
                 "securitySchemes", {}

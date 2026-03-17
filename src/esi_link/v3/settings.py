@@ -11,6 +11,11 @@ from esi_link import DEFAULT_APP_DIR, __app_name__, __version__
 
 _app_env_prefix = "PFMSOFT_ESI_LINK_"
 
+ESI_SCHEMA_URL = "https://esi.evetech.net/meta/openapi.json"
+"""The URL to download the ESI schema from."""
+ESI_SCHEMA_CHANGELOG_URL = "https://esi.evetech.net/meta/changelog.json"
+"""The URL to download the ESI schema changelog from."""
+
 
 class EsiLinkSettings(BaseSettings):
     """Settings for the ESI Link application."""
@@ -29,12 +34,16 @@ class EsiLinkSettings(BaseSettings):
     # -----------------------------------------------------------------------------------
 
     esi_schema_url: str = Field(
-        default="https://esi.evetech.net/meta/openapi.json",
+        default=ESI_SCHEMA_URL,
         description="The URL to download the ESI schema from.",
     )
-    schema_store_path: Path = Field(
-        default=DEFAULT_APP_DIR / "schema-store.json",
-        description="The path to the store of indexed ESI schema files.",
+    esi_schema_changelog_url: str = Field(
+        default=ESI_SCHEMA_CHANGELOG_URL,
+        description="The URL to download the ESI schema changelog from.",
+    )
+    schema_store_dir: Path = Field(
+        default=DEFAULT_APP_DIR / "schema-store/",
+        description="The path to the store of ESI schema files.",
     )
 
     # -----------------------------------------------------------------------------------

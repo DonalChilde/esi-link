@@ -9,7 +9,7 @@ from esi_link.esi_auth.authenticator import Authenticator
 from esi_link.esi_auth.credentials_provider import CredentialsProvider
 from esi_link.esi_auth.models import CachedMetadata, EveAppCredentials
 from esi_link.esi_auth.oauth_metadata import MetadataProvider
-from esi_link.settings import EsiLinkSettings
+from esi_link.v3.settings import EsiLinkSettings
 
 
 def load_credentials(settings: EsiLinkSettings, console: Console) -> EveAppCredentials:
