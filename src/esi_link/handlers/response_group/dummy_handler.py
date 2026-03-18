@@ -1,15 +1,18 @@
+"""A dummy response group handler that does nothing bu log the call."""
+
+import logging
 from typing import Self
 
-from esi_link.handlers.response_group.response_group_handlers import logger
+from esi_link.handlers.response_group.group_handler_abc import ResponseGroupHandlerABC
 from esi_link.models_and_protocols import (
-    RequestGroup,
-    Response,
+    ResponseGroup,
     ResponseGroupHandlerConfig,
-    ResponseGroupHandlerProtocol,
 )
 
+logger = logging.getLogger(__name__)
 
-class DummyResponseGroupHandler(ResponseGroupHandlerProtocol):
+
+class DummyResponseGroupHandler(ResponseGroupHandlerABC):
     """A dummy response group handler that does nothing."""
 
     name = "esi-link:dummy_group_handler"
@@ -18,17 +21,15 @@ class DummyResponseGroupHandler(ResponseGroupHandlerProtocol):
         """Initialize the DummyResponseGroupHandler."""
         self.config = config
 
-    async def __call__(
-        self, request_group: RequestGroup, responses: list[Response]
-    ) -> list[Response]:
+    async def __call__(self, response_group: ResponseGroup) -> ResponseGroup:
         """Handle the responses by doing nothing."""
         logger.info(
             "DummyResponseGroupHandler called for request group %s with %s responses, config: %r",
-            request_group.group_id,
-            len(responses),
+            response_group.request_group.group_id,
+            len(response_group.responses),
             self.config.model_dump(),
         )
-        return responses
+        return response_group
 
     @classmethod
     def from_config(cls, config: ResponseGroupHandlerConfig) -> Self:

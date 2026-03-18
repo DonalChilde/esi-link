@@ -1,3 +1,7 @@
+"""Abstract base class for response handlers."""
+
+from typing import Self
+
 from esi_link.models_and_protocols import (
     Response,
     ResponseHandlerConfig,
@@ -23,7 +27,7 @@ class ResponseHandlerABC(ResponseHandlerProtocol):
         raise NotImplementedError("Subclasses must implement this method.")
 
     @classmethod
-    def from_config(cls, config: ResponseHandlerConfig) -> "ResponseHandlerABC":
+    def from_config(cls, config: ResponseHandlerConfig) -> Self:
         """Create a response handler from a ResponseHandlerConfig."""
         raise NotImplementedError("Subclasses must implement this method.")
 

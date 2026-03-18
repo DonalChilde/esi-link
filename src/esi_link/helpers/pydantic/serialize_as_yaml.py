@@ -40,7 +40,9 @@ def serialize_as_yaml(
     return output_path
 
 
-def load_from_yaml(file_path: Path, model_cls: type[BaseModel]) -> BaseModel:
+def load_from_yaml[BASE_MODELS: BaseModel](
+    file_path: Path, model_cls: type[BASE_MODELS]
+) -> BASE_MODELS:
     """Load a Pydantic model from a YAML file.
 
     Args:

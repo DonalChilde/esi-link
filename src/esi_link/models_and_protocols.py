@@ -3,6 +3,7 @@
 import json
 from dataclasses import dataclass, field
 from enum import StrEnum
+from pathlib import Path
 from types import TracebackType
 from typing import Annotated, Any, ClassVar, Literal, Protocol, Self, cast
 from uuid import UUID, uuid4
@@ -514,6 +515,7 @@ class IndexedOperation:
         return False
 
 
+# TODO can this be a dataclass instead of a full class with methods? It doesn't seem to have any behavior, just data.
 class IndexedEsiSchema(BaseModel):
     """Represents the entire schema for ESI requests and responses, indexed for efficient access."""
 
@@ -561,41 +563,6 @@ class IndexedEsiSchema(BaseModel):
         raise ValueError("No servers defined in schema")
 
 
-class IndexedSchemaStore(BaseModel):
-    """Represents a store for multiple versions of the IndexedEsiSchema.
-
-    The compatibility date index is a string in ISO 8601 format 2026-02-21 representing
-    the date that the schema version was downloaded. This allows for storing multiple
-    versions of the schema and retrieving the appropriate one based on the date of the ESI
-    request being executed.
-    """
-
-    schemas: dict[str, IndexedEsiSchema] = Field(default_factory=dict)
-    """A mapping of download dates (as ISO 8601 strings) to IndexedEsiSchema instances."""
-
-    def purge_older(self, cutoff_date: str) -> None:
-        """Purge schemas that were downloaded before the given cutoff date.
-
-        Args:
-            cutoff_date: The ISO 8601 string representing the cutoff date. Schemas downloaded
-                before this date will be removed from the store.
-        """
-        keys_to_purge = [key for key in self.schemas if key < cutoff_date]
-        for key in keys_to_purge:
-            del self.schemas[key]
-
-    def latest_schema(self) -> IndexedEsiSchema | None:
-        """Get the latest schema in the store based on download date.
-
-        Returns:
-            The IndexedEsiSchema instance with the most recent download date, or None if the store is empty.
-        """
-        if not self.schemas:
-            return None
-        latest_key = max(self.schemas.keys())
-        return self.schemas[latest_key]
-
-
 @dataclass(slots=True)
 class GeneratedUrlInfo:
     """Represents the generated URL information for an ESI request."""
@@ -603,6 +570,19 @@ class GeneratedUrlInfo:
     path_url: str
     cache_url: str
     cache_key: UUID
+
+
+@dataclass(slots=True)
+class HandlerPluginLoaderConfig:
+    file_path: Path
+    class_name: str
+    enabled: bool
+
+
+class HandlerPluginConfigs(BaseModel):
+    plugins: list[HandlerPluginLoaderConfig] = Field(
+        default_factory=list[HandlerPluginLoaderConfig]
+    )
 
 
 # ---------------------------------------------------------------------------------------
@@ -789,9 +769,7 @@ class ResponseGroupHandlerProtocol(Protocol):
     name: ClassVar[str]
     config: ResponseGroupHandlerConfig
 
-    async def __call__(
-        self, request_group: RequestGroup, responses: list[Response]
-    ) -> list[Response]: ...
+    async def __call__(self, response_group: ResponseGroup) -> ResponseGroup: ...
     @classmethod
     def from_config(cls, config: ResponseGroupHandlerConfig) -> Self: ...
     @classmethod
@@ -1062,15 +1040,27 @@ class SchemaManagerProtocol:
         ...
 
 
-# class AuthenticationHeaderProviderProtocol(Protocol):
-#     async def header(self, character_id: int) -> dict[str, str] | None:
-#         """Return the authentication header to be included in ESI requests.
+class ResponseHandlerPluginLoaderProtocol(Protocol):
+    def __call__(self, handler_manager: ResponseHandlerManagerProtocol) -> None:
+        """Apply the plugin to the given ResponseHandlerManagerProtocol instance.
 
-#         Args:
-#             character_id: The ID of the character for whom to generate the authentication header.
+        This method should register any response handlers provided by the plugin with the
+        handler manager.
 
-#         Returns:
-#             A dictionary containing the authentication header, or None if no
-#                 authentication is available.
-#         """
-#         ...
+        Args:
+            handler_manager: The ResponseHandlerManagerProtocol instance to apply the plugin to.
+        """
+        ...
+
+
+class ResponseGroupHandlerPluginLoaderProtocol(Protocol):
+    def __call__(self, handler_manager: ResponseGroupHandlerManagerProtocol) -> None:
+        """Apply the plugin to the given ResponseGroupHandlerManagerProtocol instance.
+
+        This method should register any response group handlers provided by the plugin with the
+        handler manager.
+
+        Args:
+            handler_manager: The ResponseGroupHandlerManagerProtocol instance to apply the plugin to.
+        """
+        ...

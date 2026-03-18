@@ -35,3 +35,14 @@ class HandlerNotFoundError(ResponseHandlerError):
 
     def __str__(self) -> str:
         return f"{super().__str__()} | Config: {self.config!r}"
+
+
+class HandlerPluginError(ResponseHandlerError):
+    """Raised when there is an error loading or executing a handler plugin."""
+
+    def __init__(self, message: str, plugin_config: dict[str, Any]) -> None:
+        super().__init__(message)
+        self.plugin_config = plugin_config
+
+    def __str__(self) -> str:
+        return f"{super().__str__()} | Plugin Config: {self.plugin_config!r}"

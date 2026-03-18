@@ -61,15 +61,16 @@ class GroupExecutor(RequestGroupExecutorProtocol):
             runtime_requests, self._request_executor
         )
         group_metrics.group_handlers_started = perf_counter()
-        for handler in runtime_group_info.response_group_handlers:
-            await handler(request_group, handled_responses)
-        group_metrics.group_handlers_completed = perf_counter()
-        group_metrics.group_execution_completed = perf_counter()
-        return ResponseGroup(
+        response_group = ResponseGroup(
             request_group=request_group,
             runtime_info=runtime_group_info,
             responses={r.request.request_id: r for r in handled_responses},
         )
+        for handler in runtime_group_info.response_group_handlers:
+            await handler(response_group)
+        group_metrics.group_handlers_completed = perf_counter()
+        group_metrics.group_execution_completed = perf_counter()
+        return response_group
 
 
 async def execute_all_requests_then_handle_responses(
