@@ -42,7 +42,7 @@ class SimpleSaveToDiskResponseHandler(ResponseHandlerABC):
 
     @staticmethod
     def _check_directory(output_dir: str) -> Path:
-        """Check if the output directory is valid, and create it if it doesn't exist."""
+        """Check if the output directory is valid."""
         if output_dir.startswith("/"):
             home_dir = str(Path.home())
             if not output_dir.startswith(home_dir):
@@ -56,8 +56,6 @@ class SimpleSaveToDiskResponseHandler(ResponseHandlerABC):
             raise ValueError(
                 f"output_dir '{output_dir}' resolves to a file, but must be a directory."
             )
-        if not output_path.exists():
-            output_path.mkdir(parents=True, exist_ok=True)
         return output_path
 
     async def __call__(self, response: Response) -> Response:
@@ -95,19 +93,17 @@ class SimpleSaveToDiskResponseHandler(ResponseHandlerABC):
         If the directory does not exist, it will be created.
 
         Example:
-        ```json
-        config = {
+        ```
+        # json
+        {
             "name": "esi-link:simple_save_to_disk",
-            "config": {
-                "output_dir": "/path/to/output/dir",
-                "overwrite": false
-            }
+            "config": {"output_dir": "~/path/to/output/dir", "overwrite": false},
         }
         ```
         """
         try:
             output_dir = cls._check_directory(config.config["output_dir"])
-            overwrite = config.config.get("overwrite", False)
+            overwrite = config.config["overwrite"]
         except KeyError as e:
             raise HandlerCreationError(f"Missing required config key: {e}") from e
         except Exception as e:
