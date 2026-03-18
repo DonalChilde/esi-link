@@ -14,6 +14,8 @@ from esi_link.validation.errors import RequestValidationError
 
 logger = logging.getLogger(__name__)
 
+# TODO add samples of the schema structure to the docstrings of the validation functions for clarity
+
 
 class RequestValidator(RequestValidatorProtocol):
     def __init__(

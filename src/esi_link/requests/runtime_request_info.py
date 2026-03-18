@@ -2,7 +2,7 @@
 
 from esi_link import USER_AGENT
 from esi_link.esi_auth.protocols import AuthProviderProtocol
-from esi_link.handlers.response_handlers import ResponseHandlerManager
+from esi_link.handlers.response.manager import ResponseHandlerManager
 from esi_link.models_and_protocols import (
     IndexedEsiSchema,
     Request,

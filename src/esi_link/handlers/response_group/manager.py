@@ -1,82 +1,18 @@
-"""ResponseGroupHandler implementations and manager."""
-
-import logging
 from copy import deepcopy
-from typing import Self
 
 from esi_link.handlers.errors import (
     HandlerCreationError,
     HandlerNotFoundError,
     HandlerValidationError,
 )
+from esi_link.handlers.response_group import (
+    builtin_response_group_handlers,
+)
 from esi_link.models_and_protocols import (
-    RequestGroup,
-    Response,
     ResponseGroupHandlerConfig,
     ResponseGroupHandlerManagerProtocol,
     ResponseGroupHandlerProtocol,
 )
-
-logger = logging.getLogger(__name__)
-
-
-class DummyResponseGroupHandler(ResponseGroupHandlerProtocol):
-    """A dummy response group handler that does nothing."""
-
-    name = "esi-link:dummy_group_handler"
-
-    def __init__(self, config: ResponseGroupHandlerConfig) -> None:
-        """Initialize the DummyResponseGroupHandler."""
-        self.config = config
-
-    async def __call__(
-        self, request_group: RequestGroup, responses: list[Response]
-    ) -> list[Response]:
-        """Handle the responses by doing nothing."""
-        logger.info(
-            "DummyResponseGroupHandler called for request group %s with %s responses, config: %r",
-            request_group.group_id,
-            len(responses),
-            self.config.model_dump(),
-        )
-        return responses
-
-    @classmethod
-    def from_config(cls, config: ResponseGroupHandlerConfig) -> Self:
-        """Create a DummyResponseGroupHandler from a ResponseGroupHandlerConfig."""
-        return cls(config=config)
-
-    @classmethod
-    def validate_config(cls, config: ResponseGroupHandlerConfig) -> None:
-        """Validate the ResponseGroupHandlerConfig for a DummyResponseGroupHandler."""
-        pass
-
-
-builtin_response_group_handlers: dict[str, type[ResponseGroupHandlerProtocol]] = {
-    DummyResponseGroupHandler.name: DummyResponseGroupHandler,
-}
-
-
-class DummyResponseGroupHandlerManager(ResponseGroupHandlerManagerProtocol):
-    """A dummy response group handler manager that only manages the DummyResponseGroupHandler."""
-
-    def get_handler(
-        self, config: ResponseGroupHandlerConfig
-    ) -> ResponseGroupHandlerProtocol:
-        """Get a response group handler for the given config."""
-        return DummyResponseGroupHandler(config=config)
-
-    def register_handler(self, handler_cls: type[ResponseGroupHandlerProtocol]) -> None:
-        """Register a response group handler class."""
-        pass
-
-    def registered_handlers(self) -> dict[str, type[ResponseGroupHandlerProtocol]]:
-        """Get a dictionary of registered response group handler classes."""
-        return {DummyResponseGroupHandler.name: DummyResponseGroupHandler}
-
-    def validate_handler_config(self, config: ResponseGroupHandlerConfig) -> None:
-        """Validate a response group handler configuration."""
-        pass
 
 
 class ResponseGroupHandlerManager(ResponseGroupHandlerManagerProtocol):

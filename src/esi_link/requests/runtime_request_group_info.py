@@ -1,6 +1,8 @@
 """Module for generating runtime request group information from ESI request groups."""
 
-from esi_link.handlers.response_group_handlers import ResponseGroupHandlerManager
+from esi_link.handlers.response_group.manager import (
+    ResponseGroupHandlerManager,
+)
 from esi_link.models_and_protocols import (
     RequestGroup,
     RequestGroupMetrics,

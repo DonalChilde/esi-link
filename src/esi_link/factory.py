@@ -12,8 +12,10 @@ from esi_link.esi_auth.authenticator import Authenticator
 from esi_link.esi_auth.credentials_provider import CredentialsProvider
 from esi_link.esi_auth.protocols import AuthProviderProtocol
 from esi_link.esi_auth.simple_json_store import CharacterTokenManager
-from esi_link.handlers.response_group_handlers import ResponseGroupHandlerManager
-from esi_link.handlers.response_handlers import ResponseHandlerManager
+from esi_link.handlers.response.manager import ResponseHandlerManager
+from esi_link.handlers.response_group.manager import (
+    ResponseGroupHandlerManager,
+)
 from esi_link.models_and_protocols import (
     CacheManagerProtocol,
     IndexedEsiSchema,
