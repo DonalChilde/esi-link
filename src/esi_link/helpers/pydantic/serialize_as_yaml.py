@@ -1,9 +1,9 @@
+"""This module provides helper functions for serializing and deserializing Pydantic models to and from YAML files."""
+
 from pathlib import Path
 
 from pydantic import BaseModel
 from yaml import safe_dump, safe_load
-
-"""This module provides helper functions for serializing and deserializing Pydantic models to and from YAML files."""
 
 
 def serialize_as_yaml(
