@@ -12,7 +12,7 @@ from rich.table import Table
 from whenever import Instant
 
 from esi_link.cli.helpers import get_settings_from_context
-from esi_link.helpers.schema_display_helpers import display_operations_by_tag
+from esi_link.cli.schema_display_helpers import display_operations_by_tag
 from esi_link.v3.helpers.datetime_filename import file_safe_iso_datetime_string
 from esi_link.v3.helpers.download_schema import (
     download_schema,

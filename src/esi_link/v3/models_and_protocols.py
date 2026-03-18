@@ -11,8 +11,6 @@ import aiohttp
 from pydantic import BaseModel, ConfigDict, Field, SkipValidation
 from whenever import Instant
 
-from esi_link.helpers.pydantic.save_to_disk import BaseModelToDisk
-from esi_link.helpers.resolve_json_ref import resolve_internal_refs
 from esi_link.v3.type_defs import Lang
 
 
@@ -145,7 +143,7 @@ class RuntimeGroupInfo(BaseModel):
     """The list of response group handler instances to run for this group of requests, in the order they should be run."""
 
 
-class Request(BaseModelToDisk):
+class Request(BaseModel):
     """Represents a single ESI request to be executed."""
 
     request_id: UUID = Field(default_factory=uuid4)
@@ -158,12 +156,12 @@ class Request(BaseModelToDisk):
     response_handlers: list[ResponseHandlerConfig] = []
 
 
-class RuntimeRequest(BaseModelToDisk):
+class RuntimeRequest(BaseModel):
     request: Request
     runtime_info: RuntimeRequestInfo
 
 
-class RequestGroup(BaseModelToDisk):
+class RequestGroup(BaseModel):
     """Represents a batch of ESI requests to be executed.
 
     This model exists mostly for serialization puposes, with the imagined use being
@@ -403,7 +401,7 @@ class RequestMetrics:
         return -1.0
 
 
-class Response(BaseModelToDisk):
+class Response(BaseModel):
     """Represents the response to an ESI request."""
 
     request: Request
@@ -415,7 +413,7 @@ class Response(BaseModelToDisk):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
-class ResponseGroup(BaseModelToDisk):
+class ResponseGroup(BaseModel):
     """Represents the responses to a group of ESI requests."""
 
     request_group: RequestGroup
@@ -423,7 +421,7 @@ class ResponseGroup(BaseModelToDisk):
     responses: dict[UUID, Response]
 
 
-class CachedResponse(BaseModelToDisk):
+class CachedResponse(BaseModel):
     """Represents a cached response for a Request."""
 
     cache_key: UUID
@@ -516,7 +514,7 @@ class IndexedOperation:
         return False
 
 
-class IndexedEsiSchema(BaseModelToDisk):
+class IndexedEsiSchema(BaseModel):
     """Represents the entire schema for ESI requests and responses, indexed for efficient access."""
 
     download_date: Instant
@@ -562,49 +560,8 @@ class IndexedEsiSchema(BaseModelToDisk):
             return self.servers[0]["url"]
         raise ValueError("No servers defined in schema")
 
-    @classmethod
-    def from_raw_schema(
-        cls,
-        raw_schema: dict[str, Any],
-        download_date: Instant,
-    ) -> Self:
-        """Factory method to create an IndexedEsiSchema instance from a raw OpenAPI schema.
 
-        Args:
-            raw_schema: The raw OpenAPI schema as a dictionary.
-            download_date: The date the schema was downloaded.
-
-        Returns:
-            An instance of IndexedEsiSchema.
-        """
-        dereferenced_schema = resolve_internal_refs(raw_schema, raw_schema)
-
-        operations: dict[str, IndexedOperation] = {}
-        paths = dereferenced_schema.get("paths", {})
-        for path, methods in paths.items():
-            for method, operation in methods.items():
-                operation_id = operation.get("operationId")
-                if operation_id:
-                    operations[operation_id] = IndexedOperation(
-                        method=method.upper(),
-                        path=path,
-                        operation=operation,
-                    )
-        return cls(
-            download_date=download_date,
-            esi_schema=dereferenced_schema,
-            operations=operations,
-            security_schemes=dereferenced_schema.get("components", {}).get(
-                "securitySchemes", {}
-            ),
-            info=dereferenced_schema.get("info", {}),
-            openapi=dereferenced_schema.get("openapi", ""),
-            servers=dereferenced_schema.get("servers", []),
-            tags=dereferenced_schema.get("tags", []),
-        )
-
-
-class IndexedSchemaStore(BaseModelToDisk):
+class IndexedSchemaStore(BaseModel):
     """Represents a store for multiple versions of the IndexedEsiSchema.
 
     The compatibility date index is a string in ISO 8601 format 2026-02-21 representing

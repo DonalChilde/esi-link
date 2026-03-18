@@ -8,7 +8,6 @@ from pathlib import Path
 
 import aiohttp
 
-from esi_link import USER_AGENT
 from esi_link.esi_auth.authenticator import Authenticator
 from esi_link.esi_auth.models import CharacterToken
 from esi_link.esi_auth.oauth_metadata import TOKEN_ENDPOINT
@@ -16,6 +15,7 @@ from esi_link.esi_auth.protocols import (
     CharacterTokenManagerProtocol,
     CharacterTokenProviderProtocol,
 )
+from esi_link.v3 import USER_AGENT
 
 
 class CharacterTokenProvider(CharacterTokenProviderProtocol):

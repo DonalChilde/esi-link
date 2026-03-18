@@ -4,13 +4,13 @@ import logging
 
 import typer
 
-from esi_link import __app_name__, __version__
 from esi_link.cli.cache import app as cache_app
 from esi_link.cli.config_info import app as config_info_app
 from esi_link.cli.esi_auth.main_typer import app as esi_auth_app
 from esi_link.cli.esi_schema import app as esi_schema_app
 from esi_link.cli.examples import app as examples_app
-from esi_link.logging_config import setup_logging
+from esi_link.v3 import __app_name__, __version__
+from esi_link.v3.logging_config import setup_logging
 from esi_link.v3.settings import get_settings
 
 logger = logging.getLogger(__name__)

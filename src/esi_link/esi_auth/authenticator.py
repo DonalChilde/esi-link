@@ -10,7 +10,6 @@ import jwt
 from aiohttp import web
 from jwt.jwks_client import PyJWKClient
 
-from esi_link import USER_AGENT
 from esi_link.esi_auth.helpers.code_challenge import (
     generate_code_challenge_and_verifier,
 )
@@ -33,6 +32,7 @@ from esi_link.esi_auth.oauth_metadata import (
     TOKEN_ENDPOINT,
 )
 from esi_link.esi_auth.protocols import AuthenticatorProtocol
+from esi_link.v3 import USER_AGENT
 
 logger = logging.getLogger(__name__)
 
