@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from whenever import Instant
 
-from esi_link.handlers.errors import HandlerValidationError
+from esi_link.handlers.errors import HandlerBadResponseError, HandlerValidationError
 from esi_link.handlers.response.templated_filename_handler import (
     TemplatedFilenameResponseHandler,
 )
@@ -170,8 +170,8 @@ def test_filename_clipped_and_extension_preserved(tmp_path: Path) -> None:
     assert handler.output_file.suffix == ".json"
 
 
-def test_call_without_http_response_uses_model_dump_fallback(tmp_path: Path) -> None:
-    """Fallback to serialized Response content when no http_response is available."""
+def test_call_without_http_response_raises(tmp_path: Path) -> None:
+    """Raise an error when no http_response is available."""
     config = ResponseHandlerConfig(
         name=TemplatedFilenameResponseHandler.name,
         config={
@@ -183,10 +183,5 @@ def test_call_without_http_response_uses_model_dump_fallback(tmp_path: Path) -> 
     response = _build_response(include_http_response=False)
 
     handler = TemplatedFilenameResponseHandler.from_config(config)
-    asyncio.run(handler(response))
-
-    assert handler.output_file is not None
-    assert handler.output_file.exists()
-    contents = handler.output_file.read_text(encoding="utf-8")
-    assert contents.startswith("{")
-    assert "http_response" in contents
+    with pytest.raises(HandlerBadResponseError):
+        asyncio.run(handler(response))

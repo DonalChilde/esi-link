@@ -41,7 +41,7 @@ class ResponseHandlerABC(ResponseHandlerProtocol):
     @staticmethod
     def _response_check(response: Response) -> None:
         """Check that the response contains the expected http_response for this handler."""
-        if not response.http_response:
+        if response.http_response is None:
             raise HandlerBadResponseError(
                 "Response is missing http_response required for templated filename handler.",
                 response_data={
