@@ -1,22 +1,22 @@
+"""A dummy response handler that does nothing but log."""
+
 import logging
 from typing import Self
 
+from esi_link.handlers.response.handler_abc import ResponseHandlerABC
 from esi_link.models_and_protocols import (
     Response,
     ResponseHandlerConfig,
-    ResponseHandlerProtocol,
 )
 
 logger = logging.getLogger(__name__)
 
 
-class DummyResponseHandler(ResponseHandlerProtocol):
-    """A dummy response handler that does nothing."""
-
+class DummyResponseHandler(ResponseHandlerABC):
     name = "esi-link:dummy"
 
     def __init__(self, config: ResponseHandlerConfig) -> None:
-        """Initialize the DummyResponseHandler."""
+        """A dummy response handler that does nothing but logs information about the response."""
         self.config = config
 
     async def __call__(self, response: Response) -> Response:

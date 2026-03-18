@@ -1,20 +1,22 @@
+"""A response handler that saves the response to disk as a JSON file."""
+
 import logging
 from pathlib import Path
 from typing import Self
 
 from esi_link.handlers.errors import HandlerCreationError, HandlerValidationError
+from esi_link.handlers.response.handler_abc import ResponseHandlerABC
 from esi_link.handlers.response.helpers import check_required_keys
 from esi_link.helpers.save_text_file import save_text_file
 from esi_link.models_and_protocols import (
     Response,
     ResponseHandlerConfig,
-    ResponseHandlerProtocol,
 )
 
 logger = logging.getLogger(__name__)
 
 
-class SimpleSaveToDiskResponseHandler(ResponseHandlerProtocol):
+class SimpleSaveToDiskResponseHandler(ResponseHandlerABC):
     name = "esi-link:simple_save_to_disk"
 
     def __init__(
