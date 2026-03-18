@@ -11,14 +11,14 @@ from rich.console import Console
 from rich.json import JSON
 
 from esi_link.cli.helpers import get_settings_from_context
-from esi_link.v3.factory import EsiLinkObjectFactory
-from esi_link.v3.models_and_protocols import RequestGroup
-from esi_link.v3.schema.schema_manager import SchemaManager
+from esi_link.factory import EsiLinkObjectFactory
+from esi_link.models_and_protocols import RequestGroup
+from esi_link.schema.schema_manager import SchemaManager
 
 app = typer.Typer(
     no_args_is_help=True, help="Commands for testing ESI Link functionality."
 )
-from esi_link.v3 import example_requests
+from esi_link import example_requests
 
 
 @app.command()

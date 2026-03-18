@@ -4,9 +4,9 @@ import typer
 from rich.console import Console
 from rich.text import Text
 
+from esi_link import __app_name__, __version__
 from esi_link.cli import STYLE_INFO
 from esi_link.cli.helpers import get_settings_from_context
-from esi_link.v3 import __app_name__, __version__
 
 app = typer.Typer(no_args_is_help=True)
 

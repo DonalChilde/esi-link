@@ -1,7 +1,7 @@
 from rich.console import Console
 from rich.table import Table
 
-from esi_link.v3.helpers.indexed_operation_summary import IndexedOperationSummary
+from esi_link.helpers.indexed_operation_summary import IndexedOperationSummary
 
 
 def display_operations_by_tag(

@@ -4,7 +4,7 @@ from typing import cast
 
 import typer
 
-from esi_link.v3.settings import EsiLinkSettings
+from esi_link.settings import EsiLinkSettings
 
 
 def get_settings_from_context(ctx: typer.Context):

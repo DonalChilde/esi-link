@@ -13,19 +13,19 @@ from whenever import Instant
 
 from esi_link.cli.helpers import get_settings_from_context
 from esi_link.cli.schema_display_helpers import display_operations_by_tag
-from esi_link.v3.helpers.datetime_filename import file_safe_iso_datetime_string
-from esi_link.v3.helpers.download_schema import (
+from esi_link.helpers.datetime_filename import file_safe_iso_datetime_string
+from esi_link.helpers.download_schema import (
     download_schema,
     download_schema_changelog,
 )
-from esi_link.v3.helpers.eve_dates import current_compatibility_date
-from esi_link.v3.helpers.indexed_operation_summary import (
+from esi_link.helpers.eve_dates import current_compatibility_date
+from esi_link.helpers.indexed_operation_summary import (
     collect_operation_summaries,
     summaries_by_tag,
 )
-from esi_link.v3.helpers.resolve_json_ref import resolve_internal_refs
-from esi_link.v3.helpers.save_text_file import save_text_file
-from esi_link.v3.schema.schema_manager import SchemaManager
+from esi_link.helpers.resolve_json_ref import resolve_internal_refs
+from esi_link.helpers.save_text_file import save_text_file
+from esi_link.schema.schema_manager import SchemaManager
 
 app = typer.Typer(no_args_is_help=True, help="Commands related to the ESI schema.")
 
