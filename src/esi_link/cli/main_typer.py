@@ -10,6 +10,7 @@ from esi_link.cli.config_info import app as config_info_app
 from esi_link.cli.esi_auth.main_typer import app as esi_auth_app
 from esi_link.cli.esi_schema import app as esi_schema_app
 from esi_link.cli.examples import app as examples_app
+from esi_link.cli.requests import app as requests_app
 from esi_link.logging_config import setup_logging
 from esi_link.settings import get_settings
 
@@ -22,9 +23,13 @@ app.add_typer(cache_app, name="cache", help="ESI cache management commands.")
 app.add_typer(
     esi_auth_app, name="auth", help="Commands for managing ESI authentication."
 )
+# Add config info commands to the main app as indiviual commands, rather than a subcommand
 app.add_typer(config_info_app)
 app.add_typer(
     examples_app, name="examples", help="Commands for demonstrating ESI Link requests."
+)
+app.add_typer(
+    requests_app, name="requests", help="Commands for managing ESI Link requests."
 )
 
 
