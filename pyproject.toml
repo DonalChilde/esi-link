@@ -14,6 +14,7 @@ dependencies = [
     "pydantic-settings>=2.10.1",
     "pyjwt[crypto]>=2.12.0",
     "pyyaml>=6.0.3",
+    "rich>=14.3.3",
     "typer>=0.17.3",
     "whenever>=0.8.8",
 ]
@@ -31,7 +32,7 @@ description = "A command line first interface to the Eve Online API"
 [project.scripts]
 # script entry-points
 # COMMAND_NAME = "PATH.TO.ENTRY.MODULE:ENTRY_FUNCTION"
-esi-link-old = "esi_link.old.cli.main_typer:app"
+
 esi-link = "esi_link.cli.main_typer:app"
 
 [project.urls]
