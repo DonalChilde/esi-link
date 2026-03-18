@@ -6,7 +6,7 @@ from typing import Self
 
 from esi_link.handlers.errors import HandlerCreationError, HandlerValidationError
 from esi_link.handlers.response.handler_abc import ResponseHandlerABC
-from esi_link.handlers.response.helpers import check_required_keys
+from esi_link.handlers.response.helpers import check_available_keys
 from esi_link.helpers.save_text_file import save_text_file
 from esi_link.models_and_protocols import (
     Response,
@@ -60,6 +60,7 @@ class SimpleSaveToDiskResponseHandler(ResponseHandlerABC):
 
     async def __call__(self, response: Response) -> Response:
         """Handle the response by saving it to disk."""
+        # No need to check for http_response, since we save the entire response.
         request_id = response.request.request_id
         operation_id = response.request.operation_id
         status_code = (
@@ -115,7 +116,7 @@ class SimpleSaveToDiskResponseHandler(ResponseHandlerABC):
     @classmethod
     def validate_config(cls, config: ResponseHandlerConfig) -> None:
         """Check the ResponseHandlerConfig for the required keys and their types."""
-        check_required_keys(config, {"output_dir", "overwrite"})
+        check_available_keys(config, {"output_dir", "overwrite"})
         if not isinstance(config.config["output_dir"], str):
             raise HandlerValidationError(
                 "output_dir must be a string.", config=config.model_dump()

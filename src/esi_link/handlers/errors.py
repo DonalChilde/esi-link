@@ -46,3 +46,14 @@ class HandlerPluginError(ResponseHandlerError):
 
     def __str__(self) -> str:
         return f"{super().__str__()} | Plugin Config: {self.plugin_config!r}"
+
+
+class HandlerBadResponseError(ResponseHandlerError):
+    """Raised when a handler receives an unexpected or invalid response."""
+
+    def __init__(self, message: str, response_data: dict[str, Any]) -> None:
+        super().__init__(message)
+        self.response_data = response_data
+
+    def __str__(self) -> str:
+        return f"{super().__str__()} | Response Data: {self.response_data!r}"

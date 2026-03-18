@@ -2,7 +2,9 @@ from esi_link.handlers.errors import HandlerValidationError
 from esi_link.models_and_protocols import ResponseHandlerConfig
 
 
-def check_required_keys(config: ResponseHandlerConfig, required_keys: set[str]) -> None:
+def check_available_keys(
+    config: ResponseHandlerConfig, required_keys: set[str]
+) -> None:
     """Check the ResponseHandlerConfig for the required keys and their types."""
     keys = set(config.config.keys())
     missing_keys = required_keys - keys
