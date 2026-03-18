@@ -1,5 +1,7 @@
 """Top-level package for Esi Link."""
 
+# NOTE This package contains the old code, which is being kept for reference and testing purposes.
+
 from pathlib import Path
 
 import typer
