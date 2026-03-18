@@ -1,7 +1,5 @@
 """Tests for the templated filename response handler."""
 
-from __future__ import annotations
-
 import asyncio
 from pathlib import Path
 
