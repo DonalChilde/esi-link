@@ -70,7 +70,7 @@ class SimpleSaveToDiskResponseHandler(ResponseHandlerABC):
         )
         file_path = save_text_file(
             text=response.model_dump_json(indent=2),
-            output_path=self.output_dir,
+            output_dir=self.output_dir,
             file_name=f"{request_id}-{operation_id}-{status_code}.json",
             overwrite=self.overwrite,
         )

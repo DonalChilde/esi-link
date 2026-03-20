@@ -38,7 +38,10 @@ def status(
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
     schema = schema_manager.get_latest_schema()
     request = example_requests.esi_status(
-        handlers=[example_requests.simple_save_response(output_dir=output_dir)]
+        handlers=[
+            example_requests.simple_save_response(output_dir=output_dir),
+            example_requests.templated_file_saver_response(output_dir=output_dir),
+        ]
         if output_dir
         else None
     )

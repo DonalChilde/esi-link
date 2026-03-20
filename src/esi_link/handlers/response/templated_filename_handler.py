@@ -259,7 +259,7 @@ class TemplatedFilenameResponseHandler(ResponseHandlerABC):
 
     async def __call__(self, response: Response) -> Response:
         """Render the file path template and save the response text to disk."""
-        self._response_check(response)
+        self._fail_on_no_http_response(response)
         assert response.http_response is not None  # For type checker after the check
 
         template_context = build_template_context(response)
@@ -276,7 +276,7 @@ class TemplatedFilenameResponseHandler(ResponseHandlerABC):
 
         file_path = save_text_file(
             text=body_text,
-            output_path=output_file.parent,
+            output_dir=output_file.parent,
             file_name=output_file.name,
             overwrite=self.overwrite,
         )

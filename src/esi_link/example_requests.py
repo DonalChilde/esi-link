@@ -21,6 +21,29 @@ def simple_save_response(
     )
 
 
+def templated_file_saver_response(
+    output_dir: Path,
+    filename_template: str = "${operation_id}_${request_id}_${response_date}.json",
+    overwrite: bool = False,
+) -> ResponseHandlerConfig:
+    """Example ResponseHandlerConfig for the TemplatedFileSaverResponseHandler.
+
+    This config specifies the output directory, filename template, and whether to overwrite existing files.
+    The output_dir can be relative to the user's home directory (e.g. "~/path/to/output/dir")
+    or a path relative to the current working directory (e.g. "output/dir").
+    The filename_template can include tokens that will be filled in with values from the response.
+    For example, a template of "${operation_id}_${request_id}_${response_date}.json" would create files like "GetStatus_1234_2024-06-01.json".
+    """
+    return ResponseHandlerConfig(
+        name="esi-link:templated_response_saver",
+        config={
+            "output_dir": str(output_dir),
+            "filename_template": filename_template,
+            "overwrite": overwrite,
+        },
+    )
+
+
 def esi_status(handlers: list[ResponseHandlerConfig] | None = None) -> Request:
     """Example ESI request for the /status endpoint."""
     handlers = handlers or []

@@ -258,7 +258,7 @@ class SchemaManager(SchemaManagerProtocol):
         try:
             save_text_file(
                 text=json.dumps(stored_schema, indent=2),
-                output_path=self.schema_directory,
+                output_dir=self.schema_directory,
                 file_name=f"{version}-{download_date.timestamp()}-schema.json",
                 overwrite=False,
             )

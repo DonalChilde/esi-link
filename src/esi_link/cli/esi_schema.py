@@ -78,13 +78,13 @@ def download(
         raw_schema = schema_download.raw_schema
         raw_path = save_text_file(
             text=json.dumps(raw_schema, indent=2),
-            output_path=dir_out,
+            output_dir=dir_out,
             file_name=f"esi_schema_raw_{safe_date}.json",
             overwrite=overwrite,
         )
         deref_path = save_text_file(
             text=json.dumps(resolve_internal_refs(raw_schema, raw_schema), indent=2),
-            output_path=dir_out,
+            output_dir=dir_out,
             file_name=f"esi_schema_dereferenced_{safe_date}.json",
             overwrite=overwrite,
         )
@@ -126,7 +126,7 @@ def changelog(
     if dir_out:
         file_path = save_text_file(
             text=json.dumps(changelog, indent=2),
-            output_path=dir_out,
+            output_dir=dir_out,
             file_name=f"schema-changelog-{file_safe_iso_datetime_string(Instant.now().format_iso())}.json",
             overwrite=overwrite,
         )
@@ -187,7 +187,7 @@ def operations(
     if dir_out:
         file_path = save_text_file(
             text=json.dumps(operation_summaries, indent=2),
-            output_path=dir_out,
+            output_dir=dir_out,
             file_name=f"operations-{schema.compatibility_date}-{schema.download_date.timestamp()}.json",
             overwrite=True,
         )
