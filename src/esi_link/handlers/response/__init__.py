@@ -2,6 +2,9 @@ from esi_link.handlers.response.dummy_handler import DummyResponseHandler
 from esi_link.handlers.response.simple_save_response import (
     SimpleSaveToDiskResponseHandler,
 )
+from esi_link.handlers.response.templated_file_saver import (
+    TemplatedFileSaverResponseHandler,
+)
 from esi_link.handlers.response.templated_filename_handler import (
     TemplatedFilenameResponseHandler,
 )
@@ -11,6 +14,7 @@ builtin_response_handlers: dict[str, type[ResponseHandlerProtocol]] = {
     DummyResponseHandler.name: DummyResponseHandler,
     SimpleSaveToDiskResponseHandler.name: SimpleSaveToDiskResponseHandler,
     TemplatedFilenameResponseHandler.name: TemplatedFilenameResponseHandler,
+    TemplatedFileSaverResponseHandler.name: TemplatedFileSaverResponseHandler,
 }
 from esi_link.handlers.response.manager import ResponseHandlerManager
 
