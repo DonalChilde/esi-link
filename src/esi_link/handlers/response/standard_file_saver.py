@@ -5,6 +5,8 @@ from pathlib import Path
 from string import Template, ascii_letters, digits
 from typing import Self
 
+from whenever import Instant
+
 from esi_link.handlers.errors import (
     HandlerBadResponseError,
     HandlerCreationError,
@@ -163,6 +165,14 @@ def tokens_from_response(response: Response) -> dict[str, str]:
     request_id = str(response.request.request_id)
     operation_id = response.request.operation_id or "NO_OPERATION_ID"
     response_date = response.http_response.date if response.http_response else None
+    try:
+        iso_response_date = (
+            Instant.parse_rfc2822(response_date).format_iso()
+            if response_date
+            else "NO_RESPONSE_DATE"
+        )
+    except Exception:
+        iso_response_date = "NO_RESPONSE_DATE"
     path_params = {
         f"param_{k}": str(v) for k, v in response.request.path_parameters.items()
     }
@@ -173,6 +183,7 @@ def tokens_from_response(response: Response) -> dict[str, str]:
         "request_id": request_id,
         "operation_id": operation_id,
         "response_date": response_date if response_date else "NO_RESPONSE_DATE",
+        "iso_response_date": iso_response_date,
     }
     token_dict.update(path_params)
     token_dict.update(query_params)

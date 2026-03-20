@@ -2,8 +2,6 @@
 
 import json
 
-from whenever import Instant
-
 from esi_link.handlers.response.standard_file_saver import (
     StandardFileSaverResponseHandler,
 )
@@ -25,17 +23,9 @@ class DetailedFileSaverResponseHandler(StandardFileSaverResponseHandler):
             if response.http_response
             else None
         )
-        date_string = (
+        request["response_date"] = (
             response.http_response.date
             if response.http_response and response.http_response.date
-            else None
+            else "NO_RESPONSE_DATE"
         )
-        if date_string:
-            try:
-                iso_date = Instant.parse_rfc2822(date_string).format_iso()
-            except Exception:
-                iso_date = "NONE"
-        else:
-            iso_date = "NONE"
-        request["response_date"] = iso_date
         return json.dumps(request, indent=2)

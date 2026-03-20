@@ -19,7 +19,7 @@ def debug_file_response(
         name="esi-link:debug_file_saver",
         config={
             "output_dir": str(output_dir),
-            "filename_template": "${operation_id}_${request_id}_${response_date}-DEBUG.json",
+            "filename_template": "${iso_response_date}-${operation_id}-${request_id}-DEBUG.json",
             "overwrite": overwrite,
         },
     )
@@ -27,7 +27,7 @@ def debug_file_response(
 
 def standard_file_response(
     output_dir: Path,
-    filename_template: str = "${operation_id}_${request_id}_${response_date}-STANDARD.json",
+    filename_template: str = "${iso_response_date}-${operation_id}-${request_id}-STANDARD.json",
     overwrite: bool = False,
 ) -> ResponseHandlerConfig:
     """Example ResponseHandlerConfig for the StandardFileSaverResponseHandler.
@@ -36,7 +36,7 @@ def standard_file_response(
     The output_dir can be relative to the user's home directory (e.g. "~/path/to/output/dir")
     or a path relative to the current working directory (e.g. "output/dir").
     The filename_template can include tokens that will be filled in with values from the response.
-    For example, a template of "${operation_id}_${request_id}_${response_date}-STANDARD.json" would create files like "GetStatus_1234_2024-06-01-STANDARD.json".
+    For example, a template of "${iso_response_date}-${operation_id}-${request_id}-STANDARD.json" would create files like "2024-06-01T12_34_56-GetStatus-1234-STANDARD.json".
     """
     return ResponseHandlerConfig(
         name="esi-link:standard_file_saver",
@@ -50,7 +50,7 @@ def standard_file_response(
 
 def detailed_file_response(
     output_dir: Path,
-    filename_template: str = "${operation_id}_${request_id}_${response_date}-DETAILED.json",
+    filename_template: str = "${iso_response_date}-${operation_id}-${request_id}-DETAILED.json",
     overwrite: bool = False,
 ) -> ResponseHandlerConfig:
     """Example ResponseHandlerConfig for the DetailedFileSaverResponseHandler.
@@ -59,7 +59,7 @@ def detailed_file_response(
     The output_dir can be relative to the user's home directory (e.g. "~/path/to/output/dir")
     or a path relative to the current working directory (e.g. "output/dir").
     The filename_template can include tokens that will be filled in with values from the response.
-    For example, a template of "${operation_id}_${request_id}_${response_date}-DETAILED.json" would create files like "GetStatus_1234_2024-06-01-DETAILED.json".
+    For example, a template of "${iso_response_date}-${operation_id}-${request_id}-DETAILED.json" would create files like "2024-06-01T12_34_56-GetStatus-1234-DETAILED.json".
     """
     return ResponseHandlerConfig(
         name="esi-link:detailed_file_saver",
