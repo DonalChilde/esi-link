@@ -1,3 +1,5 @@
+"""Standard File Saver Response Handler for ESI Link."""
+
 import logging
 from pathlib import Path
 from string import Template, ascii_letters, digits
@@ -18,14 +20,13 @@ from esi_link.models_and_protocols import (
 logger = logging.getLogger(__name__)
 
 
-class TemplatedFileSaverResponseHandler(ResponseHandlerABC):
-    """Response Handler that saves the response to a templated file path."""
-
-    name = "esi-link:templated_response_saver"
+class StandardFileSaverResponseHandler(ResponseHandlerABC):
+    name = "esi-link:standard_file_saver"
 
     def __init__(
         self, output_dir: Path, filename_template: str, overwrite: bool = False
     ) -> None:
+        """Response Handler that saves the response to a templated file path."""
         self.output_dir = output_dir
         self.filename_template = filename_template
         self.overwrite = overwrite

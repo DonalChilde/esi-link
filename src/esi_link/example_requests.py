@@ -6,36 +6,63 @@ from uuid import uuid4
 from esi_link.models_and_protocols import Request, ResponseHandlerConfig
 
 
-def simple_save_response(
+def debug_file_response(
     output_dir: Path, overwrite: bool = False
 ) -> ResponseHandlerConfig:
-    """Example ResponseHandlerConfig for the SimpleSaveToDiskResponseHandler.
+    """Example ResponseHandlerConfig for the DebugFileSaverResponseHandler.
 
     This config specifies the output directory and whether to overwrite existing files.
     The output_dir can be relative to the user's home directory (e.g. "~/path/to/output/dir")
     or a path relative to the current working directory (e.g. "output/dir").
     """
     return ResponseHandlerConfig(
-        name="esi-link:simple_save_to_disk",
-        config={"output_dir": str(output_dir), "overwrite": overwrite},
+        name="esi-link:debug_file_saver",
+        config={
+            "output_dir": str(output_dir),
+            "filename_template": "${operation_id}_${request_id}_${response_date}-DEBUG.json",
+            "overwrite": overwrite,
+        },
     )
 
 
-def templated_file_saver_response(
+def standard_file_response(
     output_dir: Path,
-    filename_template: str = "${operation_id}_${request_id}_${response_date}.json",
+    filename_template: str = "${operation_id}_${request_id}_${response_date}-STANDARD.json",
     overwrite: bool = False,
 ) -> ResponseHandlerConfig:
-    """Example ResponseHandlerConfig for the TemplatedFileSaverResponseHandler.
+    """Example ResponseHandlerConfig for the StandardFileSaverResponseHandler.
 
     This config specifies the output directory, filename template, and whether to overwrite existing files.
     The output_dir can be relative to the user's home directory (e.g. "~/path/to/output/dir")
     or a path relative to the current working directory (e.g. "output/dir").
     The filename_template can include tokens that will be filled in with values from the response.
-    For example, a template of "${operation_id}_${request_id}_${response_date}.json" would create files like "GetStatus_1234_2024-06-01.json".
+    For example, a template of "${operation_id}_${request_id}_${response_date}-STANDARD.json" would create files like "GetStatus_1234_2024-06-01-STANDARD.json".
     """
     return ResponseHandlerConfig(
-        name="esi-link:templated_response_saver",
+        name="esi-link:standard_file_saver",
+        config={
+            "output_dir": str(output_dir),
+            "filename_template": filename_template,
+            "overwrite": overwrite,
+        },
+    )
+
+
+def detailed_file_response(
+    output_dir: Path,
+    filename_template: str = "${operation_id}_${request_id}_${response_date}-DETAILED.json",
+    overwrite: bool = False,
+) -> ResponseHandlerConfig:
+    """Example ResponseHandlerConfig for the DetailedFileSaverResponseHandler.
+
+    This config specifies the output directory, filename template, and whether to overwrite existing files.
+    The output_dir can be relative to the user's home directory (e.g. "~/path/to/output/dir")
+    or a path relative to the current working directory (e.g. "output/dir").
+    The filename_template can include tokens that will be filled in with values from the response.
+    For example, a template of "${operation_id}_${request_id}_${response_date}-DETAILED.json" would create files like "GetStatus_1234_2024-06-01-DETAILED.json".
+    """
+    return ResponseHandlerConfig(
+        name="esi-link:detailed_file_saver",
         config={
             "output_dir": str(output_dir),
             "filename_template": filename_template,
