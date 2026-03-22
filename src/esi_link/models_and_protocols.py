@@ -2,7 +2,7 @@
 
 import json
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from types import TracebackType
@@ -551,6 +551,11 @@ class EsiSchema:
 
     dereferenced_schema: dict[str, Any]
 
+    def __post_init__(self) -> None:
+        """Ensure that the schema is valid."""
+        if "openapi" not in self.dereferenced_schema:
+            raise ValueError("Invalid schema: missing 'openapi' field")
+
     @classmethod
     def from_raw_schema(cls, raw_schema: dict[str, Any]) -> Self:
         """Factory method to create an EsiSchema instance from a raw OpenAPI schema.
@@ -565,8 +570,6 @@ class EsiSchema:
         Returns:
             An instance of EsiSchema with the dereferenced schema.
         """
-        if "openapi" not in raw_schema:
-            raise ValueError("Invalid schema: missing 'openapi' field")
         dereferenced_schema = resolve_internal_refs(raw_schema, raw_schema)
         return cls(dereferenced_schema=dereferenced_schema)
 
@@ -654,133 +657,148 @@ class StoredSchema(BaseModel):
 
 
 @dataclass(slots=True)
-class IndexedOperation:
-    method: Literal["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
-    path: str
-    operation: dict[str, Any] = field(default_factory=dict[str, Any])
-    """The raw operation object from the OpenAPI schema, dereferenced and ready for use.
-    
-    This object contains all the details of the operation as defined in the OpenAPI schema,
-    including parameters, request body, responses, and security requirements.
+class AvailableSchema:
+    """Represents an available ESI schema in the SchemaManager.
 
-    <paths>:<path>:<method>:<operation> from the OpenAPI schema.
-
+    Available schemas are returned as a list of AvailableSchema, where each instance contains:
+        - compatibility_date (str): The compatibility date of the schema.
+        - timestamp (int): The timestamp of the schema download.
+        - datetime (str): The download date and time of the schema as an ISO 8601 string.
     """
 
-    @property
-    def operation_id(self) -> str:
-        """Extract the operation ID from the operation object."""
-        return self.operation.get("operationId", "")
-
-    @property
-    def tags(self) -> list[str]:
-        """Extract the tags from the operation object, if present."""
-        return self.operation.get("tags", [])
-
-    @property
-    def description(self) -> str:
-        """Extract the description from the operation object, if present."""
-        return self.operation.get("description", "")
-
-    @property
-    def path_params(self) -> list[dict[str, Any]]:
-        """Extract the path parameters from the operation object, if present."""
-        return [
-            param
-            for param in self.operation.get("parameters", [])
-            if param.get("in") == "path"
-        ]
-
-    @property
-    def query_params(self) -> list[dict[str, Any]]:
-        """Extract the query parameters from the operation object, if present."""
-        return [
-            param
-            for param in self.operation.get("parameters", [])
-            if param.get("in") == "query"
-        ]
-
-    @property
-    def header_params(self) -> list[dict[str, Any]]:
-        """Extract the header parameters from the operation object, if present."""
-        return [
-            param
-            for param in self.operation.get("parameters", [])
-            if param.get("in") == "header"
-        ]
-
-    @property
-    def request_body(self) -> dict[str, Any] | None:
-        """Extract the request body from the operation object, if present."""
-        return self.operation.get("requestBody")
-
-    @property
-    def auth_required(self) -> bool:
-        """Determine if the operation requires authentication based on the presence of security requirements."""
-        return "security" in self.operation and bool(self.operation["security"])
-
-    @property
-    def is_paged(self) -> bool:
-        """Determine if the operation is paged based on the presence of pagination-related parameters."""
-        for param in self.query_params:
-            if param.get("name") in {"page"}:
-                return True
-        return False
-
-    @property
-    def is_cached(self) -> bool:
-        """Determine if the operation is cacheable."""
-        if self.method in {"GET", "get"}:
-            return True
-        return False
+    compatibility_date: str
+    timestamp: int
+    datetime: str
 
 
-# TODO can this be a dataclass instead of a full class with methods? It doesn't seem to have any behavior, just data.
-class IndexedEsiSchema(BaseModel):
-    """Represents the entire schema for ESI requests and responses, indexed for efficient access."""
+# @dataclass(slots=True)
+# class IndexedOperation:
+#     method: Literal["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
+#     path: str
+#     operation: dict[str, Any] = field(default_factory=dict[str, Any])
+#     """The raw operation object from the OpenAPI schema, dereferenced and ready for use.
 
-    download_date: Instant
-    """The date the schema was downloaded."""
-    esi_schema: dict[str, Any]
-    """The raw OpenAPI schema as a dictionary."""
-    operations: dict[str, IndexedOperation] = Field(default_factory=dict)
-    """A mapping of operation IDs to IndexedOperation instances."""
-    security_schemes: dict[str, Any] = Field(default_factory=dict)
-    """A mapping of security scheme names to their definitions."""
-    info: dict[str, Any] = Field(default_factory=dict)
-    """The info section of the OpenAPI schema."""
-    openapi: str
-    """The OpenAPI version."""
-    servers: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
-    """The servers section of the OpenAPI schema."""
-    tags: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
-    """The tags section of the OpenAPI schema."""
+#     This object contains all the details of the operation as defined in the OpenAPI schema,
+#     including parameters, request body, responses, and security requirements.
 
-    def __str__(self) -> str:
-        """String representation of the IndexedEsiSchema instance."""
-        return (
-            f"IndexedEsiSchema(version={self.version}, "
-            f"openapi={self.openapi}, operations={len(self.operations)}, "
-            f"download_date={self.download_date})"
-        )
+#     <paths>:<path>:<method>:<operation> from the OpenAPI schema.
 
-    @property
-    def compatibility_date(self) -> str:
-        """Get the compatibility date of the ESI schema from the info section."""
-        return self.version
+#     """
 
-    @property
-    def version(self) -> str:
-        """Get the version of the ESI schema based on the compatibility date."""
-        version = cast(str, self.info["version"])
-        return version
+#     @property
+#     def operation_id(self) -> str:
+#         """Extract the operation ID from the operation object."""
+#         return self.operation.get("operationId", "")
 
-    @property
-    def base_url(self) -> str:
-        """Get the base URL for the ESI API from the servers section of the schema."""
-        if self.servers:
-            return self.servers[0]["url"]
-        raise ValueError("No servers defined in schema")
+#     @property
+#     def tags(self) -> list[str]:
+#         """Extract the tags from the operation object, if present."""
+#         return self.operation.get("tags", [])
+
+#     @property
+#     def description(self) -> str:
+#         """Extract the description from the operation object, if present."""
+#         return self.operation.get("description", "")
+
+#     @property
+#     def path_params(self) -> list[dict[str, Any]]:
+#         """Extract the path parameters from the operation object, if present."""
+#         return [
+#             param
+#             for param in self.operation.get("parameters", [])
+#             if param.get("in") == "path"
+#         ]
+
+#     @property
+#     def query_params(self) -> list[dict[str, Any]]:
+#         """Extract the query parameters from the operation object, if present."""
+#         return [
+#             param
+#             for param in self.operation.get("parameters", [])
+#             if param.get("in") == "query"
+#         ]
+
+#     @property
+#     def header_params(self) -> list[dict[str, Any]]:
+#         """Extract the header parameters from the operation object, if present."""
+#         return [
+#             param
+#             for param in self.operation.get("parameters", [])
+#             if param.get("in") == "header"
+#         ]
+
+#     @property
+#     def request_body(self) -> dict[str, Any] | None:
+#         """Extract the request body from the operation object, if present."""
+#         return self.operation.get("requestBody")
+
+#     @property
+#     def auth_required(self) -> bool:
+#         """Determine if the operation requires authentication based on the presence of security requirements."""
+#         return "security" in self.operation and bool(self.operation["security"])
+
+#     @property
+#     def is_paged(self) -> bool:
+#         """Determine if the operation is paged based on the presence of pagination-related parameters."""
+#         for param in self.query_params:
+#             if param.get("name") in {"page"}:
+#                 return True
+#         return False
+
+#     @property
+#     def is_cached(self) -> bool:
+#         """Determine if the operation is cacheable."""
+#         if self.method in {"GET", "get"}:
+#             return True
+#         return False
+
+
+# # TODO can this be a dataclass instead of a full class with methods? It doesn't seem to have any behavior, just data.
+# class IndexedEsiSchema(BaseModel):
+#     """Represents the entire schema for ESI requests and responses, indexed for efficient access."""
+
+#     download_date: Instant
+#     """The date the schema was downloaded."""
+#     esi_schema: dict[str, Any]
+#     """The raw OpenAPI schema as a dictionary."""
+#     operations: dict[str, IndexedOperation] = Field(default_factory=dict)
+#     """A mapping of operation IDs to IndexedOperation instances."""
+#     security_schemes: dict[str, Any] = Field(default_factory=dict)
+#     """A mapping of security scheme names to their definitions."""
+#     info: dict[str, Any] = Field(default_factory=dict)
+#     """The info section of the OpenAPI schema."""
+#     openapi: str
+#     """The OpenAPI version."""
+#     servers: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
+#     """The servers section of the OpenAPI schema."""
+#     tags: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
+#     """The tags section of the OpenAPI schema."""
+
+#     def __str__(self) -> str:
+#         """String representation of the IndexedEsiSchema instance."""
+#         return (
+#             f"IndexedEsiSchema(version={self.version}, "
+#             f"openapi={self.openapi}, operations={len(self.operations)}, "
+#             f"download_date={self.download_date})"
+#         )
+
+#     @property
+#     def compatibility_date(self) -> str:
+#         """Get the compatibility date of the ESI schema from the info section."""
+#         return self.version
+
+#     @property
+#     def version(self) -> str:
+#         """Get the version of the ESI schema based on the compatibility date."""
+#         version = cast(str, self.info["version"])
+#         return version
+
+#     @property
+#     def base_url(self) -> str:
+#         """Get the base URL for the ESI API from the servers section of the schema."""
+#         if self.servers:
+#             return self.servers[0]["url"]
+#         raise ValueError("No servers defined in schema")
 
 
 @dataclass(slots=True)
@@ -1132,7 +1150,7 @@ class CacheFactoryProtocol:
 
 
 class UrlGeneratorProtocol:
-    def generate_path_url(self, request: Request, schema: IndexedEsiSchema) -> str:
+    def generate_path_url(self, request: Request, schema: EsiSchema) -> str:
         """Generate the url path for an ESI request based on its parameters.\
 
         This url does not contain query parameters, and is not suitable for generateing
@@ -1141,7 +1159,7 @@ class UrlGeneratorProtocol:
         """
         ...
 
-    def generate_cache_url(self, request: Request, schema: IndexedEsiSchema) -> str:
+    def generate_cache_url(self, request: Request, schema: EsiSchema) -> str:
         """Generate the url to use for cache key generation for an ESI request based on its parameters.
 
         This url should contain all path and most query parameters, and should be
@@ -1154,7 +1172,7 @@ class UrlGeneratorProtocol:
         """
         ...
 
-    def generate_cache_key(self, request: Request, schema: IndexedEsiSchema) -> UUID:
+    def generate_cache_key(self, request: Request, schema: EsiSchema) -> UUID:
         """Generate a cache key for an ESI request based on its parameters.
 
         The key is usually generated by hashing the url generated by generate_cache_url,
@@ -1163,7 +1181,7 @@ class UrlGeneratorProtocol:
         """
         ...
 
-    def __call__(self, request: Request, schema: IndexedEsiSchema) -> GeneratedUrlInfo:
+    def __call__(self, request: Request, schema: EsiSchema) -> GeneratedUrlInfo:
         """Generate all url related information for an ESI request.
 
         This is a convenience method that generates the path url, cache url, and cache key
@@ -1191,7 +1209,7 @@ class SchemaManagerProtocol:
 
     def get_schema_for_date(
         self, compatibility_date: str, timestamp: int
-    ) -> IndexedEsiSchema:
+    ) -> StoredSchema:
         """Get the ESI schema corresponding to the given compatibility date and timestamp.
 
         Args:
@@ -1199,7 +1217,7 @@ class SchemaManagerProtocol:
             timestamp (int): The timestamp of the schema to retrieve.
 
         Returns:
-            IndexedEsiSchema: The ESI schema corresponding to the given compatibility date and timestamp.
+            StoredSchema: The ESI schema corresponding to the given compatibility date and timestamp.
 
         Raises:
             SchemaNotFoundError: If no schema is found for the given compatibility date and timestamp.
@@ -1207,7 +1225,7 @@ class SchemaManagerProtocol:
         """
         ...
 
-    def get_latest_schema(self, compatibility_date: str | None) -> IndexedEsiSchema:
+    def get_latest_schema(self, compatibility_date: str | None) -> StoredSchema:
         """Get the latest ESI schema available in the schema store.
 
         If compatibility_date is provided, return the latest schema for that compatibility date.
@@ -1226,30 +1244,31 @@ class SchemaManagerProtocol:
         """
         ...
 
-    def available_schemas(self) -> list[tuple[str, int, str]]:
+    def available_schemas(self) -> list[AvailableSchema]:
         """Return a list of available compatibility dates for schemas in the store.
 
-        Available schemas are returned as a list of tuples, where each tuple contains:
+        Available schemas are returned as a list of AvaliableSchema, where each instance contains:
         - compatibility_date (str): The compatibility date of the schema.
         - timestamp (int): The timestamp of the schema download.
         - datetime (str): The download date and time of the schema as an ISO 8601 string.
 
         Returns:
-            list[tuple[str, int, str]]: A list of available schemas in the store.
+            list[AvailableSchema]: A list of available schemas in the store, sorted by
+                compatibility date and then by timestamp (newest first).
 
         Raises:
             SchemaManagerError: If there is an error loading the schema files.
         """
         ...
 
-    def add_schema(self, schema: dict[str, Any], download_date: Instant) -> None:
+    def add_schema(self, schema: EsiSchema, download_date: Instant) -> None:
         """Add a new schema to the schema store.
 
         This method adds a raw OpenAPI schema to the schema store along with the
         date and time when the schema was downloaded.
 
         Args:
-            schema (dict[str, Any]): The raw OpenAPI schema to add to the store.
+            schema (EsiSchema): The EsiSchema to add to the store.
             download_date (Instant): The date and time when the schema was downloaded.
 
         Raises:

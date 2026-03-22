@@ -24,7 +24,7 @@ from esi_link.handlers.response_group.manager import (
 )
 from esi_link.models_and_protocols import (
     CacheManagerProtocol,
-    IndexedEsiSchema,
+    EsiSchema,
     RequestGroupExecutorProtocol,
     RequestGroupValidatorProtocol,
     RequestValidatorProtocol,
@@ -43,7 +43,7 @@ from esi_link.validation.request_validation import RequestValidator
 class EsiLinkObjectFactory:
     def __init__(
         self,
-        schema: IndexedEsiSchema,
+        schema: EsiSchema,
         cache_directory: Path,
         credentials_file: Path,
         tokens_dir: Path,
@@ -60,7 +60,7 @@ class EsiLinkObjectFactory:
         they are created with the correct dependencies and configurations.
 
         Args:
-            schema: The IndexedEsiSchema to use for request validation and runtime info generation.
+            schema: The EsiSchema to use for request validation and runtime info generation.
             cache_directory: The directory to use for caching ESI responses.
             credentials_file: The path to the application credentials JSON file for ESI authentication.
             tokens_dir: The directory to use for storing ESI authentication tokens.
@@ -105,7 +105,7 @@ class EsiLinkObjectFactory:
     def runtime_request_gen(self) -> RuntimeRequestInfoGeneratorProtocol:
         """Create a RuntimeRequestInfoGeneratorProtocol with the factory's dependencies."""
         return RuntimeRequestInfoGenerator(
-            indexed_schema=self._schema,
+            schema=self._schema,
             auth=self.auth_provider(),
             auth_min_seconds=self._auth_min_seconds,
             response_handler_manager=self.response_handler_manager(),

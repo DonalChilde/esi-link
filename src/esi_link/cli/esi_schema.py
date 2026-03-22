@@ -8,23 +8,20 @@ from typing import Annotated
 import typer
 from rich.console import Console
 from rich.json import JSON
+from rich.rule import Rule
 from rich.table import Table
 from whenever import Instant
 
 from esi_link.cli.helpers import get_settings_from_context
-from esi_link.cli.schema_display_helpers import display_operations_by_tag
 from esi_link.helpers.datetime_filename import file_safe_iso_datetime_string
 from esi_link.helpers.download_schema import (
     download_schema,
     download_schema_changelog,
 )
 from esi_link.helpers.eve_dates import current_compatibility_date
-from esi_link.helpers.indexed_operation_summary import (
-    collect_operation_summaries,
-    summaries_by_tag,
-)
-from esi_link.helpers.resolve_json_ref import resolve_internal_refs
 from esi_link.helpers.save_text_file import save_text_file
+from esi_link.models_and_protocols import EsiSchema
+from esi_link.schema.schema_doc import doc_dict_by_tag, generate_esi_schema_doc
 from esi_link.schema.schema_manager import SchemaManager
 
 app = typer.Typer(no_args_is_help=True, help="Commands related to the ESI schema.")
@@ -69,7 +66,8 @@ def download(
         download_schema(compatibility_date=compat_date, url=settings.esi_schema_url)
     )
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
-    schema_manager.add_schema(schema_download.raw_schema, schema_download.download_date)
+    esi_schema = EsiSchema.from_raw_schema(schema_download.raw_schema)
+    schema_manager.add_schema(esi_schema, schema_download.download_date)
     console.print(f"ESI schema downloaded and added to app schema store.")
     if dir_out:
         safe_date = file_safe_iso_datetime_string(
@@ -83,7 +81,7 @@ def download(
             overwrite=overwrite,
         )
         deref_path = save_text_file(
-            text=json.dumps(resolve_internal_refs(raw_schema, raw_schema), indent=2),
+            text=json.dumps(esi_schema.dereferenced_schema, indent=2),
             output_dir=dir_out,
             file_name=f"esi_schema_dereferenced_{safe_date}.json",
             overwrite=overwrite,
@@ -159,18 +157,28 @@ def operations(
     dir_out: Annotated[
         Path | None,
         typer.Option(
-            help="Directory to save the list of operations to as a json file. The file "
-            "name will be `operations-<compatibility_date>-<timestamp>.json`. If not "
-            "provided, the operations will be printed to the console."
+            help="Directory to save the operation documentation as a markdown file. The file "
+            "name will be `operations-<compatibility_date>-<timestamp>.md`. If not "
+            "provided, a summary of operations will be printed to the console."
         ),
     ] = None,
 ):
-    """List the operations available in the ESI schema."""
+    """List the operations available in the ESI schema.
+
+    If a directory is provided with the `--dir-out` option, a markdown file will be generated
+    with documentation for all operations, grouped by tag. If no directory is provided,
+    a summary of operations will be printed to the console.
+
+    The compatibility date and timestamp options can be used to specify which schema to
+    load from the schema store. If no compatibility date is provided, the most recent
+    schema will be used. If a compatibility date is provided but no timestamp, the most
+    recent schema matching the compatibility date will be used.
+    """
     console = Console()
     settings = get_settings_from_context(ctx)
     store_manager = SchemaManager(schema_directory=settings.schema_store_dir)
     try:
-        schema = get_schema(
+        stored_schema = get_schema(
             schema_manager=store_manager,
             compatibility_date=compatibility_date,
             timestamp=timestamp,
@@ -178,22 +186,35 @@ def operations(
     except Exception as e:
         console.print(f"Error loading schema: {str(e)}")
         raise typer.Exit(code=1) from e
+    operations = stored_schema.esi_schema.operations
+    doc_dict = doc_dict_by_tag(operations)
 
-    operation_summaries = collect_operation_summaries(schema)
-    summaries_by_tag_dict = summaries_by_tag(operation_summaries)
     console.print(
-        f"Collected {len(operation_summaries)} operations from the ESI schema version {schema.compatibility_date} downloaded at {schema.download_date}."
+        f"Collected {len(operations)} operations from the ESI schema version {stored_schema.esi_schema.compatibility_date} downloaded at {stored_schema.download_date}."
     )
     if dir_out:
+        text = generate_esi_schema_doc(
+            stored_schema.esi_schema, stored_schema.download_date
+        )
         file_path = save_text_file(
-            text=json.dumps(operation_summaries, indent=2),
+            text=text,
             output_dir=dir_out,
-            file_name=f"operations-{schema.compatibility_date}-{schema.download_date.timestamp()}.json",
+            file_name=f"operations-{stored_schema.esi_schema.compatibility_date}-{stored_schema.download_date.timestamp()}.md",
             overwrite=True,
         )
-        console.print(f"Operation summaries saved to {file_path}.")
+        console.print(f"Operation Documentation saved to {file_path}.")
     else:
-        display_operations_by_tag(summaries_by_tag_dict)
+        # TODO work on table formatting to make it more readable
+        for tag, operation_docs in doc_dict.items():
+            console.print(Rule(f"{tag}"))
+            table = Table()
+            table.add_column("Operation ID", style="cyan")
+            table.add_column("Description", style="magenta")
+            for operation_doc in operation_docs:
+                table.add_row(
+                    operation_doc["operation_id"], operation_doc["description"]
+                )
+            console.print(table)
 
 
 @app.command()
@@ -208,7 +229,7 @@ def available_schemas(ctx: typer.Context):
     table.add_column("Download Date", style="magenta")
     table.add_column("Timestamp", style="yellow")
     for schema in schemas:
-        table.add_row(schema[0], schema[2], str(schema[1]))
+        table.add_row(schema.compatibility_date, schema.datetime, str(schema.timestamp))
     console.print(table)
 
 

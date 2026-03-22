@@ -36,7 +36,7 @@ def status(
     console = Console()
     console.print("Running tests...")
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
-    schema = schema_manager.get_latest_schema()
+    stored_schema = schema_manager.get_latest_schema()
     request = example_requests.esi_status(
         handlers=[
             example_requests.debug_file_response(output_dir=output_dir),
@@ -51,7 +51,7 @@ def status(
     )
 
     factory = EsiLinkObjectFactory(
-        schema=schema,
+        schema=stored_schema.esi_schema,
         cache_type="json",
         cache_directory=settings.json_cache_directory,
         credentials_file=settings.app_credentials_file,
@@ -81,7 +81,7 @@ def pages(
     console = Console()
     console.print("Running tests...")
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
-    schema = schema_manager.get_latest_schema()
+    stored_schema = schema_manager.get_latest_schema()
     request = example_requests.market_types_with_active_orders(
         handlers=[example_requests.debug_file_response(output_dir=output_dir)]
         if output_dir
@@ -92,7 +92,7 @@ def pages(
     )
 
     factory = EsiLinkObjectFactory(
-        schema=schema,
+        schema=stored_schema.esi_schema,
         cache_type="json",
         cache_directory=settings.json_cache_directory,
         credentials_file=settings.app_credentials_file,
@@ -128,7 +128,7 @@ def changelog(
     console = Console()
     console.print("Running tests...")
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
-    schema = schema_manager.get_latest_schema()
+    stored_schema = schema_manager.get_latest_schema()
     request = example_requests.esi_changelog(
         handlers=[example_requests.debug_file_response(output_dir=output_dir)]
         if output_dir
@@ -139,7 +139,7 @@ def changelog(
     )
 
     factory = EsiLinkObjectFactory(
-        schema=schema,
+        schema=stored_schema.esi_schema,
         cache_type="json",
         cache_directory=settings.json_cache_directory,
         credentials_file=settings.app_credentials_file,
@@ -174,7 +174,7 @@ def character_stats(
     console = Console()
     console.print("Running tests...")
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
-    schema = schema_manager.get_latest_schema()
+    stored_schema = schema_manager.get_latest_schema()
     request = example_requests.character_stats(
         character_id=character_id,
         handlers=[example_requests.debug_file_response(output_dir=output_dir)]
@@ -186,7 +186,7 @@ def character_stats(
     )
 
     factory = EsiLinkObjectFactory(
-        schema=schema,
+        schema=stored_schema.esi_schema,
         cache_type="json",
         cache_directory=settings.json_cache_directory,
         credentials_file=settings.app_credentials_file,

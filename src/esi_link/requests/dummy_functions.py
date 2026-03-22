@@ -15,15 +15,13 @@ from esi_link.models_and_protocols import (
     ResponseHandlerConfig,
     ResponseHandlerManagerProtocol,
     ResponseHandlerProtocol,
-    RuntimeGroupInfo,
-    RuntimeGroupInfoGeneratorProtocol,
 )
 
 logger = logging.getLogger(__name__)
 
 
 class DummyRequestValidator(RequestValidatorProtocol):
-    def __call__(self, request: Request) -> None:
+    async def __call__(self, request: Request) -> None:
         pass
 
 

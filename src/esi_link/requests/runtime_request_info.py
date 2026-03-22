@@ -4,7 +4,7 @@ from esi_link import USER_AGENT
 from esi_link.esi_auth.protocols import AuthProviderProtocol
 from esi_link.handlers.response.manager import ResponseHandlerManager
 from esi_link.models_and_protocols import (
-    IndexedEsiSchema,
+    EsiSchema,
     Request,
     RequestMetrics,
     ResponseHandlerManagerProtocol,
@@ -19,14 +19,14 @@ from esi_link.requests.url_generator import UrlGenerator
 class RuntimeRequestInfoGenerator(RuntimeRequestInfoGeneratorProtocol):
     def __init__(
         self,
-        indexed_schema: IndexedEsiSchema,
+        schema: EsiSchema,
         auth: AuthProviderProtocol,
         auth_min_seconds: int = 300,
         url_generator: UrlGeneratorProtocol | None = None,
         response_handler_manager: ResponseHandlerManagerProtocol | None = None,
     ) -> None:
         """Initialize the RuntimeRequestInfoGenerator."""
-        self.indexed_schema = indexed_schema
+        self.schema = schema
         self.auth = auth
         self.auth_min_seconds = auth_min_seconds
 
@@ -37,11 +37,11 @@ class RuntimeRequestInfoGenerator(RuntimeRequestInfoGeneratorProtocol):
 
     async def __call__(self, request: Request) -> RuntimeRequestInfo:
         """Generate the RuntimeRequestInfo for a given Request."""
-        url_info = self.url_generator(request, self.indexed_schema)
+        url_info = self.url_generator(request, self.schema)
         headers = self._generate_headers(request)
         auth_headers = await self._auth_headers(request)
         headers.update(auth_headers)
-        operation = self.indexed_schema.operations.get(request.operation_id)
+        operation = self.schema.operations.get(request.operation_id)
         if operation is None:
             raise ValueError(
                 f"Operation with ID {request.operation_id} not found in indexed schema for request {request.request_id}."
@@ -89,5 +89,5 @@ class RuntimeRequestInfoGenerator(RuntimeRequestInfoGeneratorProtocol):
         headers: dict[str, str] = {}
         headers["User-Agent"] = USER_AGENT
         headers["Accept-Language"] = request.lang
-        headers["X-Compatibility-Date"] = self.indexed_schema.compatibility_date
+        headers["X-Compatibility-Date"] = self.schema.compatibility_date
         return headers

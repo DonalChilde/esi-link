@@ -85,11 +85,11 @@ import logging
 
 from esi_link.esi_auth.protocols import AuthProviderProtocol
 from esi_link.models_and_protocols import (
-    IndexedEsiSchema,
-    IndexedOperation,
+    EsiSchema,
     Request,
     RequestValidatorProtocol,
     ResponseHandlerManagerProtocol,
+    SchemaOperation,
 )
 from esi_link.validation.errors import RequestValidationError
 
@@ -101,14 +101,14 @@ logger = logging.getLogger(__name__)
 class RequestValidator(RequestValidatorProtocol):
     def __init__(
         self,
-        schema: IndexedEsiSchema,
+        schema: EsiSchema,
         response_handler_manager: ResponseHandlerManagerProtocol,
         auth_provider: AuthProviderProtocol,
     ) -> None:
         """Initialize the RequestValidator.
 
         Args:
-            schema: The indexed ESI schema to validate against.
+            schema: The EsiSchema to validate against.
             response_handler_manager: The response handler manager to validate response handler configs against.
             auth_provider: The authentication provider to validate request authentication against.
         """
@@ -117,7 +117,7 @@ class RequestValidator(RequestValidatorProtocol):
         self.auth_provider = auth_provider
 
     async def __call__(self, request: Request) -> None:
-        """Validate an ESI request against the indexed schema."""
+        """Validate an ESI request against the EsiSchema."""
         try:
             if request.operation_id not in self.schema.operations:
                 raise RequestValidationError(
@@ -141,8 +141,8 @@ class RequestValidator(RequestValidatorProtocol):
             ) from e
 
 
-def validate_request_path_params(request: Request, operation: IndexedOperation) -> None:
-    """Validate the request path against the indexed schema.
+def validate_request_path_params(request: Request, operation: SchemaOperation) -> None:
+    """Validate the request path against the EsiSchema operation.
 
     only checks for the presence or absence of parameters.
     """
@@ -165,10 +165,8 @@ def validate_request_path_params(request: Request, operation: IndexedOperation) 
             raise ValueError(f"Unexpected path parameter: {param_name}")
 
 
-def validate_request_query_params(
-    request: Request, operation: IndexedOperation
-) -> None:
-    """Validate the request query parameters against the indexed schema.
+def validate_request_query_params(request: Request, operation: SchemaOperation) -> None:
+    """Validate the request query parameters against the EsiSchema operation.
 
     This includes checking for required parameters, validating parameter types, and
     ensuring that parameter values conform to any specified constraints (e.g., enums, min/max values).
@@ -192,16 +190,16 @@ def validate_request_query_params(
             raise ValueError(f"Unexpected query parameter: {param_name}")
 
 
-def validate_request_body(request: Request, operation: IndexedOperation) -> None:
-    """Validate the request body against the indexed schema."""
+def validate_request_body(request: Request, operation: SchemaOperation) -> None:
+    """Validate the request body against the EsiSchema operation."""
     # TODO implement request body validation based on the operation's requestBody schema
     pass
 
 
 async def validate_request_auth(
-    request: Request, operation: IndexedOperation, auth_provider: AuthProviderProtocol
+    request: Request, operation: SchemaOperation, auth_provider: AuthProviderProtocol
 ) -> None:
-    """Validate the request authentication against the indexed schema."""
+    """Validate the request authentication against the EsiSchema operation."""
     if not operation:
         raise ValueError(f"Operation ID {request.operation_id} not found in schema")
     if operation.auth_required and not request.auth_character_id:
