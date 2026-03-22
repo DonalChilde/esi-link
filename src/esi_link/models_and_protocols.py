@@ -1,6 +1,7 @@
 """Models for ESI Link."""
 
 import json
+from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -431,6 +432,161 @@ class CachedResponse(BaseModel):
     http_response: HttpResponse
     expires_at: Instant | None = None
     """The instant when the cached response expires and should be considered stale."""
+
+
+@dataclass(slots=True)
+class SchemaOperation:
+    """Represents an operation defined in the ESI OpenAPI schema.
+
+    This class is used to store the details of an operation, including the path, method,
+    operation ID, and the full operation schema. This allows for easy access to the
+    details of each operation when generating documentation or validating requests.
+
+    equivalent to the combination of the path, method, and operation object from the OpenAPI schema.
+    "paths":<path>:<method>:<operation_schema> from the OpenAPI schema.
+    """
+
+    path: str
+    method: Literal["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
+    operation_schema: dict[str, Any]
+
+    @property
+    def operation_id(self) -> str:
+        """Extract the operation ID from the operation object."""
+        return self.operation_schema.get("operationId", "")
+
+    @property
+    def tags(self) -> list[str]:
+        """Extract the tags from the operation object, if present."""
+        return self.operation_schema.get("tags", [])
+
+    @property
+    def description(self) -> str:
+        """Extract the description from the operation object, if present."""
+        return self.operation_schema.get("description", "")
+
+    @property
+    def path_params(self) -> list[dict[str, Any]]:
+        """Extract the path parameters from the operation object, if present."""
+        return [
+            param
+            for param in self.operation_schema.get("parameters", [])
+            if param.get("in") == "path"
+        ]
+
+    @property
+    def query_params(self) -> list[dict[str, Any]]:
+        """Extract the query parameters from the operation object, if present."""
+        return [
+            param
+            for param in self.operation_schema.get("parameters", [])
+            if param.get("in") == "query"
+        ]
+
+    @property
+    def header_params(self) -> list[dict[str, Any]]:
+        """Extract the header parameters from the operation object, if present."""
+        return [
+            param
+            for param in self.operation_schema.get("parameters", [])
+            if param.get("in") == "header"
+        ]
+
+    @property
+    def request_body(self) -> dict[str, Any] | None:
+        """Extract the request body from the operation object, if present."""
+        return self.operation_schema.get("requestBody")
+
+    @property
+    def auth_required(self) -> bool:
+        """Determine if the operation requires authentication based on the presence of security requirements."""
+        return "security" in self.operation_schema and bool(
+            self.operation_schema["security"]
+        )
+
+    @property
+    def is_paged(self) -> bool:
+        """Determine if the operation is paged based on the presence of pagination-related parameters."""
+        for param in self.query_params:
+            if param.get("name") in {"page"}:
+                return True
+        return False
+
+    @property
+    def is_cached(self) -> bool:
+        """Determine if the operation is cacheable."""
+        if self.method in {"GET", "get"}:
+            return True
+        return False
+
+
+@dataclass(slots=True)
+class EsiSchema:
+    """Represents the ESI OpenAPI schema and its associated metadata.
+
+    For ease of access to the details of the schema.
+    """
+
+    dereferenced_schema: dict[str, Any]
+
+    @property
+    def operation_ids(self) -> set[str]:
+        """Extract the set of operation IDs from the schema."""
+        operation_ids: set[str] = set()
+        paths = self.dereferenced_schema.get("paths", {})
+        for _path, methods in paths.items():
+            for _method, operation in methods.items():
+                operation_id = operation.get("operationId")
+                if operation_id:
+                    operation_ids.add(operation_id)
+        return operation_ids
+
+    @property
+    def operations(self) -> dict[str, SchemaOperation]:
+        """Extract the operations from the schema and return them as a dictionary mapping operation IDs to SchemaOperation instances."""
+        operations: dict[str, SchemaOperation] = {}
+        operation_ids = self.operation_ids
+        for operation_id in operation_ids:
+            operation = self.get_operation_by_id(operation_id)
+            if operation:
+                operations[operation_id] = operation
+        return operations
+
+    def get_operation_by_id(self, operation_id: str) -> SchemaOperation | None:
+        """Get a SchemaOperation by its operation ID."""
+        paths = self.dereferenced_schema.get("paths", {})
+        for path, methods in paths.items():
+            for method, operation in methods.items():
+                if operation.get("operationId") == operation_id:
+                    return SchemaOperation(
+                        path=path,
+                        method=method.upper(),
+                        operation_schema=deepcopy(operation),
+                    )
+        return None
+
+    @property
+    def compatibility_date(self) -> str:
+        """Get the compatibility date of the ESI schema from the info section."""
+        return self.version
+
+    @property
+    def version(self) -> str:
+        """Get the version of the ESI schema based on the compatibility date."""
+        version = cast(str, self.dereferenced_schema["version"])
+        return version
+
+    @property
+    def base_url(self) -> str:
+        """Get the base URL for the ESI API from the servers section of the schema."""
+        return self.dereferenced_schema["servers"][0]["url"]
+
+
+class StoredSchema(BaseModel):
+    """Represents a stored ESI schema, including the raw schema and the date it was downloaded."""
+
+    esi_schema: EsiSchema
+    download_date: Instant
 
 
 @dataclass(slots=True)
