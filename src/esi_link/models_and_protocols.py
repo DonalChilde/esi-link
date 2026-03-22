@@ -13,6 +13,7 @@ import aiohttp
 from pydantic import BaseModel, ConfigDict, Field, SkipValidation
 from whenever import Instant
 
+from esi_link.helpers.resolve_json_ref import resolve_internal_refs
 from esi_link.type_defs import Lang
 
 
@@ -528,6 +529,25 @@ class EsiSchema:
     """
 
     dereferenced_schema: dict[str, Any]
+
+    @classmethod
+    def from_raw_schema(cls, raw_schema: dict[str, Any]) -> Self:
+        """Factory method to create an EsiSchema instance from a raw OpenAPI schema.
+
+        This method will resolve all internal JSON references in the schema, so that
+        the resulting EsiSchema instance contains a fully dereferenced schema for easy
+        access to all the details of the operations defined in the schema.
+
+        Args:
+            raw_schema: The raw OpenAPI schema as a dictionary.
+
+        Returns:
+            An instance of EsiSchema with the dereferenced schema.
+        """
+        if "openapi" not in raw_schema:
+            raise ValueError("Invalid schema: missing 'openapi' field")
+        dereferenced_schema = resolve_internal_refs(raw_schema, raw_schema)
+        return cls(dereferenced_schema=dereferenced_schema)
 
     @property
     def operation_ids(self) -> set[str]:
