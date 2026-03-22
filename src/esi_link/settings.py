@@ -95,6 +95,12 @@ class EsiLinkSettings(BaseSettings):
         default=DEFAULT_APP_DIR / "esi-auth" / "tokens",
         description="Directory for the application ESI token JSON files.",
     )
+    token_refresh_threshold_seconds: int = Field(
+        default=300,
+        description="Minimum number of seconds of validity required for an authentication token before it is considered invalid and a new token must be obtained.",
+    )
+    """Minimum number of seconds of validity required for an authentication token before it is considered invalid and a new token must be obtained."""
+
     """Directory for the application ESI token JSON files."""
     oauth_metadata_url: str = Field(
         default="https://login.eveonline.com/.well-known/oauth-authorization-server",
