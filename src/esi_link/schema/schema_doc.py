@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from whenever import Instant
 from yaml import safe_dump
@@ -10,37 +10,63 @@ from yaml import safe_dump
 from esi_link.models_and_protocols import EsiSchema, SchemaOperation
 
 
-def _operation_variation_1(operation: SchemaOperation) -> str:
-    """Generate human readable documentation for an ESI schema operation with variation 1.
+class OperationDoc(TypedDict):
+    operation_id: str
+    path: str
+    method: str
+    description: str
+    auth_required: bool
+    tags: list[str]
+    path_and_query_parameters: list[dict[str, Any]]
+    request_body: dict[str, Any]
+    response_schema: dict[str, Any]
 
-    This variation includes the path, method, description, parameters, request body, and authentication requirements.
+
+def doc_dict_from_operation(operation: SchemaOperation) -> OperationDoc:
+    """Convert a SchemaOperation to an OperationDoc dictionary.
 
     Args:
-        operation: The ESI schema operation to generate documentation for.
+        operation: The SchemaOperation to convert.
 
     Returns:
-        A string containing the generated documentation.
+        An OperationDoc dictionary containing the relevant information from the SchemaOperation.
     """
-    return f"""- `{operation.operation_id}`  
-**Operation ID**: `{operation.operation_id}`  
-**Path**: `{operation.path}`  
-**Method**: `{operation.method}`  
-**Description**: {operation.description.replace("\n", " ")}  
-**Authentication**: {operation.auth_required}  
-**Tags**: {", ".join(operation.tags) if operation.tags else "None"}  
-**Parameters**:  
-```json
-{json.dumps(operation.path_and_query_parameters, indent=2)}
-```
-**Request Body**:
-```json
-{json.dumps(operation.request_body, indent=2)}
-```
-**Response**:  
-```json
-{json.dumps(operation.responses, indent=2)}
-```
-"""
+    return {
+        "operation_id": operation.operation_id,
+        "path": operation.path,
+        "method": operation.method,
+        "description": operation.description.replace("\n", " "),
+        "auth_required": operation.auth_required,
+        "tags": operation.tags or [],
+        "path_and_query_parameters": operation.path_and_query_parameters,
+        "request_body": operation.request_body or {},
+        "response_schema": operation.responses,
+    }
+
+
+def doc_dict_by_tag(
+    operations: dict[str, SchemaOperation],
+) -> dict[str, list[OperationDoc]]:
+    """Group SchemaOperations by tag and convert them to OperationDoc dictionaries.
+
+    Args:
+        operations: A dictionary mapping operation IDs to SchemaOperations.
+
+    Returns:
+        A dictionary mapping tags to lists of OperationDoc dictionaries.
+    """
+    doc_by_tag: dict[str, list[OperationDoc]] = {}
+    for operation in operations.values():
+        for tag in operation.tags or []:
+            if tag not in doc_by_tag:
+                doc_by_tag[tag] = []
+            doc_by_tag[tag].append(doc_dict_from_operation(operation))
+    # sort by tag and then by operation_id
+    doc_by_tag = {
+        tag: sorted(operation_ids, key=lambda x: x["operation_id"])
+        for tag, operation_ids in sorted(doc_by_tag.items())
+    }
+    return doc_by_tag
 
 
 def generate_operation_doc(operation: SchemaOperation) -> str:
@@ -52,11 +78,14 @@ def generate_operation_doc(operation: SchemaOperation) -> str:
     Returns:
         A string containing the generated documentation.
     """
-    return _operation_variation_1(operation)
+    return safe_dump(doc_dict_from_operation(operation), sort_keys=False, indent=2)
 
 
 def generate_esi_schema_doc(schema: EsiSchema, download_date: Instant | None) -> str:
     """Generate human readable documentation for an ESI schema.
+
+    Generates ESI Schema documentation in markdown format, grouping operations by tag.
+
 
     Args:
         schema: The ESI schema to generate documentation for.
@@ -65,16 +94,32 @@ def generate_esi_schema_doc(schema: EsiSchema, download_date: Instant | None) ->
     Returns:
         A string containing the generated documentation.
     """
-    operation_id_by_tag = schema.operation_id_by_tag
-    doc = f"""# ESI Schema Documentation
-**Download Date**: {download_date.format_iso() if download_date else "Unknown"}
-## Operations
+    operations = schema.operations
+    operation_id_by_tag = doc_dict_by_tag(operations)
+    doc = f"""\n# ESI Schema Documentation
+
+Version
+: {schema.version}  
+Download Date
+: {download_date.format_iso() if download_date else "Unknown"}  
+
+## Operations  
+
+
 """
-    for tag, operation_ids in operation_id_by_tag.items():
-        doc += f"### {tag}\n\n"
-        for operation_id in operation_ids:
-            operation = schema.operations[operation_id]
-            doc += generate_operation_doc(operation) + "\n\n"
+    tag_string: list[str] = []
+    for tag, operation_docs in operation_id_by_tag.items():
+        tag_string.append("\n")
+        tag_string.append(f"### {tag}  ")
+        tag_string.append(f"\n")
+        for operation_doc in operation_docs:
+            tag_string.append("\n")
+            tag_string.append(f"#### {operation_doc['operation_id']}  ")
+            tag_string.append("\n")
+            tag_string.append(f"```yaml")
+            tag_string.append(safe_dump(operation_doc, sort_keys=False, indent=2))
+            tag_string.append("```")
+    doc += "\n".join(tag_string)
     return doc
 
 

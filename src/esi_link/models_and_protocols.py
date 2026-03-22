@@ -637,7 +637,7 @@ class EsiSchema:
     @property
     def version(self) -> str:
         """Get the version of the ESI schema based on the compatibility date."""
-        version = cast(str, self.dereferenced_schema["version"])
+        version = cast(str, self.dereferenced_schema["info"]["version"])
         return version
 
     @property
