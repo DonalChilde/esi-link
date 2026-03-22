@@ -1,4 +1,85 @@
-"""Request validation for ESI Link."""
+"""Request validation for ESI Link.
+
+Validate a request against the indexed ESI schema, including path parameters, query parameters,
+request body, and authentication requirements.
+
+An example of the schema for the parameters of a request.
+```json
+{
+    "parameters": [
+        {
+            "description": "The ID of the character",
+            "in": "path",
+            "name": "character_id",
+            "required": true,
+            "schema": {
+                "examples": [90000001],
+                "format": "int64",
+                "type": "integer",
+                "x-common-model": "true",
+            },
+        },
+        {
+            "in": "query",
+            "name": "labels",
+            "schema": {
+                "description": "Fetch only mails that match one or more of the given labels",
+                "items": {"format": "int64", "type": "integer"},
+                "maxItems": 25,
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true,
+            },
+        },
+        {
+            "in": "query",
+            "name": "last_mail_id",
+            "schema": {
+                "description": "List only mail with an ID lower than the given ID, if present",
+                "format": "int64",
+                "type": "integer",
+            },
+        },
+        {
+            "description": "The language to use for the response.",
+            "in": "header",
+            "name": "Accept-Language",
+            "schema": {
+                "default": "en",
+                "enum": ["en", "de", "fr", "ja", "ru", "zh", "ko", "es"],
+                "type": "string",
+            },
+        },
+        {
+            "description": "The ETag of the previous request. A 304 will be returned if this matches the current ETag.",
+            "in": "header",
+            "name": "If-None-Match",
+            "schema": {"type": "string"},
+        },
+        {
+            "description": "The compatibility date for the request.",
+            "in": "header",
+            "name": "X-Compatibility-Date",
+            "required": true,
+            "schema": {"enum": ["2025-12-16"], "format": "date", "type": "string"},
+        },
+        {
+            "description": "The tenant ID for the request.",
+            "example": "",
+            "in": "header",
+            "name": "X-Tenant",
+            "schema": {"default": "tranquility", "type": "string"},
+        },
+        {
+            "description": "The date the resource was last modified. A 304 will be returned if the resource has not been modified since this date.",
+            "in": "header",
+            "name": "If-Modified-Since",
+            "schema": {"type": "string"},
+        },
+    ]
+}
+```
+"""
 
 import logging
 
