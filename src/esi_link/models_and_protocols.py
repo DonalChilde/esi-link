@@ -459,7 +459,7 @@ class SchemaOperation:
     @property
     def tags(self) -> list[str]:
         """Extract the tags from the operation object, if present."""
-        return self.operation_schema.get("tags", [])
+        return [tag for tag in self.operation_schema.get("tags", [])]
 
     @property
     def description(self) -> str:
@@ -467,10 +467,19 @@ class SchemaOperation:
         return self.operation_schema.get("description", "")
 
     @property
+    def path_and_query_parameters(self) -> list[dict[str, Any]]:
+        """Extract all parameters from the operation object, if present."""
+        return [
+            deepcopy(param)
+            for param in self.operation_schema.get("parameters", [])
+            if param.get("in") in {"path", "query"}
+        ]
+
+    @property
     def path_params(self) -> list[dict[str, Any]]:
         """Extract the path parameters from the operation object, if present."""
         return [
-            param
+            deepcopy(param)
             for param in self.operation_schema.get("parameters", [])
             if param.get("in") == "path"
         ]
@@ -479,7 +488,7 @@ class SchemaOperation:
     def query_params(self) -> list[dict[str, Any]]:
         """Extract the query parameters from the operation object, if present."""
         return [
-            param
+            deepcopy(param)
             for param in self.operation_schema.get("parameters", [])
             if param.get("in") == "query"
         ]
@@ -488,15 +497,27 @@ class SchemaOperation:
     def header_params(self) -> list[dict[str, Any]]:
         """Extract the header parameters from the operation object, if present."""
         return [
-            param
+            deepcopy(param)
             for param in self.operation_schema.get("parameters", [])
             if param.get("in") == "header"
         ]
 
     @property
+    def responses(self) -> dict[str, Any]:
+        """Extract the response schema from the operation object, if present."""
+        success_responses = (
+            self.operation_schema.get("responses", {})
+            .get("200", {})
+            .get("content", {})
+            .get("application/json", {})
+            .get("schema", {})
+        )
+        return deepcopy(success_responses)
+
+    @property
     def request_body(self) -> dict[str, Any] | None:
         """Extract the request body from the operation object, if present."""
-        return self.operation_schema.get("requestBody")
+        return deepcopy(self.operation_schema.get("requestBody"))
 
     @property
     def auth_required(self) -> bool:
@@ -584,6 +605,29 @@ class EsiSchema:
                         operation_schema=deepcopy(operation),
                     )
         return None
+
+    @property
+    def operation_id_by_tag(self) -> dict[str, list[str]]:
+        """Extract a mapping of tags to operation IDs from the schema."""
+        tag_mapping: dict[str, list[str]] = {}
+        paths = self.dereferenced_schema.get("paths", {})
+        for _path, methods in paths.items():
+            for _method, operation in methods.items():
+                operation_id = operation.get("operationId")
+                tags = operation.get("tags", [])
+                if not tags:
+                    tags = ["untagged"]
+                for tag in tags:
+                    if tag not in tag_mapping:
+                        tag_mapping[tag] = []
+                    if operation_id:
+                        tag_mapping[tag].append(operation_id)
+        # sort the tags alphabetically, and the operation IDs within each tag alphabetically as well
+        tag_mapping = {
+            tag: sorted(operation_ids)
+            for tag, operation_ids in sorted(tag_mapping.items())
+        }
+        return tag_mapping
 
     @property
     def compatibility_date(self) -> str:
