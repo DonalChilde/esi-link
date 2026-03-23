@@ -900,14 +900,15 @@ class ResponseHandlerProtocol(Protocol):
         This can be used for things like error handling, response transformation,
         persisting responses to disk, etc.
 
+        An exception during handling should not raise, but should be caught and logged.
+        The messages from any exceptions should be appended to the response's handler_exception_messages,
+        and the exceptions themselves should be appended to the response's exceptions list.
+
         Args:
             response: The response to handle.
 
         Returns:
             The handled response.
-
-        Raises:
-            ResponseHandlingError: If an error occurs while handling the response.
         """
         ...
 
@@ -1008,7 +1009,21 @@ class ResponseGroupHandlerProtocol(Protocol):
     name: ClassVar[str]
     config: ResponseGroupHandlerConfig
 
-    async def __call__(self, response_group: ResponseGroup) -> ResponseGroup: ...
+    async def __call__(self, response_group: ResponseGroup) -> ResponseGroup:
+        """Handle a response group.
+
+        An exception during handling should not raise, but should be caught and logged.
+        The messages from any exceptions should be appended to the response's handler_exception_messages,
+        and the exceptions themselves should be appended to the response's exceptions list.
+
+        Args:
+            response_group: The ResponseGroup to handle.
+
+        Returns:
+            The handled ResponseGroup.
+        """
+        ...
+
     @classmethod
     def from_config(cls, config: ResponseGroupHandlerConfig) -> Self: ...
     @classmethod
