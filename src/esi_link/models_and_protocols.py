@@ -410,7 +410,8 @@ class Response(BaseModel):
     request: Request
     runtime_info: RuntimeRequestInfo
     http_response: HttpResponse | None = None
-    exception_messages: list[str] = Field(default_factory=list)
+    network_exception_messages: list[str] = Field(default_factory=list)
+    handler_exception_messages: list[str] = Field(default_factory=list)
     exceptions: list[Exception] = Field(..., exclude=True)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

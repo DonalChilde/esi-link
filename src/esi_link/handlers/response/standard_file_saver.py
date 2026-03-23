@@ -51,7 +51,7 @@ class StandardFileSaverResponseHandler(ResponseHandlerABC):
         - presence of exception messages in the response
         - http response is None
         """
-        if response.exception_messages:
+        if response.network_exception_messages:
             return True
         if response.http_response is None:
             return True

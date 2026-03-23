@@ -62,17 +62,17 @@ def execute(
     executor = factory.group_executor()
     response_group = asyncio.run(executor(request_group))
     error_count = sum(
-        len(x.exception_messages) for x in response_group.responses.values()
+        len(x.network_exception_messages) for x in response_group.responses.values()
     )
     console.print(f"Execution complete. {error_count} errors detected.")
     if error_count > 0:
         for response in response_group.responses.values():
-            if response.exception_messages:
+            if response.network_exception_messages:
                 console.print(
                     f"Request {response.request.request_id} had the following errors:",
                     style="bold red",
                 )
-                for msg in response.exception_messages:
+                for msg in response.network_exception_messages:
                     console.print(f"- {msg}", style="red")
                 console.print("\n")
 

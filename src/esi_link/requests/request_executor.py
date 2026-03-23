@@ -55,7 +55,7 @@ class RequestExecutor(HttpRequestExecutorProtocol):
                 request=request.request,
                 runtime_info=request.runtime_info,
                 http_response=None,
-                exception_messages=[str(e)],
+                network_exception_messages=[str(e)],
                 exceptions=[e],
             )
 
@@ -105,7 +105,7 @@ async def execute_http_request(
                 request=request.request,
                 runtime_info=request.runtime_info,
                 http_response=http_response,
-                exception_messages=[],
+                network_exception_messages=[],
                 exceptions=[],
             )
 
@@ -252,7 +252,7 @@ def pre_check_cache(
             request=request.request,
             runtime_info=request.runtime_info,
             http_response=cached_response.http_response,
-            exception_messages=[],
+            network_exception_messages=[],
             exceptions=[],
         ), status
     if status == CachedResponseStatus.STALE and cached_response is not None:

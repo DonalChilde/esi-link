@@ -62,7 +62,7 @@ def _build_response(
         request=request,
         runtime_info=runtime_info,
         http_response=http_response,
-        exception_messages=[],
+        network_exception_messages=[],
         exceptions=[],
     )
 

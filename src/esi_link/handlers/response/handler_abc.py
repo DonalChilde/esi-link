@@ -50,7 +50,7 @@ class ResponseHandlerABC(ResponseHandlerProtocol):
                 "Response is missing http_response required for templated filename handler.",
                 response_data={
                     "request_id": str(response.request.request_id),
-                    "exception_messages": response.exception_messages,
+                    "exception_messages": response.network_exception_messages,
                 },
             )
 
