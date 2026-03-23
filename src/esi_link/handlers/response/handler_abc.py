@@ -27,7 +27,19 @@ class ResponseHandlerABC(ResponseHandlerProtocol):
 
     @abstractmethod
     async def __call__(self, response: Response) -> Response:
-        """Handle the response."""
+        """Handle the response.
+
+        An exception during handling should not raise, but should be caught and logged.
+        The messages from any exceptions should be appended to the response's handler_exception_messages,
+        and the exceptions themselves should be appended to the response's exceptions list.
+        """
+        try:
+            pass
+        except Exception as e:
+            response.handler_exception_messages.append(str(e))
+            response.exceptions.append(e)
+
+        # return response
         raise NotImplementedError("Subclasses must implement this method.")
 
     @classmethod

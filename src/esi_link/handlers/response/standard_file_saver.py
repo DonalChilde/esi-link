@@ -23,6 +23,17 @@ logger = logging.getLogger(__name__)
 
 
 class StandardFileSaverResponseHandler(ResponseHandlerABC):
+    """Response Handler that saves the response to a templated file path.
+
+    Saves the http response body text to a file at the output path generated from the
+    template.
+
+    If there are any errors in the response (network exceptions, http response is None, etc),
+    then saves the entire response as json instead, to capture the error information. In
+    this case, the file name will still be generated from the template, but will have the
+    suffix "_WITH_ERRORS" added to it, before the file extension.
+    """
+
     name = "esi-link:standard_file_saver"
 
     def __init__(
@@ -35,9 +46,13 @@ class StandardFileSaverResponseHandler(ResponseHandlerABC):
 
     async def __call__(self, response: Response) -> Response:
         """Handle the response by saving it to a templated file path."""
-        output_file_path = self.get_output_path(response)
-        text_to_save = self.get_text_to_save(response)
-        self.save_file(output_file_path, text_to_save)
+        try:
+            output_file_path = self.get_output_path(response)
+            text_to_save = self.get_text_to_save(response)
+            self.save_file(output_file_path, text_to_save)
+        except Exception as e:
+            response.handler_exception_messages.append(str(e))
+            response.exceptions.append(e)
         return response
 
     def _get_tokens(self, response: Response) -> dict[str, str]:
