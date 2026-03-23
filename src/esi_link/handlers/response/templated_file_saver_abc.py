@@ -3,7 +3,7 @@
 import logging
 from abc import abstractmethod
 from pathlib import Path
-from string import Template, ascii_letters, digits
+from string import Template
 from typing import Self
 
 from whenever import Instant
@@ -14,6 +14,7 @@ from esi_link.handlers.errors import (
     HandlerValidationError,
 )
 from esi_link.handlers.response.handler_abc import ResponseHandlerABC
+from esi_link.helpers.file_safe_string import file_safe_string
 from esi_link.helpers.save_text_file import save_text_file
 from esi_link.models_and_protocols import (
     Response,
@@ -216,31 +217,3 @@ def tokens_from_response(response: Response) -> dict[str, str]:
     # tokens with "EMPTY_TOKEN"
     token_dict = {k: (v if v else "EMPTY_TOKEN") for k, v in token_dict.items()}
     return token_dict
-
-
-def file_safe_string(s: str) -> str:
-    """Convert a string to a file-safe string.
-
-    Converts a string to a file-safe string by:
-    - replacing non-alphanumeric characters with underscores.
-    - collapsing multiple consecutive underscores into a single underscore.
-    - removing leading and trailing underscores.
-
-    """
-    replaced = "".join(c if is_alphanum_or_dash_character(c) else "_" for c in s)
-    collapsed = "_".join(part for part in replaced.split("_") if part)
-    trimmed = collapsed.strip("_")
-    return trimmed
-
-
-allowed_chars = set(ascii_letters + digits + "-" + "_")
-
-
-def is_alphanum_or_dash(s: str) -> bool:
-    """Check if a string is alphanumeric or contains dashes or underscores."""
-    return all(is_alphanum_or_dash_character(c) for c in s)
-
-
-def is_alphanum_or_dash_character(c: str) -> bool:
-    """Check if a character is alphanumeric or a dash or underscore."""
-    return c in allowed_chars
