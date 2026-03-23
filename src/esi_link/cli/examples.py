@@ -12,7 +12,7 @@ from rich.json import JSON
 
 from esi_link.cli.helpers import get_settings_from_context
 from esi_link.factory import EsiLinkObjectFactory
-from esi_link.models_and_protocols import RequestGroup
+from esi_link.models_and_protocols import RequestGroup, Response
 from esi_link.schema.schema_manager import SchemaManager
 
 app = typer.Typer(
@@ -34,7 +34,7 @@ def status(
     """Run tests for ESI Link."""
     settings = get_settings_from_context(ctx)
     console = Console()
-    console.print("Running tests...")
+    console.print("Preparing request...")
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
     stored_schema = schema_manager.get_latest_schema()
     request = example_requests.esi_status(
@@ -61,9 +61,12 @@ def status(
     group_executor = factory.group_executor()
     response_group = asyncio.run(group_executor(request_group))
     response = response_group.responses[request.request_id]
-    console.print(JSON(response.http_response.body_text))  # type: ignore
     if output_dir:
         console.print(f"Status response saved to {output_dir}")
+    # The caller is responsible for checking for exceptions in the response and handling
+    # them appropriately.
+    check_for_exceptions(response, console)
+    console.print(JSON(response.http_response.body_text))  # type: ignore
 
 
 @app.command()
@@ -79,11 +82,15 @@ def pages(
     """Test handling of paged requests."""
     settings = get_settings_from_context(ctx)
     console = Console()
-    console.print("Running tests...")
+    console.print("Preparing request...")
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
     stored_schema = schema_manager.get_latest_schema()
     request = example_requests.market_types_with_active_orders(
-        handlers=[example_requests.debug_file_response(output_dir=output_dir)]
+        handlers=[
+            example_requests.debug_file_response(output_dir=output_dir),
+            example_requests.standard_file_response(output_dir=output_dir),
+            example_requests.detailed_file_response(output_dir=output_dir),
+        ]
         if output_dir
         else None
     )
@@ -102,6 +109,11 @@ def pages(
     group_executor = factory.group_executor()
     response_group = asyncio.run(group_executor(request_group))
     response = response_group.responses[request.request_id]
+    if output_dir:
+        console.print(f"Paged response saved to {output_dir}")
+    # The caller is responsible for checking for exceptions in the response and handling
+    # them appropriately.
+    check_for_exceptions(response, console)
     try:
         data = json.loads(response.http_response.body_text)  # type: ignore
     except Exception as e:
@@ -109,8 +121,6 @@ def pages(
         raise typer.Exit(code=1) from e
     console.print(f"Total items: {len(data)}")
     console.print(JSON.from_data(data))
-    if output_dir:
-        console.print(f"Paged response saved to {output_dir}")
 
 
 @app.command()
@@ -126,11 +136,15 @@ def changelog(
     """Test a request with an optional response handler."""
     settings = get_settings_from_context(ctx)
     console = Console()
-    console.print("Running tests...")
+    console.print("Preparing request...")
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
     stored_schema = schema_manager.get_latest_schema()
     request = example_requests.esi_changelog(
-        handlers=[example_requests.debug_file_response(output_dir=output_dir)]
+        handlers=[
+            example_requests.debug_file_response(output_dir=output_dir),
+            example_requests.standard_file_response(output_dir=output_dir),
+            example_requests.detailed_file_response(output_dir=output_dir),
+        ]
         if output_dir
         else None
     )
@@ -149,9 +163,12 @@ def changelog(
     group_executor = factory.group_executor()
     response_group = asyncio.run(group_executor(request_group))
     response = response_group.responses[request.request_id]
-    console.print(JSON(response.http_response.body_text))  # type: ignore
     if output_dir:
         console.print(f"Changelog response saved to {output_dir}")
+    # The caller is responsible for checking for exceptions in the response and handling
+    # them appropriately.
+    check_for_exceptions(response, console)
+    console.print(JSON(response.http_response.body_text))  # type: ignore
 
 
 @app.command()
@@ -172,12 +189,16 @@ def character_stats(
     """Test a request with an optional response handler."""
     settings = get_settings_from_context(ctx)
     console = Console()
-    console.print("Running tests...")
+    console.print("Preparing request...")
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
     stored_schema = schema_manager.get_latest_schema()
     request = example_requests.character_stats(
         character_id=character_id,
-        handlers=[example_requests.debug_file_response(output_dir=output_dir)]
+        handlers=[
+            example_requests.debug_file_response(output_dir=output_dir),
+            example_requests.standard_file_response(output_dir=output_dir),
+            example_requests.detailed_file_response(output_dir=output_dir),
+        ]
         if output_dir
         else None,
     )
@@ -196,6 +217,22 @@ def character_stats(
     group_executor = factory.group_executor()
     response_group = asyncio.run(group_executor(request_group))
     response = response_group.responses[request.request_id]
-    console.print(JSON(response.http_response.body_text))  # type: ignore
     if output_dir:
         console.print(f"Character stats response saved to {output_dir}")
+    # The caller is responsible for checking for exceptions in the response and handling
+    # them appropriately.
+    check_for_exceptions(response, console)
+    console.print(JSON(response.http_response.body_text))  # type: ignore
+
+
+def check_for_exceptions(response: Response, console: Console) -> None:
+    """Check for exceptions in the response and print them to the console."""
+    if response.network_exception_messages:
+        console.print("Network exceptions occurred:")
+        for msg in response.network_exception_messages:
+            console.print(f"- {msg}")
+        raise typer.Exit(code=1)
+    if response.handler_exception_messages:
+        console.print("Response handler exceptions occurred:")
+        for msg in response.handler_exception_messages:
+            console.print(f"- {msg}")
