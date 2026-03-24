@@ -294,10 +294,10 @@ class HttpResponse(BaseModel):
 class RequestGroupMetrics:
     """Performance metrics for a RequestGroup."""
 
-    group_execution_started: float | None = None
-    group_execution_completed: float | None = None
-    group_handlers_started: float | None = None
-    group_handlers_completed: float | None = None
+    group_execution_started: Instant | None = None
+    group_execution_completed: Instant | None = None
+    group_handlers_started: Instant | None = None
+    group_handlers_completed: Instant | None = None
 
     @property
     def group_handlers_duration(self) -> float:
@@ -306,7 +306,9 @@ class RequestGroupMetrics:
             self.group_handlers_started is not None
             and self.group_handlers_completed is not None
         ):
-            return self.group_handlers_completed - self.group_handlers_started
+            return (
+                self.group_handlers_completed - self.group_handlers_started
+            ).in_seconds()
         return -1.0
 
     @property
@@ -316,7 +318,9 @@ class RequestGroupMetrics:
             self.group_execution_started is not None
             and self.group_execution_completed is not None
         ):
-            return self.group_execution_completed - self.group_execution_started
+            return (
+                self.group_execution_completed - self.group_execution_started
+            ).in_seconds()
         return -1.0
 
 

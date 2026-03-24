@@ -48,7 +48,7 @@ class GroupExecutor(RequestGroupExecutorProtocol):
         """Execute a group of ESI requests and return their responses as a ResponseGroup."""
         runtime_group_info = self._runtime_group_info(request_group)
         group_metrics = runtime_group_info.metrics
-        group_metrics.group_execution_started = perf_counter()
+        group_metrics.group_execution_started = Instant.now()
         self._request_group_validator(request_group)
         runtime_requests: list[RuntimeRequest] = []
         for request in request_group.requests.values():
@@ -61,7 +61,7 @@ class GroupExecutor(RequestGroupExecutorProtocol):
         handled_responses = await self._execution_strategy(
             runtime_requests, self._request_executor
         )
-        group_metrics.group_handlers_started = perf_counter()
+        group_metrics.group_handlers_started = Instant.now()
         response_group = ResponseGroup(
             request_group=request_group,
             runtime_info=runtime_group_info,
@@ -71,8 +71,8 @@ class GroupExecutor(RequestGroupExecutorProtocol):
         )
         for handler in runtime_group_info.response_group_handlers:
             await handler(response_group)
-        group_metrics.group_handlers_completed = perf_counter()
-        group_metrics.group_execution_completed = perf_counter()
+        group_metrics.group_handlers_completed = Instant.now()
+        group_metrics.group_execution_completed = Instant.now()
         return response_group
 
 
