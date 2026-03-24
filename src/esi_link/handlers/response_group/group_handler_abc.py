@@ -55,7 +55,8 @@ class ResponseGroupHandlerABC(ResponseGroupHandlerProtocol):
     @abstractmethod
     def validate_config(cls, config: ResponseGroupHandlerConfig) -> None:
         """Validate the ResponseGroupHandlerConfig for this handler."""
-        raise NotImplementedError("Subclasses must implement this method.")
+        # No validation of config possible because config has no settings.
+        pass
 
     @staticmethod
     def _check_available_keys(

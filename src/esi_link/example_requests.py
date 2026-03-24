@@ -11,6 +11,28 @@ from esi_link.models_and_protocols import (
 )
 
 
+def save_group_stats(
+    output_dir: Path,
+    filename_template: str = "${iso_response_date}-${request_group_id}-GROUP-STATS.yaml",
+    overwrite: bool = False,
+) -> ResponseGroupHandlerConfig:
+    """Example ResponseGroupHandlerConfig for the ResponseGroupSummaryToFileHandler.
+
+    This config specifies the output directory, filename template, and whether to overwrite existing files.
+    The filename_template can include tokens that will be filled in with values from the response group.
+    For example, a template of "${iso_response_date}-${request_group_id}-GROUP-STATS.yaml"
+    would create files like "2024-06-01T12_34_56-abc123-GROUP-STATS.yaml".
+    """
+    return ResponseGroupHandlerConfig(
+        name="esi-link:response_group_summary_to_file_handler",
+        config={
+            "output_dir": str(output_dir),
+            "filename_template": filename_template,
+            "overwrite": overwrite,
+        },
+    )
+
+
 def save_group_as_jsonl(
     output_dir: Path,
     filename_template: str = "${iso_response_date}-${request_group_id}-GROUP.jsonl",

@@ -6,12 +6,12 @@ from pathlib import Path
 from esi_link.handlers.errors import ResponseHandlerError
 from esi_link.handlers.response.helpers import make_response_details
 from esi_link.handlers.response_group.templated_file_saver_abc import (
-    TemplatedFileSaverABC,
+    GroupTemplatedFileSaverABC,
 )
 from esi_link.models_and_protocols import ResponseGroup
 
 
-class JsonlGroupSaver(TemplatedFileSaverABC):
+class JsonlGroupSaver(GroupTemplatedFileSaverABC):
     """ResponseGroup Handler that saves data to a templated file path as jsonl.
 
     If there are any errors in the response_group (network exceptions, http response is None, etc),

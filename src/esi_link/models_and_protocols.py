@@ -341,26 +341,17 @@ class RequestMetrics:
     cache_action: "CacheAction | None" = None
     cache_check_started: float | None = None
     cache_check_completed: float | None = None
-    cache_add_started: float | None = None
-    cache_add_completed: float | None = None
-    cache_update_started: float | None = None
-    cache_update_completed: float | None = None
+    cache_action_started: float | None = None
+    cache_action_completed: float | None = None
 
     @property
-    def cache_add_duration(self) -> float:
+    def cache_action_duration(self) -> float:
         """Calculate the duration of adding a response to the cache."""
-        if self.cache_add_started is not None and self.cache_add_completed is not None:
-            return self.cache_add_completed - self.cache_add_started
-        return -1.0
-
-    @property
-    def cache_update_duration(self) -> float:
-        """Calculate the duration of updating a response in the cache."""
         if (
-            self.cache_update_started is not None
-            and self.cache_update_completed is not None
+            self.cache_action_started is not None
+            and self.cache_action_completed is not None
         ):
-            return self.cache_update_completed - self.cache_update_started
+            return self.cache_action_completed - self.cache_action_started
         return -1.0
 
     @property

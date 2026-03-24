@@ -120,9 +120,9 @@ def update_cache_if_needed(
         raise ValueError("Cannot update cache for a response with no HTTP response")
     if response.runtime_info.cache_key is not None:
         metrics = response.runtime_info.metrics
-        metrics.cache_update_started = perf_counter()
+        metrics.cache_action_started = perf_counter()
         cache_manager.set(response.runtime_info.cache_key, response.http_response)
-        metrics.cache_update_completed = perf_counter()
+        metrics.cache_action_completed = perf_counter()
         metrics.cache_action = CacheAction.ADDED_TO_CACHE
         return response.runtime_info.cache_key
     return None
@@ -223,11 +223,11 @@ def handle_304_not_modified(
         and response.runtime_info.cache_key is not None
     ):
         metrics = response.runtime_info.metrics
-        metrics.cache_update_started = perf_counter()
+        metrics.cache_action_started = perf_counter()
         cached_response = cache_manager.refresh(
             response.runtime_info.cache_key, response.http_response
         )
-        metrics.cache_update_completed = perf_counter()
+        metrics.cache_action_completed = perf_counter()
         metrics.cache_action = CacheAction.CACHE_304_REFRESH
         response.http_response = cached_response.http_response
     return response
@@ -248,6 +248,8 @@ def pre_check_cache(
     if status == CachedResponseStatus.HIT and cached_response is not None:
         metrics.cache_response_status = CachedResponseStatus.HIT
         metrics.cache_action = CacheAction.CACHED_RESPONSE_USED
+        metrics.cache_action_started = metrics.cache_check_started
+        metrics.cache_action_completed = metrics.cache_check_completed
         logger.info(f"Cache hit for request {request.request.request_id}")
         return Response(
             request=request.request,

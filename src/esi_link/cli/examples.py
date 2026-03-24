@@ -283,6 +283,7 @@ def market_history(
         ],
         group_handlers=[
             example_requests.save_group_as_jsonl(output_dir=output_dir),
+            example_requests.save_group_stats(output_dir=output_dir),
         ],
     )
 

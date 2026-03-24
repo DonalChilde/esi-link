@@ -1,7 +1,6 @@
 """Standard File Saver Response Handler for ESI Link."""
 
 import logging
-from abc import abstractmethod
 from pathlib import Path
 from string import Template
 from typing import Self
@@ -23,7 +22,7 @@ from esi_link.models_and_protocols import (
 logger = logging.getLogger(__name__)
 
 
-class TemplatedFileSaverABC(ResponseGroupHandlerABC):
+class GroupTemplatedFileSaverABC(ResponseGroupHandlerABC):
     """ResponseGroup Handler that saves data to a templated file path.
 
     ABC for saving response_group data to a templated filename.
