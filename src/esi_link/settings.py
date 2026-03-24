@@ -55,7 +55,7 @@ class EsiLinkSettings(BaseSettings):
         description="The directory for ESI Link cache files.",
     )
     cache_type: Literal["diskcache", "json"] = Field(
-        default="json",
+        default="diskcache",
         description="The type of cache to use for ESI Link.",
     )
     diskcache_directory: Path = Field(
@@ -72,12 +72,12 @@ class EsiLinkSettings(BaseSettings):
     # -----------------------------------------------------------------------------------
 
     connection_period: int = Field(
-        default=60,
+        default=1,
         description="Period (in seconds) for ESI Link connection rate limiting.",
     )
     """Period (in seconds) for ESI Link connection rate limiting."""
     connection_max_rate: int = Field(
-        default=100,
+        default=30,
         description="Maximum number of requests per period for ESI Link connections.",
     )
     """Maximum number of concurrent connections to ESI per period."""

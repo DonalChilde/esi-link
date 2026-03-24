@@ -298,6 +298,7 @@ def market_history(
     )
 
     console.print(f"Requesting market history for region {region_id}...")
+    group_executor = factory.group_executor()
     response_group = asyncio.run(group_executor(request_group))
     console.print(f"Response Group Summary:")
     display_response_group_summary(response_group, console)
