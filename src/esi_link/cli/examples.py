@@ -11,6 +11,7 @@ from rich.console import Console
 from rich.json import JSON
 
 from esi_link.cli.helpers import factory_from_settings, get_settings_from_context
+from esi_link.cli.response_display_helpers import display_response_group_summary
 from esi_link.factory import EsiLinkObjectFactory
 from esi_link.models_and_protocols import RequestGroup, Response
 from esi_link.schema.schema_manager import SchemaManager
@@ -60,6 +61,8 @@ def status(
     console.print(f"Requesting data from {request.operation_id} endpoint...")
     group_executor = factory.group_executor()
     response_group = asyncio.run(group_executor(request_group))
+    console.print(f"Response Group Summary:")
+    display_response_group_summary(response_group, console)
     response = response_group.responses[request.request_id]
     if output_dir:
         console.print(f"Status response saved to {output_dir}")
@@ -108,6 +111,8 @@ def pages(
     console.print(f"Requesting data from {request.operation_id} endpoint...")
     group_executor = factory.group_executor()
     response_group = asyncio.run(group_executor(request_group))
+    console.print(f"Response Group Summary:")
+    display_response_group_summary(response_group, console)
     response = response_group.responses[request.request_id]
     if output_dir:
         console.print(f"Paged response saved to {output_dir}")
@@ -120,7 +125,8 @@ def pages(
         console.print(f"Failed to decode JSON: {e}")
         raise typer.Exit(code=1) from e
     console.print(f"Total items: {len(data)}")
-    console.print(JSON.from_data(data))
+    console.print("First 10 items:")
+    console.print(data[:10])
 
 
 @app.command()
@@ -162,6 +168,8 @@ def changelog(
     console.print(f"Requesting data from {request.operation_id} endpoint...")
     group_executor = factory.group_executor()
     response_group = asyncio.run(group_executor(request_group))
+    console.print(f"Response Group Summary:")
+    display_response_group_summary(response_group, console)
     response = response_group.responses[request.request_id]
     if output_dir:
         console.print(f"Changelog response saved to {output_dir}")
@@ -216,6 +224,8 @@ def character_stats(
     console.print(f"Requesting data from {request.operation_id} endpoint...")
     group_executor = factory.group_executor()
     response_group = asyncio.run(group_executor(request_group))
+    console.print(f"Response Group Summary:")
+    display_response_group_summary(response_group, console)
     response = response_group.responses[request.request_id]
     if output_dir:
         console.print(f"Character stats response saved to {output_dir}")
@@ -289,13 +299,10 @@ def market_history(
 
     console.print(f"Requesting market history for region {region_id}...")
     response_group = asyncio.run(group_executor(request_group))
-    console.print(f"Response count: {len(response_group.responses)}")
+    console.print(f"Response Group Summary:")
+    display_response_group_summary(response_group, console)
     console.print(
-        f"Group handler exception messages: {response_group.group_handler_exception_messages}"
-    )
-    console.print(f"Group handler exceptions: {response_group.exceptions}")
-    console.print(
-        f"Group hanlder save path: {response_group.runtime_info.response_group_handlers[0].file_path if response_group.runtime_info.response_group_handlers else 'N/A'}"
+        f"Group handler save path: {response_group.runtime_info.response_group_handlers[0].file_path if response_group.runtime_info.response_group_handlers else 'N/A'}"
     )
     console.print(f"Market history responses saved to {output_dir}")
 
@@ -311,7 +318,3 @@ def check_for_exceptions(response: Response, console: Console) -> None:
         console.print("Response handler exceptions occurred:")
         for msg in response.handler_exception_messages:
             console.print(f"- {msg}")
-
-
-# TODO add display function to report perf and cache status of response
-# TODO add display function to report same for a group.
