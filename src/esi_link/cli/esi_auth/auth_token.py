@@ -81,7 +81,7 @@ def add(
 def list(
     ctx: typer.Context,
 ):
-    """List all CharacterTokens, optionally filtered by app alias."""
+    """List all CharacterTokens."""
     settings = get_settings_from_context(ctx)
     console = Console()
     authenticator = get_authenticator(settings, console)
