@@ -9,9 +9,52 @@ esi-link is a library and cli for accessing the EVE Online ESI API. It enable th
 
 ## Quick Start
 
-esi-link uses [esi-auth](https://github.com/DonalChilde/esi-auth) to manage authenticated calls to the EVE ESI. If you want to make authenticated calls, follow the the instructions in the esi_auth Quick Start to set up an EVE Online application.
+esi-link can make authenticated calls to the EVE ESI. If you want to make authenticated calls, follow the the instructions in the esi_auth Quick Start to set up an EVE Online application.
 
-TODO - Usable quick start and usage instructions.
+### 1. Download the latest esi schema
+
+from the terminal, run `esi-link schema download` to get the latest esi schema. This is required to be able to make requests to the EVE Esi.
+
+### 2. Set Up EVE Application
+
+If you want to make authenticated requests, you must register an app with eve online.
+
+First, create an EVE Online application at [EVE Developers](https://developers.eveonline.com/):
+
+1. Create a new application
+2. After your application has been created, view your application settings.
+3. In that settings view, copy your application settings as json, and save to file.
+4. You can use this file later to import your credentials to esi-link.
+
+### 3. Add your app credentials to esi-link
+
+Add your credentials to esi-auth by running `esi-link auth creds add <path-to-credentials-file>`
+
+Credentials must be in json format. 
+
+
+### 4. Authenticate Your First Character
+
+From the terminal, run `esi-link auth tokens add` 
+
+Click on the link in the terminal window, or copy and paste the url into your web browser.
+
+Log into EVE Online, select your character, and approve the list of scopes.
+
+### 4. Test it out!
+
+run `esi-link auth tokens list` to see the registered characters, 
+and their character_id. You will need this character_id to make authenticated requests.
+
+You can make some example requests to the esi by running `esi-link examples`
+
+Assuming your app includes the `esi-skills.read_skills.v1` scope, you can try 
+out an authenticated request by running `esi-link examples character-stats`
+
+
+Try out the other example requests.
+
+
 
 ## Usage
 
