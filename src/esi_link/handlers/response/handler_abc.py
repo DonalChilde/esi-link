@@ -3,8 +3,7 @@
 from abc import abstractmethod
 from typing import Self
 
-from esi_link.handlers.errors import HandlerBadResponseError
-from esi_link.handlers.response.helpers import check_available_keys
+from esi_link.handlers.errors import HandlerBadResponseError, HandlerValidationError
 from esi_link.models_and_protocols import (
     Response,
     ResponseHandlerConfig,
@@ -16,7 +15,7 @@ class ResponseHandlerABC(ResponseHandlerProtocol):
     """Abstract base class for response handlers.
 
     This class defines the interface for response handlers, and provides some common
-    functionality. Subclasses must implement the `__call__` method to handle the
+    functionality. Subclasses must implement the `handle_response` method to handle the
     response.
     """
 
@@ -25,7 +24,6 @@ class ResponseHandlerABC(ResponseHandlerProtocol):
     def __init__(self, config: ResponseHandlerConfig) -> None:
         self.config = config
 
-    @abstractmethod
     async def __call__(self, response: Response) -> Response:
         """Handle the response.
 
@@ -34,12 +32,15 @@ class ResponseHandlerABC(ResponseHandlerProtocol):
         and the exceptions themselves should be appended to the response's exceptions list.
         """
         try:
-            pass
+            await self.handle_response(response)
         except Exception as e:
             response.handler_exception_messages.append(str(e))
             response.exceptions.append(e)
+        return response
 
-        # return response
+    @abstractmethod
+    async def handle_response(self, response: Response) -> Response:
+        """Handle the response with error handling."""
         raise NotImplementedError("Subclasses must implement this method.")
 
     @classmethod
@@ -71,4 +72,16 @@ class ResponseHandlerABC(ResponseHandlerProtocol):
         config: ResponseHandlerConfig, required_keys: set[str]
     ) -> None:
         """Check the ResponseHandlerConfig for the required keys and their types."""
-        check_available_keys(config, required_keys)
+        keys = set(config.config.keys())
+        missing_keys = required_keys - keys
+        if missing_keys:
+            raise HandlerValidationError(
+                f"Missing required config keys: {missing_keys}",
+                config=config.model_dump(),
+            )
+        extra_keys = keys - required_keys
+        if extra_keys:
+            raise HandlerValidationError(
+                f"Extra config keys not used by handler: {extra_keys}",
+                config=config.model_dump(),
+            )

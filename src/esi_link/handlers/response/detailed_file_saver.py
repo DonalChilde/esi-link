@@ -2,6 +2,7 @@
 
 import json
 
+from esi_link.handlers.response.helpers import make_response_details
 from esi_link.handlers.response.standard_file_saver import (
     StandardFileSaverResponseHandler,
 )
@@ -28,15 +29,5 @@ class DetailedFileSaverResponseHandler(StandardFileSaverResponseHandler):
         """Get the text to save for the response, including debug information."""
         if self._has_errors(response):
             return response.model_dump_json(indent=2)
-        request = response.request.model_dump(mode="json")
-        request["response_data"] = (
-            json.loads(response.http_response.body_text)
-            if response.http_response
-            else None
-        )
-        request["response_date"] = (
-            response.http_response.date
-            if response.http_response and response.http_response.date
-            else "NO_RESPONSE_DATE"
-        )
-        return json.dumps(request, indent=2)
+        response_dict = make_response_details(response)
+        return json.dumps(response_dict, indent=2)

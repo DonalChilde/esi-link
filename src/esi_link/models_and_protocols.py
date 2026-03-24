@@ -423,6 +423,10 @@ class ResponseGroup(BaseModel):
     request_group: RequestGroup
     runtime_info: RuntimeGroupInfo
     responses: dict[UUID, Response]
+    group_handler_exception_messages: list[str] = Field(default_factory=list)
+    exceptions: list[Exception] = Field(..., exclude=True)
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class CachedResponse(BaseModel):

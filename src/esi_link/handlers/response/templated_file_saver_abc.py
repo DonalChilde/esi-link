@@ -48,16 +48,13 @@ class TemplatedFileSaverABC(ResponseHandlerABC):
         self.output_dir = output_dir
         self.filename_template = filename_template
         self.overwrite = overwrite
+        self.file_path: Path | None = None
 
-    async def __call__(self, response: Response) -> Response:
+    async def handle_response(self, response: Response) -> Response:
         """Handle the response by saving it to a templated file path."""
-        try:
-            output_file_path = self.get_output_path(response)
-            text_to_save = self.get_text_to_save(response)
-            self.save_file(output_file_path, text_to_save)
-        except Exception as e:
-            response.handler_exception_messages.append(str(e))
-            response.exceptions.append(e)
+        output_file_path = self.get_output_path(response)
+        text_to_save = self.get_text_to_save(response)
+        self.save_file(output_file_path, text_to_save)
         return response
 
     def _get_tokens(self, response: Response) -> dict[str, str]:
@@ -123,7 +120,7 @@ class TemplatedFileSaverABC(ResponseHandlerABC):
         output_dir = output_file_path.parent
         file_name = output_file_path.name
         try:
-            save_text_file(
+            self.file_path = save_text_file(
                 text=text_to_save,
                 output_dir=output_dir,
                 file_name=file_name,

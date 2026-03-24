@@ -65,6 +65,8 @@ class GroupExecutor(RequestGroupExecutorProtocol):
             request_group=request_group,
             runtime_info=runtime_group_info,
             responses={r.request.request_id: r for r in handled_responses},
+            group_handler_exception_messages=[],
+            exceptions=[],
         )
         for handler in runtime_group_info.response_group_handlers:
             await handler(response_group)
