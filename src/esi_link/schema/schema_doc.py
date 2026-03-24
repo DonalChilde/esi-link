@@ -20,6 +20,8 @@ class OperationDoc(TypedDict):
     path_and_query_parameters: list[dict[str, Any]]
     request_body: dict[str, Any]
     response_schema: dict[str, Any]
+    summary: str | None
+    x_values: list[dict[str, Any]]
 
 
 def doc_dict_from_operation(operation: SchemaOperation) -> OperationDoc:
@@ -41,6 +43,8 @@ def doc_dict_from_operation(operation: SchemaOperation) -> OperationDoc:
         "path_and_query_parameters": operation.path_and_query_parameters,
         "request_body": operation.request_body or {},
         "response_schema": operation.responses,
+        "summary": operation.summary,
+        "x_values": operation.x_values,
     }
 
 

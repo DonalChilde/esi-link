@@ -546,6 +546,20 @@ class SchemaOperation:
             return True
         return False
 
+    @property
+    def summary(self) -> str | None:
+        """Extract the summary from the operation object, if present."""
+        return self.operation_schema.get("summary")
+
+    @property
+    def x_values(self) -> list[dict[str, Any]]:
+        """Extract the x-values from the operation object, if present."""
+        x_list: list[dict[str, Any]] = []
+        for key, value in self.operation_schema.items():
+            if key.startswith("x-"):
+                x_list.append({key: deepcopy(value)})
+        return x_list
+
 
 @dataclass(slots=True)
 class EsiSchema:
