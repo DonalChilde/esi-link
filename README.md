@@ -11,11 +11,11 @@ esi-link is a library and cli for accessing the EVE Online ESI API. It enable th
 
 esi-link can make authenticated calls to the EVE ESI. If you want to make authenticated calls, follow the the instructions in the esi_auth Quick Start to set up an EVE Online application.
 
-### 1. Download the latest esi schema
+### Download the latest esi schema
 
 from the terminal, run `esi-link schema download` to get the latest esi schema. This is required to be able to make requests to the EVE Esi.
 
-### 2. Set Up EVE Application
+### Set Up EVE Application
 
 If you want to make authenticated requests, you must register an app with eve online.
 
@@ -26,14 +26,14 @@ First, create an EVE Online application at [EVE Developers](https://developers.e
 3. In that settings view, copy your application settings as json, and save to file.
 4. You can use this file later to import your credentials to esi-link.
 
-### 3. Add your app credentials to esi-link
+### Add your app credentials to esi-link
 
 Add your credentials to esi-auth by running `esi-link auth creds add <path-to-credentials-file>`
 
 Credentials must be in json format. 
 
 
-### 4. Authenticate Your First Character
+### Authenticate Your First Character
 
 From the terminal, run `esi-link auth tokens add` 
 
@@ -41,7 +41,7 @@ Click on the link in the terminal window, or copy and paste the url into your we
 
 Log into EVE Online, select your character, and approve the list of scopes.
 
-### 4. Test it out!
+### Test it out!
 
 run `esi-link auth tokens list` to see the registered characters, 
 and their character_id. You will need this character_id to make authenticated requests.
