@@ -157,9 +157,11 @@ def operations(
     dir_out: Annotated[
         Path | None,
         typer.Option(
+            "-d",
+            "--dir-out",
             help="Directory to save the operation documentation as a markdown file. The file "
             "name will be `operations-<compatibility_date>-<timestamp>.md`. If not "
-            "provided, a summary of operations will be printed to the console."
+            "provided, a summary of operations will be printed to the console.",
         ),
     ] = None,
 ):
