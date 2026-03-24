@@ -46,11 +46,13 @@ class ResponseGroupHandlerABC(ResponseGroupHandlerProtocol):
         raise NotImplementedError("Subclasses must implement this method.")
 
     @classmethod
+    @abstractmethod
     def from_config(cls, config: ResponseGroupHandlerConfig) -> Self:
         """Create a response group handler from a ResponseGroupHandlerConfig."""
         raise NotImplementedError("Subclasses must implement this method.")
 
     @classmethod
+    @abstractmethod
     def validate_config(cls, config: ResponseGroupHandlerConfig) -> None:
         """Validate the ResponseGroupHandlerConfig for this handler."""
         raise NotImplementedError("Subclasses must implement this method.")

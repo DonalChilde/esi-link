@@ -26,12 +26,13 @@ def check_available_keys(
 def make_response_details(response: Response) -> dict[str, Any]:
     """Get the details of the response for use in filename tokens."""
     request_detail = response.request.model_dump(mode="json")
-    request_detail["response_data"] = (
-        json.loads(response.http_response.body_text) if response.http_response else None
-    )
     request_detail["response_date"] = (
         response.http_response.date
         if response.http_response and response.http_response.date
         else "NO_RESPONSE_DATE"
     )
+    request_detail["response_data"] = (
+        json.loads(response.http_response.body_text) if response.http_response else None
+    )
+
     return request_detail

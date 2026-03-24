@@ -48,6 +48,7 @@ class JsonlGroupSaver(TemplatedFileSaverABC):
                 f"File {output_path} already exists and overwrite is set to False."
             )
         self.file_path = output_path
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         with output_path.open("w", encoding="utf-8") as f:
             for response in response_group.responses.values():
                 response_details = make_response_details(response)

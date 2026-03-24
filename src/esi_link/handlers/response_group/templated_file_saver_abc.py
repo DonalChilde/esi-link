@@ -82,7 +82,6 @@ class TemplatedFileSaverABC(ResponseGroupHandlerABC):
         return output_path
 
     @classmethod
-    @abstractmethod
     def from_config(cls, config: ResponseGroupHandlerConfig) -> Self:
         """Create a TemplatedFileSaverResponseHandler from a ResponseGroupHandlerConfig."""
         try:
@@ -106,7 +105,6 @@ class TemplatedFileSaverABC(ResponseGroupHandlerABC):
             ) from e
 
     @classmethod
-    @abstractmethod
     def validate_config(cls, config: ResponseGroupHandlerConfig) -> None:
         """Validate the ResponseHandlerConfig for TemplatedFileSaverResponseHandler."""
         required_keys = {"output_dir", "filename_template", "overwrite"}
