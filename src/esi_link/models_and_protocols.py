@@ -324,8 +324,8 @@ class RequestGroupMetrics:
 class RequestMetrics:
     """Performance metrics for a Request."""
 
-    task_started: float | None = None
-    task_completed: float | None = None
+    task_started: Instant | None = None
+    task_completed: Instant | None = None
     primary_request_started: float | None = None
     primary_request_completed: float | None = None
     paged_requests_start: float | None = None
@@ -363,7 +363,8 @@ class RequestMetrics:
     def task_duration(self) -> float:
         """Calculate the total duration of the task."""
         if self.task_started is not None and self.task_completed is not None:
-            return self.task_completed - self.task_started
+            duration = self.task_completed - self.task_started
+            return duration.in_seconds()
         return -1.0
 
     @property

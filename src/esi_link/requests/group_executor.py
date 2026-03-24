@@ -5,6 +5,7 @@ from collections.abc import Awaitable, Callable
 from time import perf_counter
 
 import aiohttp
+from whenever import Instant
 
 from esi_link.models_and_protocols import (
     HttpRequestExecutorProtocol,
@@ -88,7 +89,7 @@ async def execute_all_requests_then_handle_responses(
         for handler in response.runtime_info.response_handlers:
             await handler(response)
         metrics.handlers_completed = perf_counter()
-        metrics.task_completed = perf_counter()
+        metrics.task_completed = Instant.now()
     return responses
 
 
@@ -104,7 +105,7 @@ async def execute_requests_and_handle_responses_together(
             for handler in response.runtime_info.response_handlers:
                 await handler(response)
             response.runtime_info.metrics.handlers_completed = perf_counter()
-            response.runtime_info.metrics.task_completed = perf_counter()
+            response.runtime_info.metrics.task_completed = Instant.now()
             return response
 
         tasks = [execute_and_handle(runtime_request) for runtime_request in requests]

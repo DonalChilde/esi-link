@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 
 import aiohttp
 from aiolimiter import AsyncLimiter
+from whenever import Instant
 
 from esi_link.models_and_protocols import (
     CacheAction,
@@ -41,7 +42,7 @@ class RequestExecutor(HttpRequestExecutorProtocol):
     ) -> Response:
         """Execute the given request, utilizing caching and rate limiting."""
         metrics = request.runtime_info.metrics
-        metrics.task_started = perf_counter()
+        metrics.task_started = Instant.now()
         cached_response, cache_status = pre_check_cache(request, self.cache_manager)
         if cached_response is not None:
             return cached_response
