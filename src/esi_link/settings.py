@@ -24,14 +24,20 @@ class EsiLinkSettings(BaseSettings):
         default=DEFAULT_APP_DIR,
         description="The application directory for ESI Link.",
     )
-    log_dir: Path = Field(
-        default=DEFAULT_APP_DIR / "logs",
-        description="The log directory for ESI Link.",
-    )
+
+    @property
+    def log_dir(self) -> Path:
+        """The log directory for ESI Link."""
+        return self.app_dir / "logs"
 
     # -----------------------------------------------------------------------------------
     # Schema settings
     # -----------------------------------------------------------------------------------
+
+    @property
+    def schema_store_dir(self) -> Path:
+        """The directory for ESI schema files."""
+        return self.app_dir / "schema-store"
 
     esi_schema_url: str = Field(
         default=ESI_SCHEMA_URL,
@@ -41,31 +47,30 @@ class EsiLinkSettings(BaseSettings):
         default=ESI_SCHEMA_CHANGELOG_URL,
         description="The URL to download the ESI schema changelog from.",
     )
-    schema_store_dir: Path = Field(
-        default=DEFAULT_APP_DIR / "schema-store/",
-        description="The path to the store of ESI schema files.",
-    )
 
     # -----------------------------------------------------------------------------------
     # Cache settings
     # -----------------------------------------------------------------------------------
 
-    cache_directory: Path = Field(
-        default=DEFAULT_APP_DIR / "cache",
-        description="The directory for ESI Link cache files.",
-    )
+    @property
+    def cache_directory(self) -> Path:
+        """The directory for ESI Link cache files."""
+        return self.app_dir / "cache"
+
     cache_type: Literal["diskcache", "json"] = Field(
         default="diskcache",
         description="The type of cache to use for ESI Link.",
     )
-    diskcache_directory: Path = Field(
-        default=DEFAULT_APP_DIR / "cache" / "disk_cache",
-        description="The directory for ESI Link diskcache files.",
-    )
-    json_cache_directory: Path = Field(
-        default=DEFAULT_APP_DIR / "cache" / "json_cache",
-        description="The directory for ESI Link JSON cache files.",
-    )
+
+    @property
+    def diskcache_directory(self) -> Path:
+        """The directory for ESI Link diskcache files."""
+        return self.cache_directory / "disk_cache"
+
+    @property
+    def json_cache_directory(self) -> Path:
+        """The directory for ESI Link JSON cache files."""
+        return self.cache_directory / "json_cache"
 
     # -----------------------------------------------------------------------------------
     # Rate limiting settings
@@ -86,15 +91,16 @@ class EsiLinkSettings(BaseSettings):
     # ESI Auth settings
     # -----------------------------------------------------------------------------------
 
-    app_credentials_file: Path = Field(
-        default=DEFAULT_APP_DIR / "esi-auth" / "credentials.json",
-        description="Path to the application credential JSON file.",
-    )
-    """Path to the application credential JSON file."""
-    tokens_dir: Path = Field(
-        default=DEFAULT_APP_DIR / "esi-auth" / "tokens",
-        description="Directory for the application ESI token JSON files.",
-    )
+    @property
+    def app_credentials_file(self) -> Path:
+        """The path to the application credential JSON file."""
+        return self.app_dir / "esi-auth" / "credentials.json"
+
+    @property
+    def tokens_dir(self) -> Path:
+        """The directory for ESI Auth token JSON files."""
+        return self.app_dir / "esi-auth" / "tokens"
+
     token_refresh_threshold_seconds: int = Field(
         default=300,
         description="Minimum number of seconds of validity required for an authentication token before it is considered invalid and a new token must be obtained.",
@@ -107,11 +113,12 @@ class EsiLinkSettings(BaseSettings):
         description="URL to fetch OAuth metadata from the ESI auth server.",
     )
     """URL to fetch OAuth metadata from the ESI auth server."""
-    cached_oauth_metadata_file: Path = Field(
-        default=DEFAULT_APP_DIR / "esi-auth" / "oauth_metadata.json",
-        description="Path to the cached OAuth metadata JSON file.",
-    )
-    """Path to the cached OAuth metadata JSON file."""
+
+    @property
+    def cached_oauth_metadata_file(self) -> Path:
+        """Path to the cached OAuth metadata JSON file."""
+        return self.app_dir / "esi-auth" / "oauth_metadata.json"
+
     cached_metadata_max_age: int = Field(
         default=86400,
         description="Maximum age (in seconds) for cached OAuth metadata before it is considered expired.",
