@@ -39,6 +39,8 @@ from esi_link.requests.runtime_request_info import RuntimeRequestInfoGenerator
 from esi_link.validation.request_group_validation import RequestGroupValidator
 from esi_link.validation.request_validation import RequestValidator
 
+# This kind of all in one. Maybe split out the authentication to another factory.
+
 
 class EsiLinkObjectFactory:
     def __init__(
