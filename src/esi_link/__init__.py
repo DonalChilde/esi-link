@@ -5,8 +5,6 @@ from uuid import NAMESPACE_URL, uuid5
 
 import typer
 
-from esi_link.api import EsiLink, EsiLinkTools
-
 __author__ = "Chad Lowe"
 __email__ = "pfmsoft.dev@gmail.com"
 __app_name__ = "esi-link"
@@ -19,7 +17,7 @@ __url__ = "https://github.com/DonalChilde/esi-link"
 #######################################################################################
 __description__ = "A command line first interface to the Eve Online API"
 # The short X.Y.Z version.
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 # The full version, including alpha/beta/rc tags.
 __release__ = __version__
 #######################################################################################
@@ -28,5 +26,8 @@ APPLICATION_NAME = "esi-link"
 DEFAULT_APP_DIR = Path(typer.get_app_dir(f"{APP_NAMESPACE}-{APPLICATION_NAME}"))
 USER_AGENT = f"{__app_name__}/{__version__} (+{__url__})"
 ESI_LINK_NAMESPACE = uuid5(NAMESPACE_URL, "esi-link")
+
+
+from esi_link.api import EsiLink, EsiLinkTools
 
 __all__ = ["EsiLink", "EsiLinkTools"]
