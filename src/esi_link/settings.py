@@ -15,6 +15,14 @@ ESI_SCHEMA_URL = "https://esi.evetech.net/meta/openapi.json"
 """The URL to download the ESI schema from."""
 ESI_SCHEMA_CHANGELOG_URL = "https://esi.evetech.net/meta/changelog.json"
 """The URL to download the ESI schema changelog from."""
+OAUTH_METADATA_URL = (
+    "https://login.eveonline.com/.well-known/oauth-authorization-server"
+)
+"""URL to fetch OAuth metadata from the ESI auth server."""
+AUDIENCE = "EVE Online"
+"""The audience to use for ESI Auth tokens."""
+ISSUER = "https://login.eveonline.com"
+"""The issuer to use for ESI Auth tokens."""
 
 
 class EsiLinkSettings(BaseSettings):
@@ -109,7 +117,7 @@ class EsiLinkSettings(BaseSettings):
 
     """Directory for the application ESI token JSON files."""
     oauth_metadata_url: str = Field(
-        default="https://login.eveonline.com/.well-known/oauth-authorization-server",
+        default=OAUTH_METADATA_URL,
         description="URL to fetch OAuth metadata from the ESI auth server.",
     )
     """URL to fetch OAuth metadata from the ESI auth server."""
@@ -133,12 +141,12 @@ class EsiLinkSettings(BaseSettings):
     )
     """Timeout (in seconds) for the local auth server used by esi-auth."""
     audience: str = Field(
-        default="EVE Online",
+        default=AUDIENCE,
         description="The audience to use for ESI Auth tokens.",
     )
     """The audience to use for ESI Auth tokens."""
     issuer: str = Field(
-        default="https://login.eveonline.com",
+        default=ISSUER,
         description="The issuer to use for ESI Auth tokens.",
     )
     """The issuer to use for ESI Auth tokens."""
