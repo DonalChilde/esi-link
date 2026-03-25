@@ -8,8 +8,6 @@ import typer
 __author__ = "Chad Lowe"
 __email__ = "pfmsoft.dev@gmail.com"
 __app_name__ = "esi-link"
-__version__ = "0.1.0"
-__description__ = "A command line first interface to the Eve Online API"
 __license__ = "MIT"
 __url__ = "https://github.com/DonalChilde/esi-link"
 
@@ -19,7 +17,7 @@ __url__ = "https://github.com/DonalChilde/esi-link"
 #######################################################################################
 __description__ = "A command line first interface to the Eve Online API"
 # The short X.Y.Z version.
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 # The full version, including alpha/beta/rc tags.
 __release__ = __version__
 #######################################################################################
