@@ -8,7 +8,10 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
-from esi_link.cli.helpers import factory_from_settings, get_settings_from_context
+from esi_link.cli.helpers import (
+    get_executor_from_settings_and_schema,
+    get_settings_from_context,
+)
 from esi_link.factory import EsiLinkObjectFactory
 from esi_link.helpers.pydantic.serialize_as_json import (
     load_from_json,
@@ -54,13 +57,15 @@ def execute(
 
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
     stored_schema = schema_manager.get_latest_schema()
+    executor = get_executor_from_settings_and_schema(
+        settings=settings,
+        schema=stored_schema.esi_schema,
+    )
     console.print(
         f"Executing with schema: {stored_schema.esi_schema.version} downloaded at {stored_schema.download_date.format_iso()}"
     )
 
-    factory = factory_from_settings(settings, stored_schema.esi_schema)
-    executor = factory.group_executor()
-    response_group = asyncio.run(executor(request_group))
+    response_group = asyncio.run(executor.do_requests(request_group))
     error_count = sum(
         len(x.network_exception_messages) for x in response_group.responses.values()
     )
@@ -110,21 +115,22 @@ def validate(
 
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
     stored_schema = schema_manager.get_latest_schema()
-    factory = factory_from_settings(settings, stored_schema.esi_schema)
-    validator = factory.request_validator()
+    executor = get_executor_from_settings_and_schema(
+        settings=settings,
+        schema=stored_schema.esi_schema,
+    )
 
-    async def validate_requests(requests: Iterable[Request]):
-        for request in requests:
-            try:
-                await validator(request)
-            except Exception as e:
-                console.print(
-                    f"Request {request.request_id} failed validation with error: {str(e)}",
-                    style="bold red",
-                )
-                continue
+    # async def validate_requests():
 
-    asyncio.run(validate_requests(request_group.requests.values()))
+    #     try:
+    #         await executor.validate_requests(request_group)
+    #     except Exception as e:
+    #         console.print(
+    #             f"Request {request.request_id} failed validation with error: {str(e)}",
+    #             style="bold red",
+    #         )
+
+    # asyncio.run(validate_requests(request_group.requests.values()))
 
     # TODO validate group here.
 

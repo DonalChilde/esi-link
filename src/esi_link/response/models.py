@@ -8,13 +8,28 @@ container itself.
 Fields may also be added to the container that have data from the query parameters or
 other metadata that is not directly from the ESI response, but is relevant to the calculations.
 
+The data may be organized in collections in a different form than the raw ESI response
+for ease of use in calculations. For example, market orders may be collected by type ID
+and buy/sell status, rather than being a flat list of orders as returned by ESI.
+
 This is a limited set of models defined for convienience in the calculations modules,
 and is not intended to be a comprehensive set of models for all ESI responses. For a
 more comprehensive information on the response data from the EVE Esi, see the schema docs.
 """
 
 from dataclasses import dataclass
-from typing import Literal, TypedDict
+from typing import Any, Literal, Self, TypedDict
+
+from pydantic import BaseModel
+
+from esi_link.models_and_protocols import ResponseData
+
+
+class EsiDataModel(BaseModel):
+    """Base class for ESI data models."""
+
+    response_date: str
+    """The date and time when the data was downloaded from ESI."""
 
 
 @dataclass(slots=True)
@@ -27,10 +42,25 @@ class GetMarketPricesItem:
     """The average price of the item, calculated as a simple average of recent market prices."""
 
 
-@dataclass(slots=True)
-class GetMarketPrices:
-    data: dict[int, GetMarketPricesItem]
+class GetMarketPrices(EsiDataModel):
+    prices: dict[int, GetMarketPricesItem]
     """A mapping of item type IDs to their corresponding market price information."""
+
+    @classmethod
+    def from_response_data(cls, response_data: ResponseData) -> Self:
+        """Create a GetMarketPrices instance from ESI response data."""
+        operation_id = "GetMarketPrices"
+        if response_data.request.operation_id != operation_id:
+            raise ValueError(
+                f"Expected operation_id {operation_id}, got {response_data.request.operation_id}"
+            )
+        prices_dict: dict[int, GetMarketPricesItem] = {}
+        for item in response_data.data:
+            price_item = GetMarketPricesItem(**item)
+            prices_dict[price_item.type_id] = price_item
+        return cls.model_validate(
+            {"response_date": response_data.response_date, "prices": prices_dict}
+        )
 
 
 @dataclass(slots=True)
@@ -43,23 +73,39 @@ class GetMarketsRegionIdHistoryItem:
     volume: float
 
 
-@dataclass(slots=True)
-class GetMarketsRegionIdHistory:
+class GetMarketsRegionIdHistory(EsiDataModel):
     region_id: int
     type_id: int
     history: dict[str, GetMarketsRegionIdHistoryItem]
-
-    def __post_init__(self):
-        """Post-initialization processing to ensure data is sorted by date."""
-        # Ensure that the data dictionary is sorted by date in descending order
-        self.history = dict(
-            sorted(self.history.items(), key=lambda item: item[0], reverse=True)
-        )
 
     @property
     def most_recent_date(self) -> str | None:
         """Get the most recent date from the market history data."""
         return next(iter(self.history.keys())) if self.history else None
+
+    @classmethod
+    def from_response_data(cls, response_data: ResponseData) -> Self:
+        """Create a GetMarketsRegionIdHistory instance from ESI response data."""
+        operation_id = "GetMarketsRegionIdHistory"
+        if response_data.request.operation_id != operation_id:
+            raise ValueError(
+                f"Expected operation_id {operation_id}, got {response_data.request.operation_id}"
+            )
+        region_id = int(response_data.request.path_parameters["region_id"])
+        type_id = int(response_data.request.path_parameters["type_id"])
+        history_dict: dict[str, GetMarketsRegionIdHistoryItem] = {}
+        sorted_data = sorted(response_data.data, key=lambda x: x["date"], reverse=True)
+        for item in sorted_data:
+            history_item = GetMarketsRegionIdHistoryItem(**item)
+            history_dict[history_item.date] = history_item
+        return cls.model_validate(
+            {
+                "response_date": response_data.response_date,
+                "region_id": region_id,
+                "type_id": type_id,
+                "history": history_dict,
+            }
+        )
 
 
 @dataclass(slots=True)
@@ -90,41 +136,43 @@ class CollectedMarketOrders:
     sell_orders: list[GetMarketsRegionIdOrdersItem]
 
 
-@dataclass(slots=True)
-class GetMarketsRegionIdOrders:
+class GetMarketsRegionIdOrders(EsiDataModel):
     """Represents market orders for a specific region."""
 
     region_id: int
     orders: dict[int, CollectedMarketOrders]
 
-
-# def collect_orders_by_type(
-#     region_orders: GetMarketsRegionIdOrders,
-# ) -> dict[int, CollectedMarketOrders]:
-#     """Collect orders by type ID and buy/sell status.
-
-#     Args:
-#         region_orders: A GetMarketsRegionIdOrders object containing market orders for a specific region.
-
-#     Returns:
-#         A dictionary mapping type IDs to CollectedMarketOrders, which contains
-#         separate lists of buy and sell orders for each type ID.
-#     """
-#     orders_by_type: dict[int, CollectedMarketOrders] = {}
-#     for type_id, orders in region_orders.orders.items():
-#         if type_id not in orders_by_type:
-#             orders_by_type[type_id] = CollectedMarketOrders(
-#                 region_id=region_orders.region_id,
-#                 type_id=type_id,
-#                 buy_orders=[],
-#                 sell_orders=[],
-#             )
-#         for order in orders:
-#             if order.is_buy_order:
-#                 orders_by_type[type_id].buy_orders.append(order)
-#             else:
-#                 orders_by_type[type_id].sell_orders.append(order)
-#     return orders_by_type
+    @classmethod
+    def from_response_data(cls, response_data: ResponseData) -> Self:
+        """Create a GetMarketsRegionIdOrders instance from ESI response data."""
+        operation_id = "GetMarketsRegionIdOrders"
+        if response_data.request.operation_id != operation_id:
+            raise ValueError(
+                f"Expected operation_id {operation_id}, got {response_data.request.operation_id}"
+            )
+        region_id = int(response_data.request.path_parameters["region_id"])
+        orders_by_type: dict[int, CollectedMarketOrders] = {}
+        for item in response_data.data:
+            order_item = GetMarketsRegionIdOrdersItem(**item)
+            type_id = order_item.type_id
+            if type_id not in orders_by_type:
+                orders_by_type[type_id] = CollectedMarketOrders(
+                    region_id=region_id,
+                    type_id=type_id,
+                    buy_orders=[],
+                    sell_orders=[],
+                )
+            if order_item.is_buy_order:
+                orders_by_type[type_id].buy_orders.append(order_item)
+            else:
+                orders_by_type[type_id].sell_orders.append(order_item)
+        return cls.model_validate(
+            {
+                "response_date": response_data.response_date,
+                "region_id": region_id,
+                "orders": orders_by_type,
+            }
+        )
 
 
 class CostIndexActivity(TypedDict):
@@ -152,6 +200,61 @@ class GetIndustrySystemsItem:
         return {ci["activity"]: ci["cost_index"] for ci in self.cost_indices}
 
 
-@dataclass(slots=True)
-class GetIndustrySystems:
+class GetIndustrySystems(EsiDataModel):
     systems: dict[int, GetIndustrySystemsItem]
+
+    @classmethod
+    def from_response_data(cls, response_data: ResponseData) -> Self:
+        """Create a GetIndustrySystems instance from ESI response data."""
+        operation_id = "GetIndustrySystems"
+        if response_data.request.operation_id != operation_id:
+            raise ValueError(
+                f"Expected operation_id {operation_id}, got {response_data.request.operation_id}"
+            )
+        data_dict: dict[int, GetIndustrySystemsItem] = {}
+        for item in response_data.data:
+            system_item = GetIndustrySystemsItem(**item)
+            data_dict[system_item.solar_system_id] = system_item
+        return cls.model_validate(
+            {"response_date": response_data.response_date, "systems": data_dict}
+        )
+
+
+@dataclass(slots=True)
+class GetCorporationsCorporationIdBlueprintsItem:
+    item_id: int
+    location_flag: str
+    location_id: int
+    material_efficiency: int
+    quantity: int
+    runs: int
+    time_efficiency: int
+    type_id: int
+
+
+class GetCorporationsCorporationIdBlueprints(EsiDataModel):
+    corporation_id: int
+    blueprints: dict[int, list[GetCorporationsCorporationIdBlueprintsItem]]
+
+    @classmethod
+    def from_response_data(cls, response_data: ResponseData) -> Self:
+        """Create a GetCorporationsCorporationIdBlueprints instance from ESI response data."""
+        operation_id = "GetCorporationsCorporationIdBlueprints"
+        if response_data.request.operation_id != operation_id:
+            raise ValueError(
+                f"Expected operation_id {operation_id}, got {response_data.request.operation_id}"
+            )
+        data_dict: dict[int, list[GetCorporationsCorporationIdBlueprintsItem]] = {}
+        for item in response_data.data:
+            blueprint_item = GetCorporationsCorporationIdBlueprintsItem(**item)
+            if blueprint_item.type_id not in data_dict:
+                data_dict[blueprint_item.type_id] = []
+            data_dict[blueprint_item.type_id].append(blueprint_item)
+        model_dict: dict[str, Any] = {
+            "response_date": response_data.response_date,
+            "corporation_id": int(
+                response_data.request.path_parameters["corporation_id"]
+            ),
+            "blueprints": data_dict,
+        }
+        return cls.model_validate(model_dict)

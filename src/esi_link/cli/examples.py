@@ -11,9 +11,11 @@ from rich.console import Console
 from rich.json import JSON
 
 import esi_link.handler_factory
-from esi_link.cli.helpers import factory_from_settings, get_settings_from_context
+from esi_link.cli.helpers import (
+    get_executor_from_settings_and_schema,
+    get_settings_from_context,
+)
 from esi_link.cli.response_display_helpers import display_response_group_summary
-from esi_link.factory import EsiLinkObjectFactory
 from esi_link.models_and_protocols import RequestGroup, Response
 from esi_link.schema.schema_manager import SchemaManager
 
@@ -39,6 +41,10 @@ def status(
     console.print("Preparing request...")
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
     stored_schema = schema_manager.get_latest_schema()
+    executor = get_executor_from_settings_and_schema(
+        settings=settings, schema=stored_schema.esi_schema
+    )
+
     request = request_factory.esi_status(
         handlers=[
             esi_link.handler_factory.debug_file_response(output_dir=output_dir),
@@ -52,16 +58,9 @@ def status(
         group_id=uuid4(), requests={request.request_id: request}
     )
 
-    factory = EsiLinkObjectFactory(
-        schema=stored_schema.esi_schema,
-        cache_type="json",
-        cache_directory=settings.json_cache_directory,
-        credentials_file=settings.app_credentials_file,
-        tokens_dir=settings.tokens_dir,
-    )
     console.print(f"Requesting data from {request.operation_id} endpoint...")
-    group_executor = factory.group_executor()
-    response_group = asyncio.run(group_executor(request_group))
+
+    response_group = asyncio.run(executor.do_requests(request_group))
     console.print(f"Response Group Summary:")
     display_response_group_summary(response_group, console)
     response = response_group.responses[request.request_id]
@@ -89,6 +88,9 @@ def pages(
     console.print("Preparing request...")
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
     stored_schema = schema_manager.get_latest_schema()
+    executor = get_executor_from_settings_and_schema(
+        settings=settings, schema=stored_schema.esi_schema
+    )
     request = request_factory.market_types_with_active_orders(
         handlers=[
             esi_link.handler_factory.debug_file_response(output_dir=output_dir),
@@ -102,16 +104,8 @@ def pages(
         group_id=uuid4(), requests={request.request_id: request}
     )
 
-    factory = EsiLinkObjectFactory(
-        schema=stored_schema.esi_schema,
-        cache_type="json",
-        cache_directory=settings.json_cache_directory,
-        credentials_file=settings.app_credentials_file,
-        tokens_dir=settings.tokens_dir,
-    )
     console.print(f"Requesting data from {request.operation_id} endpoint...")
-    group_executor = factory.group_executor()
-    response_group = asyncio.run(group_executor(request_group))
+    response_group = asyncio.run(executor.do_requests(request_group))
     console.print(f"Response Group Summary:")
     display_response_group_summary(response_group, console)
     response = response_group.responses[request.request_id]
@@ -146,6 +140,9 @@ def changelog(
     console.print("Preparing request...")
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
     stored_schema = schema_manager.get_latest_schema()
+    executor = get_executor_from_settings_and_schema(
+        settings=settings, schema=stored_schema.esi_schema
+    )
     request = request_factory.esi_changelog(
         handlers=[
             esi_link.handler_factory.debug_file_response(output_dir=output_dir),
@@ -159,16 +156,8 @@ def changelog(
         group_id=uuid4(), requests={request.request_id: request}
     )
 
-    factory = EsiLinkObjectFactory(
-        schema=stored_schema.esi_schema,
-        cache_type="json",
-        cache_directory=settings.json_cache_directory,
-        credentials_file=settings.app_credentials_file,
-        tokens_dir=settings.tokens_dir,
-    )
     console.print(f"Requesting data from {request.operation_id} endpoint...")
-    group_executor = factory.group_executor()
-    response_group = asyncio.run(group_executor(request_group))
+    response_group = asyncio.run(executor.do_requests(request_group))
     console.print(f"Response Group Summary:")
     display_response_group_summary(response_group, console)
     response = response_group.responses[request.request_id]
@@ -201,6 +190,9 @@ def character_stats(
     console.print("Preparing request...")
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
     stored_schema = schema_manager.get_latest_schema()
+    executor = get_executor_from_settings_and_schema(
+        settings=settings, schema=stored_schema.esi_schema
+    )
     request = request_factory.character_stats(
         character_id=character_id,
         handlers=[
@@ -215,16 +207,8 @@ def character_stats(
         group_id=uuid4(), requests={request.request_id: request}
     )
 
-    factory = EsiLinkObjectFactory(
-        schema=stored_schema.esi_schema,
-        cache_type="json",
-        cache_directory=settings.json_cache_directory,
-        credentials_file=settings.app_credentials_file,
-        tokens_dir=settings.tokens_dir,
-    )
     console.print(f"Requesting data from {request.operation_id} endpoint...")
-    group_executor = factory.group_executor()
-    response_group = asyncio.run(group_executor(request_group))
+    response_group = asyncio.run(executor.do_requests(request_group))
     console.print(f"Response Group Summary:")
     display_response_group_summary(response_group, console)
     response = response_group.responses[request.request_id]
@@ -234,6 +218,111 @@ def character_stats(
     # them appropriately.
     check_for_exceptions(response, console)
     console.print(JSON(response.http_response.body_text))  # type: ignore
+
+
+@app.command()
+def character_info(
+    ctx: typer.Context,
+    character_id: Annotated[
+        int, typer.Argument(..., help="The character ID to get info for.")
+    ],
+    output_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "-d",
+            "--directory",
+            help="Directory to save the character info response to.",
+        ),
+    ] = None,
+):
+    """Example ESI request for the GetCharactersCharacterId operation."""
+    settings = get_settings_from_context(ctx)
+    console = Console()
+    console.print("Preparing request...")
+    schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
+    stored_schema = schema_manager.get_latest_schema()
+    executor = get_executor_from_settings_and_schema(
+        settings=settings, schema=stored_schema.esi_schema
+    )
+    request = request_factory.character_information(
+        character_id=character_id,
+        handlers=[
+            esi_link.handler_factory.debug_file_response(output_dir=output_dir),
+            esi_link.handler_factory.standard_file_response(output_dir=output_dir),
+            esi_link.handler_factory.detailed_file_response(output_dir=output_dir),
+        ]
+        if output_dir
+        else None,
+    )
+    request_group = RequestGroup(
+        group_id=uuid4(), requests={request.request_id: request}
+    )
+    console.print(f"Requesting data from {request.operation_id} endpoint...")
+    response_group = asyncio.run(executor.do_requests(request_group))
+    console.print(f"Response Group Summary:")
+    display_response_group_summary(response_group, console)
+    response = response_group.responses[request.request_id]
+    if output_dir:
+        console.print(f"Character stats response saved to {output_dir}")
+    # The caller is responsible for checking for exceptions in the response and handling
+    # them appropriately.
+    check_for_exceptions(response, console)
+    console.print(JSON(response.http_response.body_text))  # type: ignore
+
+
+@app.command()
+def corporation_blueprints(
+    ctx: typer.Context,
+    corporation_id: Annotated[
+        int, typer.Argument(..., help="The corporation ID to get blueprints for.")
+    ],
+    character_id: Annotated[
+        int, typer.Argument(..., help="The character ID to get info for.")
+    ],
+    output_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "-d",
+            "--directory",
+            help="Directory to save the character info response to.",
+        ),
+    ] = None,
+):
+    """Example ESI request for the GetCorporationsCorporationIdBlueprints operation."""
+    settings = get_settings_from_context(ctx)
+    console = Console()
+    console.print("Preparing request...")
+    schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
+    stored_schema = schema_manager.get_latest_schema()
+    executor = get_executor_from_settings_and_schema(
+        settings=settings, schema=stored_schema.esi_schema
+    )
+    request = request_factory.corporation_blueprints(
+        corporation_id=corporation_id,
+        character_id=character_id,
+        handlers=[
+            esi_link.handler_factory.debug_file_response(output_dir=output_dir),
+            esi_link.handler_factory.standard_file_response(output_dir=output_dir),
+            esi_link.handler_factory.detailed_file_response(output_dir=output_dir),
+        ]
+        if output_dir
+        else None,
+    )
+    request_group = RequestGroup(
+        group_id=uuid4(), requests={request.request_id: request}
+    )
+    console.print(f"Requesting data from {request.operation_id} endpoint...")
+    response_group = asyncio.run(executor.do_requests(request_group))
+    console.print(f"Response Group Summary:")
+    display_response_group_summary(response_group, console)
+    response = response_group.responses[request.request_id]
+    check_for_exceptions(response, console)
+    if output_dir:
+        console.print(f"Corporation blueprints response saved to {output_dir}")
+    # The caller is responsible for checking for exceptions in the response and handling
+    # them appropriately.
+    else:
+        console.print(JSON(response.http_response.body_text))  # type: ignore
 
 
 @app.command()
@@ -258,14 +347,15 @@ def market_history(
     console.print("Preparing request group...")
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
     stored_schema = schema_manager.get_latest_schema()
-    factory = factory_from_settings(settings, stored_schema.esi_schema)
+    executor = get_executor_from_settings_and_schema(
+        settings=settings, schema=stored_schema.esi_schema
+    )
     console.print("Fetching type IDs for market history requests...")
     type_ids_request = request_factory.market_types_with_active_orders()
     type_ids_group = RequestGroup(
         group_id=uuid4(), requests={type_ids_request.request_id: type_ids_request}
     )
-    group_executor = factory.group_executor()
-    type_ids_response_group = asyncio.run(group_executor(type_ids_group))
+    type_ids_response_group = asyncio.run(executor.do_requests(type_ids_group))
     try:
         type_ids = json.loads(
             type_ids_response_group.responses[
@@ -299,8 +389,7 @@ def market_history(
     )
 
     console.print(f"Requesting market history for region {region_id}...")
-    group_executor = factory.group_executor()
-    response_group = asyncio.run(group_executor(request_group))
+    response_group = asyncio.run(executor.do_requests(request_group))
     console.print(f"Response Group Summary:")
     display_response_group_summary(response_group, console)
     console.print(

@@ -59,26 +59,25 @@ class EsiLinkSettings(BaseSettings):
     # -----------------------------------------------------------------------------------
     # Cache settings
     # -----------------------------------------------------------------------------------
+    @property
+    def cache_root_dir(self) -> Path:
+        """The root directory for ESI Link cache files."""
+        return self.app_dir / "cache"
 
     @property
     def cache_directory(self) -> Path:
         """The directory for ESI Link cache files."""
-        return self.app_dir / "cache"
+        if self.cache_type == "diskcache":
+            return self.cache_root_dir / "diskcache"
+        elif self.cache_type == "json":
+            return self.cache_root_dir / "json"
+        else:
+            raise ValueError(f"Invalid cache type: {self.cache_type}")
 
     cache_type: Literal["diskcache", "json"] = Field(
         default="diskcache",
         description="The type of cache to use for ESI Link.",
     )
-
-    @property
-    def diskcache_directory(self) -> Path:
-        """The directory for ESI Link diskcache files."""
-        return self.cache_directory / "disk_cache"
-
-    @property
-    def json_cache_directory(self) -> Path:
-        """The directory for ESI Link JSON cache files."""
-        return self.cache_directory / "json_cache"
 
     # -----------------------------------------------------------------------------------
     # Rate limiting settings
@@ -167,8 +166,6 @@ def get_settings() -> EsiLinkSettings:
     # Ensure application directories exist
     settings.app_dir.mkdir(parents=True, exist_ok=True)
     settings.cache_directory.mkdir(parents=True, exist_ok=True)
-    settings.diskcache_directory.mkdir(parents=True, exist_ok=True)
-    settings.json_cache_directory.mkdir(parents=True, exist_ok=True)
     settings.cached_oauth_metadata_file.parent.mkdir(parents=True, exist_ok=True)
     return settings
 

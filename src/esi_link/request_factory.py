@@ -105,3 +105,56 @@ def market_history_group(
         response_group_handlers=group_handlers,
     )
     return request_group
+
+
+def character_blueprints(
+    character_id: int, handlers: list[ResponseHandlerConfig] | None = None
+) -> Request:
+    """Example ESI request for the GetCharactersCharacterIdBlueprints operation."""
+    handlers = handlers or []
+    return Request(
+        request_id=uuid4(),
+        operation_id="GetCharactersCharacterIdBlueprints",
+        path_parameters={"character_id": character_id},
+        query_parameters={"page": 1},
+        auth_character_id=character_id,
+        lang="en",
+        json_body=None,
+        response_handlers=handlers,
+    )
+
+
+def character_information(
+    character_id: int, handlers: list[ResponseHandlerConfig] | None = None
+) -> Request:
+    """Example ESI request for the GetCharactersCharacterId operation."""
+    handlers = handlers or []
+    return Request(
+        request_id=uuid4(),
+        operation_id="GetCharactersCharacterId",
+        path_parameters={"character_id": character_id},
+        query_parameters={},
+        auth_character_id=None,
+        lang="en",
+        json_body=None,
+        response_handlers=handlers,
+    )
+
+
+def corporation_blueprints(
+    corporation_id: int,
+    character_id: int,
+    handlers: list[ResponseHandlerConfig] | None = None,
+) -> Request:
+    """Example ESI request for the GetCorporationsCorporationIdBlueprints operation."""
+    handlers = handlers or []
+    return Request(
+        request_id=uuid4(),
+        operation_id="GetCorporationsCorporationIdBlueprints",
+        path_parameters={"corporation_id": corporation_id},
+        query_parameters={"page": 1},
+        auth_character_id=character_id,
+        lang="en",
+        json_body=None,
+        response_handlers=handlers,
+    )
