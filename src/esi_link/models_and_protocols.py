@@ -425,6 +425,20 @@ class ResponseGroup(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
+class ResponseData(BaseModel):
+    """Represents the data of a response, includes the request and response_date.
+
+    This model is used both as a serialization format for response data, and as a
+    way to pass response data to functions in a structured way.
+
+
+    """
+
+    request: Request
+    response_date: str
+    data: Any
+
+
 class CachedResponse(BaseModel):
     """Represents a cached response for a Request."""
 
