@@ -258,3 +258,41 @@ class GetCorporationsCorporationIdBlueprints(EsiDataModel):
             "blueprints": data_dict,
         }
         return cls.model_validate(model_dict)
+
+
+@dataclass(slots=True)
+class GetCharactersCharacterIdBlueprintsItem:
+    item_id: int
+    location_flag: str
+    location_id: int
+    material_efficiency: int
+    quantity: int
+    runs: int
+    time_efficiency: int
+    type_id: int
+
+
+class GetCharactersCharacterIdBlueprints(EsiDataModel):
+    character_id: int
+    blueprints: dict[int, list[GetCharactersCharacterIdBlueprintsItem]]
+
+    @classmethod
+    def from_response_data(cls, response_data: ResponseData) -> Self:
+        """Create a GetCharactersCharacterIdBlueprints instance from ESI response data."""
+        operation_id = "GetCharactersCharacterIdBlueprints"
+        if response_data.request.operation_id != operation_id:
+            raise ValueError(
+                f"Expected operation_id {operation_id}, got {response_data.request.operation_id}"
+            )
+        data_dict: dict[int, list[GetCharactersCharacterIdBlueprintsItem]] = {}
+        for item in response_data.data:
+            blueprint_item = GetCharactersCharacterIdBlueprintsItem(**item)
+            if blueprint_item.type_id not in data_dict:
+                data_dict[blueprint_item.type_id] = []
+            data_dict[blueprint_item.type_id].append(blueprint_item)
+        model_dict: dict[str, Any] = {
+            "response_date": response_data.response_date,
+            "character_id": int(response_data.request.path_parameters["character_id"]),
+            "blueprints": data_dict,
+        }
+        return cls.model_validate(model_dict)
