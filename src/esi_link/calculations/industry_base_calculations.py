@@ -5,6 +5,7 @@ from typing import Any, TypedDict
 
 # TODO add types for arguments for clarity
 # TODO Thorough testing, with explicit examples in a main function
+# TODO step by step documentation for all the calculations, with examples and references to ESI docs and other sources.
 
 type TypeId = int
 """Type alias for type IDs."""

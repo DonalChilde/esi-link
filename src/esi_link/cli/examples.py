@@ -10,6 +10,7 @@ import typer
 from rich.console import Console
 from rich.json import JSON
 
+import esi_link.handler_factory
 from esi_link.cli.helpers import factory_from_settings, get_settings_from_context
 from esi_link.cli.response_display_helpers import display_response_group_summary
 from esi_link.factory import EsiLinkObjectFactory
@@ -19,7 +20,7 @@ from esi_link.schema.schema_manager import SchemaManager
 app = typer.Typer(
     no_args_is_help=True, help="Commands for testing ESI Link functionality."
 )
-from esi_link import example_requests
+from esi_link import request_factory
 
 
 @app.command()
@@ -38,11 +39,11 @@ def status(
     console.print("Preparing request...")
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
     stored_schema = schema_manager.get_latest_schema()
-    request = example_requests.esi_status(
+    request = request_factory.esi_status(
         handlers=[
-            example_requests.debug_file_response(output_dir=output_dir),
-            example_requests.standard_file_response(output_dir=output_dir),
-            example_requests.detailed_file_response(output_dir=output_dir),
+            esi_link.handler_factory.debug_file_response(output_dir=output_dir),
+            esi_link.handler_factory.standard_file_response(output_dir=output_dir),
+            esi_link.handler_factory.detailed_file_response(output_dir=output_dir),
         ]
         if output_dir
         else None
@@ -88,11 +89,11 @@ def pages(
     console.print("Preparing request...")
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
     stored_schema = schema_manager.get_latest_schema()
-    request = example_requests.market_types_with_active_orders(
+    request = request_factory.market_types_with_active_orders(
         handlers=[
-            example_requests.debug_file_response(output_dir=output_dir),
-            example_requests.standard_file_response(output_dir=output_dir),
-            example_requests.detailed_file_response(output_dir=output_dir),
+            esi_link.handler_factory.debug_file_response(output_dir=output_dir),
+            esi_link.handler_factory.standard_file_response(output_dir=output_dir),
+            esi_link.handler_factory.detailed_file_response(output_dir=output_dir),
         ]
         if output_dir
         else None
@@ -145,11 +146,11 @@ def changelog(
     console.print("Preparing request...")
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
     stored_schema = schema_manager.get_latest_schema()
-    request = example_requests.esi_changelog(
+    request = request_factory.esi_changelog(
         handlers=[
-            example_requests.debug_file_response(output_dir=output_dir),
-            example_requests.standard_file_response(output_dir=output_dir),
-            example_requests.detailed_file_response(output_dir=output_dir),
+            esi_link.handler_factory.debug_file_response(output_dir=output_dir),
+            esi_link.handler_factory.standard_file_response(output_dir=output_dir),
+            esi_link.handler_factory.detailed_file_response(output_dir=output_dir),
         ]
         if output_dir
         else None
@@ -200,12 +201,12 @@ def character_stats(
     console.print("Preparing request...")
     schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
     stored_schema = schema_manager.get_latest_schema()
-    request = example_requests.character_stats(
+    request = request_factory.character_stats(
         character_id=character_id,
         handlers=[
-            example_requests.debug_file_response(output_dir=output_dir),
-            example_requests.standard_file_response(output_dir=output_dir),
-            example_requests.detailed_file_response(output_dir=output_dir),
+            esi_link.handler_factory.debug_file_response(output_dir=output_dir),
+            esi_link.handler_factory.standard_file_response(output_dir=output_dir),
+            esi_link.handler_factory.detailed_file_response(output_dir=output_dir),
         ]
         if output_dir
         else None,
@@ -259,7 +260,7 @@ def market_history(
     stored_schema = schema_manager.get_latest_schema()
     factory = factory_from_settings(settings, stored_schema.esi_schema)
     console.print("Fetching type IDs for market history requests...")
-    type_ids_request = example_requests.market_types_with_active_orders()
+    type_ids_request = request_factory.market_types_with_active_orders()
     type_ids_group = RequestGroup(
         group_id=uuid4(), requests={type_ids_request.request_id: type_ids_request}
     )
@@ -283,17 +284,17 @@ def market_history(
     type_id_list = type_ids[
         :100
     ]  # Get the first 100 type IDs for the market history requests
-    request_group = example_requests.market_history_group(
+    request_group = request_factory.market_history_group(
         region_id=region_id,
         type_ids=type_id_list,
         response_handlers=[
-            example_requests.only_on_error_file_response(
+            esi_link.handler_factory.only_on_error_file_response(
                 output_dir=output_dir / "errors"
             )
         ],
         group_handlers=[
-            example_requests.save_group_as_jsonl(output_dir=output_dir),
-            example_requests.save_group_stats(output_dir=output_dir),
+            esi_link.handler_factory.save_group_as_jsonl(output_dir=output_dir),
+            esi_link.handler_factory.save_group_stats(output_dir=output_dir),
         ],
     )
 
