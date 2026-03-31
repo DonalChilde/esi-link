@@ -46,6 +46,9 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = ["pytest>=8.4.1", "pytest-cov>=6.2.1", "ruff>=0.12.11", "scriv>=1.7.0"]
 
+[tool.uv]
+exclude-newer = "1 week"
+
 [tool.uv.sources]
 eve-static-data = { git = "https://github.com/DonalChilde/eve-static-data", branch = "main" }
 
