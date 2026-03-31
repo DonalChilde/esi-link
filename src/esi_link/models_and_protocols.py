@@ -194,7 +194,15 @@ class HttpResponse(BaseModel):
     url: str
     headers: dict[str, str] = {}
     body_text: str
-    received_at: Instant = Field(default_factory=_get_current_instant)
+    received_at: int = -1
+    """The timestamp when the response was received, as a Unix timestamp in nanoseconds."""
+
+    @property
+    def received_at_instant(self) -> Instant | None:
+        """Convert the received_at timestamp to an Instant, if possible."""
+        if self.received_at != -1:
+            return Instant.from_timestamp_nanos(self.received_at)
+        return None
 
     @property
     def etag(self) -> str | None:
@@ -225,6 +233,17 @@ class HttpResponse(BaseModel):
         return self.headers.get("Date") or self.headers.get("date")
 
     @property
+    def date_as_instant(self) -> Instant | None:
+        """Convert the Date header to an Instant, if possible."""
+        date_str = self.date
+        if date_str:
+            try:
+                return Instant.parse_rfc2822(date_str)
+            except ValueError:
+                pass
+        return None
+
+    @property
     def cache_control(self) -> str | None:
         """Extract the Cache-Control header from the response headers, if present."""
         return (
@@ -250,9 +269,12 @@ class HttpResponse(BaseModel):
     @property
     def expires_at(self) -> Instant | None:
         """Calculate the expiration time of the response based on the Expires header or Cache-Control max-age."""
-        max_age = self.max_age
-        if max_age is not None:
-            return self.received_at.add(seconds=max_age)
+        if self.max_age is not None and self.date is not None:
+            try:
+                response_date = Instant.parse_rfc2822(self.date)
+                return response_date.add(seconds=self.max_age)
+            except ValueError:
+                pass
         if self.expires:
             try:
                 return Instant.parse_rfc2822(self.expires)
