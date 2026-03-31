@@ -454,7 +454,7 @@ dev = [
 [[package]]
 name = "eve-static-data"
 version = "0.2.3"
-source = { git = "https://github.com/DonalChilde/eve-static-data?branch=main#6d3e902b9abf274ee258e8a7123acaf56bef5747" }
+source = { git = "https://github.com/DonalChilde/eve-static-data?branch=main#dbf23cfbcc82c3ed1b6dac6a031deb45b2363edb" }
 dependencies = [
     { name = "aiohttp" },
     { name = "pydantic" },
