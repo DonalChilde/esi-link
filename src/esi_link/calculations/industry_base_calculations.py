@@ -1,6 +1,6 @@
 """Industry calculations using the most basic inputs."""
 
-from math import ceil
+from math import ceil, floor
 from typing import Any, TypedDict
 
 # TODO add types for arguments for clarity
@@ -107,6 +107,27 @@ class JobCosts(TypedDict):
 #     required_materials: dict[int, int] = base_materials.copy()
 
 #     return required_materials
+
+
+def reprocess(base_materials: dict[int, int], reprocess_yield: float) -> dict[int, int]:
+    """Calculates the materials obtained from reprocessing.
+
+    base_materials for reprocessing comes from the typeMaterials.jsonl SDE dataset.
+
+    Reprocessing calculations round down to the nearest whole number.
+
+    Args:
+        base_materials (dict[int, int]): A dictionary of material IDs and their quantities.
+        reprocess_yield (float): The reprocessing yield as a decimal (e.g., 0.5 for 50%).
+
+    Returns:
+        dict[int, int]: A dictionary of reprocessed materials with their quantities.
+    """
+    reprocessed_materials: dict[int, int] = {}
+    for material_id, quantity in base_materials.items():
+        reprocessed_quantity = floor(quantity * reprocess_yield)
+        reprocessed_materials[material_id] = reprocessed_quantity
+    return reprocessed_materials
 
 
 def eiv(
