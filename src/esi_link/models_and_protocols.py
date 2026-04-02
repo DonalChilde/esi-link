@@ -458,7 +458,11 @@ class ResponseData(BaseModel):
 
     request: Request
     response_date: str
+    """Date header from the response, as an RFC 2822 string."""
+    received_at: int
+    """The timestamp when the response was received, as a Unix timestamp in nanoseconds."""
     data: Any
+    """The actual data of the response, typically the parsed JSON body."""
 
 
 class CachedResponse(BaseModel):
