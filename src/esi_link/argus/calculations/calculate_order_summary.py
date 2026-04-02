@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 
-from esi_link.calculations.models import (
+from esi_link.argus.calculations.models import (
     OrderSummary,
     OrderSummaryItem,
 )
