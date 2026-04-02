@@ -43,6 +43,282 @@ class EsiDataModel(BaseModel):
         raise NotImplementedError("Subclasses must implement from_response_data method")
 
 
+# ------------------------------------------------------------------------------
+# Character Models
+# ------------------------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class GetCharactersCharacterIdBlueprintsItem:
+    item_id: int
+    """Unique ID for this item."""
+    location_flag: str
+    """Type of the location_id."""
+    location_id: int
+    """References a station, a ship or an item_id if this blueprint
+          is located within a container. If the return value is an item_id, then the
+          Character AssetList API must be queried to find the container using the
+          given item_id to determine the correct location of the Blueprint."""
+    material_efficiency: int
+    """Material Efficiency Level of the blueprint."""
+    quantity: int
+    """A range of numbers with a minimum of -2 and no maximum value
+          where -1 is an original and -2 is a copy. It can be a positive integer if
+          it is a stack of blueprint originals fresh from the market (e.g. no activities
+          performed on them yet)."""
+    runs: int
+    """Number of runs remaining if the blueprint is a copy, -1 if it is an original."""
+    time_efficiency: int
+    """Time Efficiency Level of the blueprint."""
+    type_id: int
+
+
+class GetCharactersCharacterIdBlueprints(EsiDataModel):
+    character_id: int
+    blueprints: dict[int, list[GetCharactersCharacterIdBlueprintsItem]]
+
+    @classmethod
+    def from_response_data(cls, response_data: ResponseData) -> Self:
+        """Create a GetCharactersCharacterIdBlueprints instance from ESI response data."""
+        operation_id = "GetCharactersCharacterIdBlueprints"
+        if response_data.request.operation_id != operation_id:
+            raise ValueError(
+                f"Expected operation_id {operation_id}, got {response_data.request.operation_id}"
+            )
+        data_dict: dict[int, list[GetCharactersCharacterIdBlueprintsItem]] = {}
+        for item in response_data.data:
+            blueprint_item = GetCharactersCharacterIdBlueprintsItem(**item)
+            if blueprint_item.type_id not in data_dict:
+                data_dict[blueprint_item.type_id] = []
+            data_dict[blueprint_item.type_id].append(blueprint_item)
+        model_dict: dict[str, Any] = {
+            "operation_id": operation_id,
+            "response_date": response_data.response_date,
+            "received_at": response_data.received_at,
+            "character_id": int(response_data.request.path_parameters["character_id"]),
+            "blueprints": data_dict,
+        }
+        return cls.model_validate(model_dict)
+
+
+@dataclass(slots=True, kw_only=True)
+class GetCharactersCharacterIdIndustryJobsItem:
+    activity_id: int
+    blueprint_id: int
+    blueprint_location_id: int
+    blueprint_type_id: int
+    completed_character_id: int | None = None
+    completed_date: str | None = None
+    cost: float | None = None
+    duration: int
+    end_date: str
+    facility_id: int
+    installer_id: int
+    job_id: int
+    licensed_runs: int | None = None
+    output_location_id: int
+    pause_date: str | None = None
+    probability: float | None = None
+    product_type_id: int | None = None
+    runs: int
+    start_date: str
+    station_id: int
+    status: str
+    successful_runs: int | None = None
+
+
+class GetCharactersCharacterIdIndustryJobs(EsiDataModel):
+    character_id: int
+    jobs: list[GetCharactersCharacterIdIndustryJobsItem]
+
+    @classmethod
+    def from_response_data(cls, response_data: ResponseData) -> Self:
+        """Create a GetCharactersCharacterIdIndustryJobs instance from ESI response data."""
+        operation_id = "GetCharactersCharacterIdIndustryJobs"
+        if response_data.request.operation_id != operation_id:
+            raise ValueError(
+                f"Expected operation_id {operation_id}, got {response_data.request.operation_id}"
+            )
+        data_list: list[GetCharactersCharacterIdIndustryJobsItem] = []
+        for item in response_data.data:
+            job_item = GetCharactersCharacterIdIndustryJobsItem(**item)
+            data_list.append(job_item)
+        model_dict: dict[str, Any] = {
+            "operation_id": operation_id,
+            "response_date": response_data.response_date,
+            "received_at": response_data.received_at,
+            "character_id": int(response_data.request.path_parameters["character_id"]),
+            "jobs": data_list,
+        }
+        return cls.model_validate(model_dict)
+
+
+@dataclass(slots=True, kw_only=True)
+class GetCharactersCharacterIdItem:
+    alliance_id: int | None = None
+    """The alliance that the character is a member of, if any."""
+    birthday: str
+    bloodline_id: int
+    corporation_id: int
+    description: str | None = None
+    faction_id: int | None = None
+    gender: str
+    name: str
+    race_id: int
+    security_status: float | None = None
+    title: str | None = None
+
+
+class GetCharactersCharacterId(EsiDataModel):
+    character_id: int
+    character_info: GetCharactersCharacterIdItem
+
+    @classmethod
+    def from_response_data(cls, response_data: ResponseData) -> Self:
+        """Create a GetCharactersCharacterId instance from ESI response data."""
+        operation_id = "GetCharactersCharacterId"
+        if response_data.request.operation_id != operation_id:
+            raise ValueError(
+                f"Expected operation_id {operation_id}, got {response_data.request.operation_id}"
+            )
+        try:
+            character_info = GetCharactersCharacterIdItem(**response_data.data)
+            data_dict = {"character_info": character_info}
+        except Exception as e:
+            raise ValueError(f"Error parsing character info: {e}") from e
+        return cls.model_validate(
+            {
+                "operation_id": operation_id,
+                "response_date": response_data.response_date,
+                "received_at": response_data.received_at,
+                "character_id": int(
+                    response_data.request.path_parameters["character_id"]
+                ),
+                **data_dict,
+            }
+        )
+
+
+# ------------------------------------------------------------------------------
+# Corporation Models
+# ------------------------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class GetCorporationsCorporationIdBlueprintsItem:
+    item_id: int
+    """Unique ID for this item."""
+    location_flag: str
+    """Type of the location_id."""
+    location_id: int
+    """References a station, a ship or an item_id if this blueprint
+          is located within a container. If the return value is an item_id, then the
+          Character AssetList API must be queried to find the container using the
+          given item_id to determine the correct location of the Blueprint."""
+    material_efficiency: int
+    """Material Efficiency Level of the blueprint."""
+    quantity: int
+    """A range of numbers with a minimum of -2 and no maximum value
+          where -1 is an original and -2 is a copy. It can be a positive integer if
+          it is a stack of blueprint originals fresh from the market (e.g. no activities
+          performed on them yet)."""
+    runs: int
+    """Number of runs remaining if the blueprint is a copy, -1 if it is an original."""
+    time_efficiency: int
+    """Time Efficiency Level of the blueprint."""
+    type_id: int
+
+
+class GetCorporationsCorporationIdBlueprints(EsiDataModel):
+    corporation_id: int
+    blueprints: dict[int, list[GetCorporationsCorporationIdBlueprintsItem]]
+
+    @classmethod
+    def from_response_data(cls, response_data: ResponseData) -> Self:
+        """Create a GetCorporationsCorporationIdBlueprints instance from ESI response data."""
+        operation_id = "GetCorporationsCorporationIdBlueprints"
+        if response_data.request.operation_id != operation_id:
+            raise ValueError(
+                f"Expected operation_id {operation_id}, got {response_data.request.operation_id}"
+            )
+        data_dict: dict[int, list[GetCorporationsCorporationIdBlueprintsItem]] = {}
+        for item in response_data.data:
+            blueprint_item = GetCorporationsCorporationIdBlueprintsItem(**item)
+            if blueprint_item.type_id not in data_dict:
+                data_dict[blueprint_item.type_id] = []
+            data_dict[blueprint_item.type_id].append(blueprint_item)
+        model_dict: dict[str, Any] = {
+            "operation_id": operation_id,
+            "response_date": response_data.response_date,
+            "received_at": response_data.received_at,
+            "corporation_id": int(
+                response_data.request.path_parameters["corporation_id"]
+            ),
+            "blueprints": data_dict,
+        }
+        return cls.model_validate(model_dict)
+
+
+# ------------------------------------------------------------------------------
+# Industry Models
+# ------------------------------------------------------------------------------
+
+
+class CostIndexActivity(TypedDict):
+    activity: Literal[
+        "manufacturing",
+        "researching_time_efficiency",
+        "researching_material_efficiency",
+        "copying",
+        "invention",
+        "reaction",
+    ]
+    cost_index: float
+
+
+@dataclass(slots=True)
+class GetIndustrySystemsItem:
+    solar_system_id: int
+    cost_indices: list[CostIndexActivity]
+
+    @property
+    def cost_index_by_activity(self) -> dict[str, float | str]:
+        """Get a mapping of activity names to their corresponding cost indices."""
+        for ci in self.cost_indices:
+            print(ci)
+        return {ci["activity"]: ci["cost_index"] for ci in self.cost_indices}
+
+
+class GetIndustrySystems(EsiDataModel):
+    systems: dict[int, GetIndustrySystemsItem]
+
+    @classmethod
+    def from_response_data(cls, response_data: ResponseData) -> Self:
+        """Create a GetIndustrySystems instance from ESI response data."""
+        operation_id = "GetIndustrySystems"
+        if response_data.request.operation_id != operation_id:
+            raise ValueError(
+                f"Expected operation_id {operation_id}, got {response_data.request.operation_id}"
+            )
+        data_dict: dict[int, GetIndustrySystemsItem] = {}
+        for item in response_data.data:
+            system_item = GetIndustrySystemsItem(**item)
+            data_dict[system_item.solar_system_id] = system_item
+        return cls.model_validate(
+            {
+                "operation_id": operation_id,
+                "response_date": response_data.response_date,
+                "received_at": response_data.received_at,
+                "systems": data_dict,
+            }
+        )
+
+
+# ------------------------------------------------------------------------------
+# Market Models
+# ------------------------------------------------------------------------------
+
+
 @dataclass(slots=True)
 class GetMarketPricesItem:
     type_id: int
@@ -193,135 +469,3 @@ class GetMarketsRegionIdOrders(EsiDataModel):
                 "orders": orders_by_type,
             }
         )
-
-
-class CostIndexActivity(TypedDict):
-    activity: Literal[
-        "manufacturing",
-        "researching_time_efficiency",
-        "researching_material_efficiency",
-        "copying",
-        "invention",
-        "reaction",
-    ]
-    cost_index: float
-
-
-@dataclass(slots=True)
-class GetIndustrySystemsItem:
-    solar_system_id: int
-    cost_indices: list[CostIndexActivity]
-
-    @property
-    def cost_index_by_activity(self) -> dict[str, float | str]:
-        """Get a mapping of activity names to their corresponding cost indices."""
-        for ci in self.cost_indices:
-            print(ci)
-        return {ci["activity"]: ci["cost_index"] for ci in self.cost_indices}
-
-
-class GetIndustrySystems(EsiDataModel):
-    systems: dict[int, GetIndustrySystemsItem]
-
-    @classmethod
-    def from_response_data(cls, response_data: ResponseData) -> Self:
-        """Create a GetIndustrySystems instance from ESI response data."""
-        operation_id = "GetIndustrySystems"
-        if response_data.request.operation_id != operation_id:
-            raise ValueError(
-                f"Expected operation_id {operation_id}, got {response_data.request.operation_id}"
-            )
-        data_dict: dict[int, GetIndustrySystemsItem] = {}
-        for item in response_data.data:
-            system_item = GetIndustrySystemsItem(**item)
-            data_dict[system_item.solar_system_id] = system_item
-        return cls.model_validate(
-            {
-                "operation_id": operation_id,
-                "response_date": response_data.response_date,
-                "received_at": response_data.received_at,
-                "systems": data_dict,
-            }
-        )
-
-
-@dataclass(slots=True)
-class GetCorporationsCorporationIdBlueprintsItem:
-    item_id: int
-    location_flag: str
-    location_id: int
-    material_efficiency: int
-    quantity: int
-    runs: int
-    time_efficiency: int
-    type_id: int
-
-
-class GetCorporationsCorporationIdBlueprints(EsiDataModel):
-    corporation_id: int
-    blueprints: dict[int, list[GetCorporationsCorporationIdBlueprintsItem]]
-
-    @classmethod
-    def from_response_data(cls, response_data: ResponseData) -> Self:
-        """Create a GetCorporationsCorporationIdBlueprints instance from ESI response data."""
-        operation_id = "GetCorporationsCorporationIdBlueprints"
-        if response_data.request.operation_id != operation_id:
-            raise ValueError(
-                f"Expected operation_id {operation_id}, got {response_data.request.operation_id}"
-            )
-        data_dict: dict[int, list[GetCorporationsCorporationIdBlueprintsItem]] = {}
-        for item in response_data.data:
-            blueprint_item = GetCorporationsCorporationIdBlueprintsItem(**item)
-            if blueprint_item.type_id not in data_dict:
-                data_dict[blueprint_item.type_id] = []
-            data_dict[blueprint_item.type_id].append(blueprint_item)
-        model_dict: dict[str, Any] = {
-            "operation_id": operation_id,
-            "response_date": response_data.response_date,
-            "received_at": response_data.received_at,
-            "corporation_id": int(
-                response_data.request.path_parameters["corporation_id"]
-            ),
-            "blueprints": data_dict,
-        }
-        return cls.model_validate(model_dict)
-
-
-@dataclass(slots=True)
-class GetCharactersCharacterIdBlueprintsItem:
-    item_id: int
-    location_flag: str
-    location_id: int
-    material_efficiency: int
-    quantity: int
-    runs: int
-    time_efficiency: int
-    type_id: int
-
-
-class GetCharactersCharacterIdBlueprints(EsiDataModel):
-    character_id: int
-    blueprints: dict[int, list[GetCharactersCharacterIdBlueprintsItem]]
-
-    @classmethod
-    def from_response_data(cls, response_data: ResponseData) -> Self:
-        """Create a GetCharactersCharacterIdBlueprints instance from ESI response data."""
-        operation_id = "GetCharactersCharacterIdBlueprints"
-        if response_data.request.operation_id != operation_id:
-            raise ValueError(
-                f"Expected operation_id {operation_id}, got {response_data.request.operation_id}"
-            )
-        data_dict: dict[int, list[GetCharactersCharacterIdBlueprintsItem]] = {}
-        for item in response_data.data:
-            blueprint_item = GetCharactersCharacterIdBlueprintsItem(**item)
-            if blueprint_item.type_id not in data_dict:
-                data_dict[blueprint_item.type_id] = []
-            data_dict[blueprint_item.type_id].append(blueprint_item)
-        model_dict: dict[str, Any] = {
-            "operation_id": operation_id,
-            "response_date": response_data.response_date,
-            "received_at": response_data.received_at,
-            "character_id": int(response_data.request.path_parameters["character_id"]),
-            "blueprints": data_dict,
-        }
-        return cls.model_validate(model_dict)
