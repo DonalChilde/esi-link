@@ -12,7 +12,7 @@ The data may be organized in collections in a different form than the raw ESI re
 for ease of use in calculations. For example, market orders may be collected by type ID
 and buy/sell status, rather than being a flat list of orders as returned by ESI.
 
-This is a limited set of models defined for convienience in the Argus modules,
+This is a limited set of models defined for convenience in the Argus modules,
 and is not intended to be a comprehensive set of models for all ESI responses. For a
 more comprehensive information on the response data from the EVE Esi, see the schema docs.
 """

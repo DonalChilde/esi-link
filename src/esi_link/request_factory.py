@@ -8,10 +8,13 @@ from esi_link.models_and_protocols import (
     ResponseGroupHandlerConfig,
     ResponseHandlerConfig,
 )
+from esi_link.type_defs import Lang
 
 
-def esi_status(handlers: list[ResponseHandlerConfig] | None = None) -> Request:
-    """Example ESI request for the /status endpoint."""
+def esi_status(
+    handlers: list[ResponseHandlerConfig] | None = None, lang: Lang = "en"
+) -> Request:
+    """Request factory for the GetStatus operation."""
     handlers = handlers or []
     return Request(
         request_id=uuid4(),
@@ -19,14 +22,16 @@ def esi_status(handlers: list[ResponseHandlerConfig] | None = None) -> Request:
         path_parameters={},
         query_parameters={},
         auth_character_id=None,
-        lang="en",
+        lang=lang,
         json_body=None,
         response_handlers=handlers,
     )
 
 
-def esi_changelog(handlers: list[ResponseHandlerConfig] | None = None) -> Request:
-    """Example ESI request for the /meta/changelog endpoint."""
+def esi_changelog(
+    handlers: list[ResponseHandlerConfig] | None = None, lang: Lang = "en"
+) -> Request:
+    """Request factory for the GetMetaChangelog operation."""
     handlers = handlers or []
     return Request(
         request_id=uuid4(),
@@ -34,16 +39,18 @@ def esi_changelog(handlers: list[ResponseHandlerConfig] | None = None) -> Reques
         path_parameters={},
         query_parameters={},
         auth_character_id=None,
-        lang="en",
+        lang=lang,
         json_body=None,
         response_handlers=handlers,
     )
 
 
 def market_types_with_active_orders(
-    region_id: int = 10000002, handlers: list[ResponseHandlerConfig] | None = None
+    region_id: int = 10000002,
+    handlers: list[ResponseHandlerConfig] | None = None,
+    lang: Lang = "en",
 ) -> Request:
-    """Example ESI request for the /markets/{region_id}/types/ endpoint with a query parameter."""
+    """Request factory for the GetMarketsRegionIdTypes operation."""
     handlers = handlers or []
     return Request(
         request_id=uuid4(),
@@ -51,16 +58,18 @@ def market_types_with_active_orders(
         path_parameters={"region_id": region_id},
         query_parameters={"page": 1},
         auth_character_id=None,
-        lang="en",
+        lang=lang,
         json_body=None,
         response_handlers=handlers,
     )
 
 
 def character_stats(
-    character_id: int, handlers: list[ResponseHandlerConfig] | None = None
+    character_id: int,
+    handlers: list[ResponseHandlerConfig] | None = None,
+    lang: Lang = "en",
 ) -> Request:
-    """Example ESI request for the GetCharactersCharacterIdAttributes operation."""
+    """Request factory for the GetCharactersCharacterIdAttributes operation."""
     handlers = handlers or []
     return Request(
         request_id=uuid4(),
@@ -68,7 +77,7 @@ def character_stats(
         path_parameters={"character_id": character_id},
         query_parameters={},
         auth_character_id=character_id,
-        lang="en",
+        lang=lang,
         json_body=None,
         response_handlers=handlers,
     )
@@ -79,8 +88,9 @@ def market_history_group(
     type_ids: list[int],
     response_handlers: list[ResponseHandlerConfig] | None = None,
     group_handlers: list[ResponseGroupHandlerConfig] | None = None,
+    lang: Lang = "en",
 ) -> RequestGroup:
-    """Example ESI request for the /markets/{region_id}/history/ endpoint with query parameters."""
+    """Request factory for the GetMarketsRegionIdHistory operation with query parameters."""
     response_handlers = response_handlers or []
     group_handlers = group_handlers or []
     requests: dict[UUID, Request] = {}
@@ -92,7 +102,7 @@ def market_history_group(
             path_parameters={"region_id": region_id},
             query_parameters={"type_id": type_id},
             auth_character_id=None,
-            lang="en",
+            lang=lang,
             json_body=None,
             response_handlers=response_handlers,
         )
@@ -108,9 +118,11 @@ def market_history_group(
 
 
 def character_blueprints(
-    character_id: int, handlers: list[ResponseHandlerConfig] | None = None
+    character_id: int,
+    handlers: list[ResponseHandlerConfig] | None = None,
+    lang: Lang = "en",
 ) -> Request:
-    """Example ESI request for the GetCharactersCharacterIdBlueprints operation."""
+    """Request factory for the GetCharactersCharacterIdBlueprints operation."""
     handlers = handlers or []
     return Request(
         request_id=uuid4(),
@@ -118,16 +130,18 @@ def character_blueprints(
         path_parameters={"character_id": character_id},
         query_parameters={"page": 1},
         auth_character_id=character_id,
-        lang="en",
+        lang=lang,
         json_body=None,
         response_handlers=handlers,
     )
 
 
 def character_information(
-    character_id: int, handlers: list[ResponseHandlerConfig] | None = None
+    character_id: int,
+    handlers: list[ResponseHandlerConfig] | None = None,
+    lang: Lang = "en",
 ) -> Request:
-    """Example ESI request for the GetCharactersCharacterId operation."""
+    """Request factory for the GetCharactersCharacterId operation."""
     handlers = handlers or []
     return Request(
         request_id=uuid4(),
@@ -135,7 +149,7 @@ def character_information(
         path_parameters={"character_id": character_id},
         query_parameters={},
         auth_character_id=None,
-        lang="en",
+        lang=lang,
         json_body=None,
         response_handlers=handlers,
     )
@@ -145,8 +159,9 @@ def corporation_blueprints(
     corporation_id: int,
     character_id: int,
     handlers: list[ResponseHandlerConfig] | None = None,
+    lang: Lang = "en",
 ) -> Request:
-    """Example ESI request for the GetCorporationsCorporationIdBlueprints operation."""
+    """Request factory for the GetCorporationsCorporationIdBlueprints operation."""
     handlers = handlers or []
     return Request(
         request_id=uuid4(),
@@ -154,7 +169,46 @@ def corporation_blueprints(
         path_parameters={"corporation_id": corporation_id},
         query_parameters={"page": 1},
         auth_character_id=character_id,
-        lang="en",
+        lang=lang,
+        json_body=None,
+        response_handlers=handlers,
+    )
+
+
+def corporation_jobs(
+    corporation_id: int,
+    character_id: int,
+    handlers: list[ResponseHandlerConfig] | None = None,
+    lang: Lang = "en",
+) -> Request:
+    """Request factory for the GetCorporationsCorporationIdIndustryJobs operation."""
+    handlers = handlers or []
+    return Request(
+        request_id=uuid4(),
+        operation_id="GetCorporationsCorporationIdIndustryJobs",
+        path_parameters={"corporation_id": corporation_id},
+        query_parameters={"page": 1},
+        auth_character_id=character_id,
+        lang=lang,
+        json_body=None,
+        response_handlers=handlers,
+    )
+
+
+def character_jobs(
+    character_id: int,
+    handlers: list[ResponseHandlerConfig] | None = None,
+    lang: Lang = "en",
+) -> Request:
+    """Request factory for the GetCharactersCharacterIdIndustryJobs operation."""
+    handlers = handlers or []
+    return Request(
+        request_id=uuid4(),
+        operation_id="GetCharactersCharacterIdIndustryJobs",
+        path_parameters={"character_id": character_id},
+        query_parameters={},
+        auth_character_id=character_id,
+        lang=lang,
         json_body=None,
         response_handlers=handlers,
     )
