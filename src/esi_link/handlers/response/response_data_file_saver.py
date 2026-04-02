@@ -2,10 +2,10 @@
 
 import json
 
-from esi_link.handlers.response.helpers import make_response_data
 from esi_link.handlers.response.standard_file_saver import (
     StandardFileSaverResponseHandler,
 )
+from esi_link.helpers.make_response_data import make_response_data
 from esi_link.models_and_protocols import Response
 
 
