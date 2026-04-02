@@ -131,6 +131,8 @@ class RequestValidator(RequestValidatorProtocol):
             await validate_request_auth(request, operation, self.auth_provider)
             for handler_config in request.response_handlers:
                 self.response_handler_manager.validate_handler_config(handler_config)
+        except RequestValidationError:
+            raise
         except Exception as e:
             logger.error(
                 f"ESI request validation failed: {e}, schema version: {self.schema.version}, request: {request.model_dump_json()}"

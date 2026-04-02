@@ -17,6 +17,7 @@ and is not intended to be a comprehensive set of models for all ESI responses. F
 more comprehensive information on the response data from the EVE Esi, see the schema docs.
 """
 
+import logging
 from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Any, Literal, Self, TypedDict
@@ -24,6 +25,8 @@ from typing import Any, Literal, Self, TypedDict
 from pydantic import BaseModel
 
 from esi_link.models_and_protocols import ResponseData
+
+logger = logging.getLogger(__name__)
 
 
 class EsiDataModel(BaseModel):
@@ -493,6 +496,7 @@ class GetMarketsRegionIdOrders(EsiDataModel):
     @classmethod
     def from_response_data(cls, response_data: ResponseData) -> Self:
         """Create a GetMarketsRegionIdOrders instance from ESI response data."""
+        logger.info("Creating GetMarketsRegionIdOrders instance from response data")
         operation_id = "GetMarketsRegionIdOrders"
         if response_data.request.operation_id != operation_id:
             raise ValueError(
@@ -514,6 +518,11 @@ class GetMarketsRegionIdOrders(EsiDataModel):
                 orders_by_type[type_id].buy_orders.append(order_item)
             else:
                 orders_by_type[type_id].sell_orders.append(order_item)
+        # sort the keys in orders_by_type
+        orders_by_type = dict(sorted(orders_by_type.items()))
+        logger.info(
+            f"Successfully created GetMarketsRegionIdOrders instance for region {region_id}, processed {len(response_data.data)} orders into {len(orders_by_type)} types."
+        )
         return cls.model_validate(
             {
                 "operation_id": operation_id,
@@ -523,3 +532,55 @@ class GetMarketsRegionIdOrders(EsiDataModel):
                 "orders": orders_by_type,
             }
         )
+
+
+# ------------------------------------------------------------------------------
+# Derived Models
+# ------------------------------------------------------------------------------
+@dataclass(slots=True)
+class OrderSummaryItem:
+    """Represents a summary of market orders."""
+
+    type_id: int
+    """The type ID of the item."""
+    is_buy_summary: bool
+    """Whether the summary is for buy orders."""
+    five_price: float
+    """The price at which five percent of the available items can be transacted."""
+    five_orders: int
+    """The number of orders available at the five percent price."""
+    five_items: int
+    """The number of items available at the five percent price."""
+    lowest: float
+    """The lowest price."""
+    highest: float
+    """The highest price."""
+    total_items: int
+    """The total number of items available."""
+    total_orders: int
+    """The total number of orders."""
+    avg_price: float
+    """The average price of the available items."""
+    filtered_items: int
+    """The number of items that did not meet the threshold."""
+    filtered_orders: int
+    """The number of orders that did not meet the threshold."""
+
+
+@dataclass(slots=True)
+class OrderSummary:
+    """Represents a summary of market orders for a specific region and type."""
+
+    region_id: int
+    solar_system_id: int | None
+    type_id: int
+    buy_summary: OrderSummaryItem
+    sell_summary: OrderSummaryItem
+
+
+class OrderSummaries(BaseModel):
+    received_at: int
+    region_id: int
+    solar_system_id: int | None
+    filter_factor: float
+    summaries: dict[int, OrderSummary]

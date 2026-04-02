@@ -20,8 +20,8 @@ from esi_link.type_defs import Lang
 def _get_current_instant() -> Instant:
     """Factory function to get current instant for default values.
 
-    This function is used as a default_factory to avoid circular dependencies
-    that can occur when using Instant.now directly in field definitions.
+    This function is used as a default_factory to avoid Pydantic issue with using a
+    non-callable default for a non-serializable type.
 
     Returns:
         Current instant in time.
@@ -167,7 +167,7 @@ class RuntimeRequest(BaseModel):
 class RequestGroup(BaseModel):
     """Represents a batch of ESI requests to be executed.
 
-    This model exists mostly for serialization puposes, with the imagined use being
+    This model exists mostly for serialization purposes, with the imagined use being
     a set of requests that are loaded from disk and run repeatedly over time. For instance,
     downloading a fresh set of pricing data every day.
     """
@@ -187,6 +187,7 @@ class X_ratelimit:
     used: str
 
 
+# TODO consider forcing headers to lower case on ingestion.
 class HttpResponse(BaseModel):
     """Represents the data of an ESI response."""
 
@@ -285,7 +286,7 @@ class HttpResponse(BaseModel):
     @property
     def pages(self) -> int:
         """Extract the number of pages from the X-Pages header, if present."""
-        pages = self.headers.get("X-Pages", 1) or self.headers.get("x-pages", 1)
+        pages = self.headers.get("X-Pages") or self.headers.get("x-pages", 1)
         return int(pages)
 
     @property

@@ -1,6 +1,7 @@
 """Module for executing groups of ESI requests."""
 
 import asyncio
+import logging
 from collections.abc import Awaitable, Callable
 from time import perf_counter
 
@@ -20,6 +21,7 @@ from esi_link.models_and_protocols import (
     RuntimeRequestInfoGeneratorProtocol,
 )
 
+logger = logging.getLogger(__name__)
 RequestExecutionStrategy = Callable[
     [list[RuntimeRequest], HttpRequestExecutorProtocol], Awaitable[list[Response]]
 ]
@@ -72,6 +74,9 @@ class GroupExecutor(RequestGroupExecutorProtocol):
         for handler in runtime_group_info.response_group_handlers:
             await handler(response_group)
         group_metrics.group_handlers_completed = Instant.now()
+        logger.info(
+            f"Completed handling of response group for {len(handled_responses)} requests."
+        )
         group_metrics.group_execution_completed = Instant.now()
         return response_group
 
@@ -83,13 +88,16 @@ async def execute_all_requests_then_handle_responses(
     async with aiohttp.ClientSession() as session:
         tasks = [executor(runtime_request, session) for runtime_request in requests]
         responses = await asyncio.gather(*tasks)
+        logger.info(f"Completed execution of {len(responses)} requests.")
     for response in responses:
         metrics = response.runtime_info.metrics
         metrics.handlers_started = perf_counter()
         for handler in response.runtime_info.response_handlers:
             await handler(response)
+
         metrics.handlers_completed = perf_counter()
         metrics.task_completed = Instant.now()
+    logger.info(f"Completed handling of responses for {len(responses)} requests.")
     return responses
 
 
@@ -110,4 +118,5 @@ async def execute_requests_and_handle_responses_together(
 
         tasks = [execute_and_handle(runtime_request) for runtime_request in requests]
         responses = await asyncio.gather(*tasks)
+    logger.info(f"Completed execution and handling of {len(responses)} requests.")
     return responses

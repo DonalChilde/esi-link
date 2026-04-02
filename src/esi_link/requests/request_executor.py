@@ -87,6 +87,9 @@ async def execute_http_request(
             params=query_params,
             json=request.request.json_body,
         ) as resp:
+            logger.info(
+                f"Made HTTP request to {resp.real_url} with method {request.runtime_info.method} and received status code {resp.status}"
+            )
             content = ""
             try:
                 content = await resp.text()
@@ -163,17 +166,26 @@ async def check_for_pages(
     paged_responses = await asyncio.gather(
         *[execute_http_request(req, session, rate_limiter) for req in requests]
     )
+    logger.info(
+        f"Completed {len(paged_responses)} paged requests for original request {response.request.request_id} to url {response.http_response.url}"
+    )
     metrics.paged_requests_completed = perf_counter()
 
     check_for_valid_paged_responses(response, paged_responses)
     response = combine_responses(response, paged_responses)
+    logger.info(
+        f"Combined paged responses for original request {response.request.request_id} into a single response with url {response.http_response.url}"
+    )
     return response
 
 
 def combine_responses(
     first_page: Response, paged_responses: list[Response]
 ) -> Response:
-    """Combine the body text from the original response and the paged responses into a single response."""
+    """Combine the body text from the original response and the paged responses into a single response.
+
+    Mutates first_page to have the combined body text, and returns it for convenience.
+    """
     if first_page.http_response is None:
         raise ValueError(
             "Cannot combine paged responses for a response with no HTTP response"
@@ -208,6 +220,9 @@ def assemble_paged_runtime_requests(response: Response) -> list[RuntimeRequest]:
             None  # paged requests are not cached individually
         )
         paged_runtime_requests.append(new_request)
+    logger.info(
+        f"Assembled {len(paged_runtime_requests)} paged requests for original request {response.request.request_id} to url {response.http_response.url}"
+    )
     return paged_runtime_requests
 
 
@@ -217,7 +232,10 @@ def handle_304_not_modified(
     cache_status: CachedResponseStatus,
 ) -> Response:
     """Handle a 304 Not Modified response by returning the cached response."""
-    assert response.http_response is not None  # for mypy
+    if response.http_response is None:
+        raise ValueError(
+            "Cannot handle 304 Not Modified for a response with no HTTP response"
+        )
     if (
         response.http_response.status_code == 304
         and cache_status == CachedResponseStatus.STALE
@@ -251,7 +269,9 @@ def pre_check_cache(
         metrics.cache_action = CacheAction.CACHED_RESPONSE_USED
         metrics.cache_action_started = metrics.cache_check_started
         metrics.cache_action_completed = metrics.cache_check_completed
-        logger.info(f"Cache hit for request {request.request.request_id}")
+        logger.info(
+            f"Cache hit for request {request.request.request_id} to path_url {request.runtime_info.path_url}"
+        )
         return Response(
             request=request.request,
             runtime_info=request.runtime_info,
@@ -261,12 +281,16 @@ def pre_check_cache(
         ), status
     if status == CachedResponseStatus.STALE and cached_response is not None:
         metrics.cache_response_status = CachedResponseStatus.STALE
-        logger.info(f"Stale cache hit for request {request.request.request_id}")
+        logger.info(
+            f"Stale cache hit for request {request.request.request_id} to path_url {request.runtime_info.path_url}"
+        )
         set_stale_cache_headers(request, cached_response)
         return None, status
     if status == CachedResponseStatus.MISS and cached_response is None:
         metrics.cache_response_status = CachedResponseStatus.MISS
-        logger.info(f"Cache miss for request {request.request.request_id}")
+        logger.info(
+            f"Cache miss for request {request.request.request_id} to path_url {request.runtime_info.path_url}"
+        )
         return None, status
     raise ValueError(
         f"Invalid cache response and status combination: {status} with cached_response {cached_response}"
@@ -281,8 +305,12 @@ def set_stale_cache_headers(
     last_modified = cached_response.http_response.last_modified
     if etag is not None:
         request.runtime_info.headers["If-None-Match"] = etag
-    if last_modified is not None:
+    elif last_modified is not None:
         request.runtime_info.headers["If-Modified-Since"] = last_modified
+    else:
+        raise ValueError(
+            "Cannot set stale cache headers: cached response has no ETag or Last-Modified header"
+        )
 
 
 def combine_paged_response_strings(first_page: str, paged_strings: list[str]) -> str:
@@ -348,6 +376,9 @@ def check_for_valid_paged_responses(
             the original response.
     """
     if response.http_response is None:
+        logger.error(
+            f"Cannot check paged responses for a response with no HTTP response, request ID: {response.request.request_id}"
+        )
         raise ValueError(
             "Cannot check paged responses for a response with no HTTP response"
         )
@@ -356,6 +387,9 @@ def check_for_valid_paged_responses(
             "page", "unknown"
         )
         if paged_response.http_response is None:
+            logger.error(
+                f"Received invalid paged response with no HTTP response for request {response.request.request_id} page {page_num}"
+            )
             raise ValueError(
                 f"Invalid paged response: page {page_num} has no HTTP response"
             )
@@ -372,6 +406,13 @@ def check_for_valid_paged_responses(
             paged_response.http_response.last_modified
             != response.http_response.last_modified
         ):
+            logger.error(
+                f"Received paged response with different Last-Modified header for request {response.request.request_id} page {page_num}. "
+                f"Original Last-Modified: {response.http_response.last_modified}, "
+                f"Paged Last-Modified: {paged_response.http_response.last_modified}"
+            )
             raise ValueError(
-                f"Invalid paged response: page {page_num} has a different Last-Modified header than the original response"
+                f"Invalid paged response: page {page_num} has a different Last-Modified "
+                "header than the original response. This may indicate that the data changed "
+                "between requests, and the paged responses may not be valid. Try again."
             )

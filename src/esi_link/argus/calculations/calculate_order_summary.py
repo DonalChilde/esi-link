@@ -2,25 +2,48 @@
 
 from collections.abc import Sequence
 
-from esi_link.argus.calculations.models import (
+from esi_link.argus.models import (
+    CollectedMarketOrders,
+    GetMarketsRegionIdOrders,
+    GetMarketsRegionIdOrdersItem,
+    OrderSummaries,
     OrderSummary,
     OrderSummaryItem,
 )
-from esi_link.argus.models import (
-    CollectedMarketOrders,
-    GetMarketsRegionIdOrdersItem,
-)
+
+
+def calculate_summaries(
+    region_orders: GetMarketsRegionIdOrders,
+    solar_system_id: int | None = None,
+    filter_factor: float = 100.0,
+) -> OrderSummaries:
+    """Calculate summaries for buy and sell orders in a GetMarketsRegionIdOrders response."""
+    summaries = OrderSummaries(
+        received_at=region_orders.received_at,
+        region_id=region_orders.region_id,
+        solar_system_id=solar_system_id,
+        filter_factor=filter_factor,
+        summaries={},
+    )
+    for collected_orders in region_orders.orders.values():
+        summary = calculate_order_summary(
+            collected_orders=collected_orders,
+            solar_system_id=solar_system_id,
+            filter_factor=filter_factor,
+        )
+        summaries.summaries[collected_orders.type_id] = summary
+    return summaries
 
 
 def calculate_order_summary(
-    orders: CollectedMarketOrders,
+    collected_orders: CollectedMarketOrders,
     solar_system_id: int | None = None,
     filter_factor: float = 100.0,
 ) -> OrderSummary:
     """Calculate a summary of market orders for a specific region and type.
 
     Args:
-        orders: A CollectedMarketOrders object containing buy and sell orders for a specific region and type.
+        collected_orders: A CollectedMarketOrders object containing buy and sell orders for a specific region and type.
         solar_system_id: Optional solar system ID to include in the summary. Defaults to None.
         filter_factor: Factor used to filter outlier orders. For buy orders, only
             orders with price >= (highest_price / filter_factor) are included.
@@ -32,11 +55,15 @@ def calculate_order_summary(
     """
     # if a solarsystem_id is provided, filter orders to only include those in that solar system
     if solar_system_id is not None:
-        buy_orders = [o for o in orders.buy_orders if o.system_id == solar_system_id]
-        sell_orders = [o for o in orders.sell_orders if o.system_id == solar_system_id]
+        buy_orders = [
+            o for o in collected_orders.buy_orders if o.system_id == solar_system_id
+        ]
+        sell_orders = [
+            o for o in collected_orders.sell_orders if o.system_id == solar_system_id
+        ]
     else:
-        buy_orders = orders.buy_orders
-        sell_orders = orders.sell_orders
+        buy_orders = collected_orders.buy_orders
+        sell_orders = collected_orders.sell_orders
     buy_summary = calculate_order_summary_detail(
         buy_orders, is_buy_summary=True, filter_factor=filter_factor
     )
@@ -44,9 +71,9 @@ def calculate_order_summary(
         sell_orders, is_buy_summary=False, filter_factor=filter_factor
     )
     return OrderSummary(
-        region_id=orders.region_id,
+        region_id=collected_orders.region_id,
         solar_system_id=solar_system_id,
-        type_id=orders.type_id,
+        type_id=collected_orders.type_id,
         buy_summary=buy_summary,
         sell_summary=sell_summary,
     )
@@ -63,7 +90,7 @@ def calculate_order_summary_detail(
     location if desired.
 
     Args:
-        orders: A sequence of MarketOrderDetail objects to summarize. Should be
+        orders: A sequence of GetMarketsRegionIdOrdersItem objects to summarize. Should be
             pre-filtered by type_id and is_buy_order, and optionally by location.
         is_buy_summary: If True, summarize buy orders.
             If False, summarize sell orders.

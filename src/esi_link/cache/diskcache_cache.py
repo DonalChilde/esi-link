@@ -1,5 +1,6 @@
 """A disk-based cache implementation for ESI responses using the diskcache library."""
 
+import logging
 from pathlib import Path
 from types import TracebackType
 from typing import Any, Self
@@ -15,6 +16,8 @@ from esi_link.models_and_protocols import (
     CacheManagerProtocol,
     HttpResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class DiskCache(CacheManagerProtocol):
@@ -57,12 +60,19 @@ class DiskCache(CacheManagerProtocol):
             local_max_age = self.local_max_age_seconds
         response = self.cache.get(str(key))  # type: ignore
         if response is None:
+            logger.info(f"Cache miss for key {key}")
             return None, CachedResponseStatus.MISS
-        assert isinstance(response, CachedResponse), (
-            "Cached value is not of type CachedResponse"
-        )
+        if not isinstance(response, CachedResponse):
+            logger.error(
+                f"Cached value for key {key} is not of type CachedResponse, got {type(response)}"  # type: ignore
+            )
+            raise ValueError(
+                f"Cached value for key {key} is not of type CachedResponse, got {type(response)}"  # type: ignore
+            )
         if is_stale(response, local_max_age_seconds=local_max_age):
+            logger.info(f"Cache stale for key {key}")
             return response, CachedResponseStatus.STALE
+        logger.info(f"Cache hit for key {key}")
         return response, CachedResponseStatus.HIT
 
     def set(self, key: UUID, http_response: HttpResponse) -> CachedResponse:
@@ -74,12 +84,16 @@ class DiskCache(CacheManagerProtocol):
             expires_at=http_response.expires_at,
         )
         self.cache.set(str(key), cached_response)  # type: ignore
+        logger.info(
+            f"Cached response for key {key} with expiration at {cached_response.expires_at}"
+        )
         return cached_response
 
     def refresh(self, key: UUID, new_http_response: HttpResponse) -> CachedResponse:
         """Refresh a value in the disk cache."""
         cached_response, _ = self.get(key)
         if cached_response is None:
+            logger.info(f"No cached response found for key {key} to refresh.")
             raise KeyError(f"No cached response found for key {key} to refresh.")
         data = cached_response.http_response.body_text
         updated_http_response = HttpResponse(
@@ -88,6 +102,9 @@ class DiskCache(CacheManagerProtocol):
             headers=new_http_response.headers,
             body_text=data,
             received_at=new_http_response.received_at,
+        )
+        logger.info(
+            f"Refreshing cache for key {key} with new HTTP response received at {new_http_response.received_at}"
         )
         return self.set(key, updated_http_response)
 

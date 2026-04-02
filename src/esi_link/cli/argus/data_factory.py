@@ -1,6 +1,7 @@
 """Data factory functions for Argus commands."""
 
 import asyncio
+import logging
 from uuid import uuid4
 
 import typer
@@ -12,6 +13,8 @@ from esi_link.argus import models as argus_models
 from esi_link.helpers.make_response_data import make_response_data
 from esi_link.models_and_protocols import RequestGroup
 from esi_link.type_defs import Lang
+
+logger = logging.getLogger(__name__)
 
 
 def get_character_blueprints(
@@ -256,6 +259,9 @@ def get_market_orders_for_region(
         response_data = make_response_data(response)
         market_orders = argus_models.GetMarketsRegionIdOrders.from_response_data(
             response_data=response_data
+        )
+        logger.info(
+            f"Successfully fetched market orders for region {region_id}, received {len(market_orders.orders)} orders."
         )
         return market_orders
     except ValueError as e:
