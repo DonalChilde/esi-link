@@ -17,6 +17,7 @@ and is not intended to be a comprehensive set of models for all ESI responses. F
 more comprehensive information on the response data from the EVE Esi, see the schema docs.
 """
 
+from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Any, Literal, Self, TypedDict
 
@@ -28,8 +29,16 @@ from esi_link.models_and_protocols import ResponseData
 class EsiDataModel(BaseModel):
     """Base class for ESI data models."""
 
+    operation_id: str
+    """The ESI operation ID that this model represents."""
     response_date: str
     """The date and time when the data was downloaded from ESI."""
+
+    @classmethod
+    @abstractmethod
+    def from_response_data(cls, response_data: ResponseData) -> Self:
+        """Create an instance of the model from ESI response data."""
+        raise NotImplementedError("Subclasses must implement from_response_data method")
 
 
 @dataclass(slots=True)
@@ -59,7 +68,11 @@ class GetMarketPrices(EsiDataModel):
             price_item = GetMarketPricesItem(**item)
             prices_dict[price_item.type_id] = price_item
         return cls.model_validate(
-            {"response_date": response_data.response_date, "prices": prices_dict}
+            {
+                "operation_id": operation_id,
+                "response_date": response_data.response_date,
+                "prices": prices_dict,
+            }
         )
 
 
@@ -100,6 +113,7 @@ class GetMarketsRegionIdHistory(EsiDataModel):
             history_dict[history_item.date] = history_item
         return cls.model_validate(
             {
+                "operation_id": operation_id,
                 "response_date": response_data.response_date,
                 "region_id": region_id,
                 "type_id": type_id,
@@ -168,6 +182,7 @@ class GetMarketsRegionIdOrders(EsiDataModel):
                 orders_by_type[type_id].sell_orders.append(order_item)
         return cls.model_validate(
             {
+                "operation_id": operation_id,
                 "response_date": response_data.response_date,
                 "region_id": region_id,
                 "orders": orders_by_type,
@@ -216,7 +231,11 @@ class GetIndustrySystems(EsiDataModel):
             system_item = GetIndustrySystemsItem(**item)
             data_dict[system_item.solar_system_id] = system_item
         return cls.model_validate(
-            {"response_date": response_data.response_date, "systems": data_dict}
+            {
+                "operation_id": operation_id,
+                "response_date": response_data.response_date,
+                "systems": data_dict,
+            }
         )
 
 
@@ -251,6 +270,7 @@ class GetCorporationsCorporationIdBlueprints(EsiDataModel):
                 data_dict[blueprint_item.type_id] = []
             data_dict[blueprint_item.type_id].append(blueprint_item)
         model_dict: dict[str, Any] = {
+            "operation_id": operation_id,
             "response_date": response_data.response_date,
             "corporation_id": int(
                 response_data.request.path_parameters["corporation_id"]
@@ -291,6 +311,7 @@ class GetCharactersCharacterIdBlueprints(EsiDataModel):
                 data_dict[blueprint_item.type_id] = []
             data_dict[blueprint_item.type_id].append(blueprint_item)
         model_dict: dict[str, Any] = {
+            "operation_id": operation_id,
             "response_date": response_data.response_date,
             "character_id": int(response_data.request.path_parameters["character_id"]),
             "blueprints": data_dict,

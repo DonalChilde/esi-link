@@ -8,7 +8,7 @@ and trading metrics.
 from datetime import date, timedelta
 
 from esi_link.argus.calculations.models import HistorySummaryItem
-from esi_link.response.models import (
+from esi_link.argus.models import (
     GetMarketsRegionIdHistory,
 )
 

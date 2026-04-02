@@ -6,7 +6,7 @@ from esi_link.argus.calculations.models import (
     OrderSummary,
     OrderSummaryItem,
 )
-from esi_link.response.models import (
+from esi_link.argus.models import (
     CollectedMarketOrders,
     GetMarketsRegionIdOrdersItem,
 )

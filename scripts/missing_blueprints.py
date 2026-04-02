@@ -8,13 +8,13 @@ from eve_static_data import ESDLoader
 
 from esi_link import EsiLink, request_factory
 from esi_link.argus.calculations.sde_lookups import blueprints_in_market
-from esi_link.handlers.response.helpers import make_response_data
-from esi_link.helpers.dict_writer import write_dicts_to_csv
-from esi_link.models_and_protocols import RequestGroup, ResponseGroup
-from esi_link.response.models import (
+from esi_link.argus.models import (
     GetCharactersCharacterIdBlueprints,
     GetCorporationsCorporationIdBlueprints,
 )
+from esi_link.handlers.response.helpers import make_response_data
+from esi_link.helpers.dict_writer import write_dicts_to_csv
+from esi_link.models_and_protocols import RequestGroup, ResponseGroup
 from esi_link.schema.schema_manager import SchemaManager
 from esi_link.settings import get_settings
 
