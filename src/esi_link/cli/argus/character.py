@@ -1,0 +1,241 @@
+"""Commands for working with Esi character data."""
+
+from pathlib import Path
+from time import perf_counter
+from typing import Annotated
+
+import typer
+from rich.console import Console
+from whenever import Instant
+
+from esi_link.cli.argus.data_factory import (
+    get_character_blueprints,
+    get_character_information,
+    get_character_jobs,
+)
+from esi_link.cli.helpers import (
+    get_executor_from_settings_and_schema,
+    get_settings_from_context,
+)
+from esi_link.helpers.file_safe_string import file_safe_string
+from esi_link.helpers.save_text_file import save_text_file
+from esi_link.schema.schema_manager import SchemaManager
+from esi_link.type_defs import LangEnum
+
+app = typer.Typer(
+    no_args_is_help=True, help="Commands for working with Esi character data."
+)
+
+
+@app.command()
+def blueprints(
+    ctx: typer.Context,
+    character_id: Annotated[
+        int, typer.Argument(help="The character ID to fetch blueprints for.")
+    ],
+    output_dir: Annotated[
+        Path, typer.Argument(help="The directory to save the blueprints data to.")
+    ],
+    terminal: Annotated[
+        bool,
+        typer.Option(
+            "--terminal",
+            help="Whether to print the blueprints data to the terminal. Defaults to False.",
+        ),
+    ] = False,
+    overwrite: Annotated[
+        bool,
+        typer.Option(
+            "--overwrite",
+            help="Whether to overwrite the output file if it already exists. Defaults to False.",
+        ),
+    ] = False,
+    lang: Annotated[
+        LangEnum,
+        typer.Option(
+            "-l", "--lang", help="Language for the ESI response. Defaults to 'en'."
+        ),
+    ] = LangEnum.EN,
+):
+    """Fetch blueprints for a character."""
+    start = perf_counter()
+    settings = get_settings_from_context(ctx)
+    console = Console()
+    console.print(f"Fetching blueprints for character {character_id}...")
+    schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
+    stored_schema = schema_manager.get_latest_schema()
+    executor = get_executor_from_settings_and_schema(
+        settings=settings, schema=stored_schema.esi_schema
+    )
+    try:
+        argus_blueprints = get_character_blueprints(
+            executor=executor,
+            character_id=character_id,
+            console=console,
+            lang=lang.value,
+        )
+        date_str = Instant.from_timestamp_nanos(
+            argus_blueprints.received_at
+        ).format_iso()
+        file_stem = f"character_{character_id}_blueprints_{date_str}"
+        file_stem = file_safe_string(file_stem)
+        save_path = save_text_file(
+            text=argus_blueprints.model_dump_json(indent=2),
+            output_dir=output_dir,
+            file_name=f"{file_stem}.json",
+            overwrite=overwrite,
+        )
+    except Exception as e:
+        console.print(f"[red]Error fetching character blueprints: {e}[/red]")
+        raise typer.Exit(code=1) from e
+    end = perf_counter()
+    console.print(f"Blueprints saved to {save_path} in {end - start:.2f} seconds.")
+    if terminal:
+        console.print(argus_blueprints.model_dump_json(indent=2))
+
+
+@app.command()
+def information(
+    ctx: typer.Context,
+    character_id: Annotated[
+        int, typer.Argument(help="The character ID to fetch information for.")
+    ],
+    output_dir: Annotated[
+        Path,
+        typer.Argument(help="The directory to save the character information data to."),
+    ],
+    terminal: Annotated[
+        bool,
+        typer.Option(
+            "--terminal",
+            help="Whether to print the character information data to the terminal. Defaults to False.",
+        ),
+    ] = False,
+    overwrite: Annotated[
+        bool,
+        typer.Option(
+            "--overwrite",
+            help="Whether to overwrite the output file if it already exists. Defaults to False.",
+        ),
+    ] = False,
+    lang: Annotated[
+        LangEnum,
+        typer.Option(
+            "-l", "--lang", help="Language for the ESI response. Defaults to 'en'."
+        ),
+    ] = LangEnum.EN,
+):
+    """Fetch information for a character."""
+    start = perf_counter()
+    settings = get_settings_from_context(ctx)
+    console = Console()
+    console.print(f"Fetching information for character {character_id}...")
+    schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
+    stored_schema = schema_manager.get_latest_schema()
+    executor = get_executor_from_settings_and_schema(
+        settings=settings, schema=stored_schema.esi_schema
+    )
+    try:
+        argus_character_info = get_character_information(
+            executor=executor,
+            character_id=character_id,
+            console=console,
+            lang=lang.value,
+        )
+        date_str = Instant.from_timestamp_nanos(
+            argus_character_info.received_at
+        ).format_iso()
+        file_stem = f"character_{character_id}_information_{date_str}"
+        file_stem = file_safe_string(file_stem)
+        save_path = save_text_file(
+            text=argus_character_info.model_dump_json(indent=2),
+            output_dir=output_dir,
+            file_name=f"{file_stem}.json",
+            overwrite=overwrite,
+        )
+    except Exception as e:
+        console.print(f"[red]Error fetching character information: {e}[/red]")
+        raise typer.Exit(code=1) from e
+    end = perf_counter()
+    console.print(
+        f"Character information saved to {save_path} in {end - start:.2f} seconds."
+    )
+    if terminal:
+        console.print(argus_character_info.model_dump_json(indent=2))
+
+
+def jobs(
+    ctx: typer.Context,
+    character_id: Annotated[
+        int, typer.Argument(help="The character ID to fetch industry jobs for.")
+    ],
+    output_dir: Annotated[
+        Path,
+        typer.Argument(
+            help="The directory to save the character industry jobs data to."
+        ),
+    ],
+    include_completed: Annotated[
+        bool,
+        typer.Option(
+            "--include-completed",
+            help="Whether to include completed industry jobs in the response. Defaults to False.",
+        ),
+    ] = False,
+    terminal: Annotated[
+        bool,
+        typer.Option(
+            "--terminal",
+            help="Whether to print the character industry jobs data to the terminal. Defaults to False.",
+        ),
+    ] = False,
+    overwrite: Annotated[
+        bool,
+        typer.Option(
+            "--overwrite",
+            help="Whether to overwrite the output file if it already exists. Defaults to False.",
+        ),
+    ] = False,
+    lang: Annotated[
+        LangEnum,
+        typer.Option(
+            "-l", "--lang", help="Language for the ESI response. Defaults to 'en'."
+        ),
+    ] = LangEnum.EN,
+):
+    """Fetch industry jobs for a character."""
+    start = perf_counter()
+    settings = get_settings_from_context(ctx)
+    console = Console()
+    console.print(f"Fetching industry jobs for character {character_id}...")
+    schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
+    stored_schema = schema_manager.get_latest_schema()
+    executor = get_executor_from_settings_and_schema(
+        settings=settings, schema=stored_schema.esi_schema
+    )
+    try:
+        argus_jobs = get_character_jobs(
+            executor=executor,
+            character_id=character_id,
+            include_completed=include_completed,
+            console=console,
+            lang=lang.value,
+        )
+        date_str = Instant.from_timestamp_nanos(argus_jobs.received_at).format_iso()
+        file_stem = f"character_{character_id}_industry_jobs_{date_str}"
+        file_stem = file_safe_string(file_stem)
+        save_path = save_text_file(
+            text=argus_jobs.model_dump_json(indent=2),
+            output_dir=output_dir,
+            file_name=f"{file_stem}.json",
+            overwrite=overwrite,
+        )
+    except Exception as e:
+        console.print(f"[red]Error fetching character industry jobs: {e}[/red]")
+        raise typer.Exit(code=1) from e
+    end = perf_counter()
+    console.print(
+        f"Character industry jobs saved to {save_path} in {end - start:.2f} seconds."
+    )
+    if terminal:
+        console.print(argus_jobs.model_dump_json(indent=2))

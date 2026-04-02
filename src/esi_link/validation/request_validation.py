@@ -171,8 +171,6 @@ def validate_request_query_params(request: Request, operation: SchemaOperation) 
     This includes checking for required parameters, validating parameter types, and
     ensuring that parameter values conform to any specified constraints (e.g., enums, min/max values).
     """
-    if not operation:
-        raise ValueError(f"Operation ID {request.operation_id} not found in schema")
     query_params = {
         param.get("name", "UNKNOWN"): param for param in operation.query_params
     }
@@ -182,7 +180,8 @@ def validate_request_query_params(request: Request, operation: SchemaOperation) 
         )
     for param_name, param_schema in query_params.items():
         if param_name not in request.query_parameters:
-            if param_schema.get("required", False):
+            required = param_schema.get("required", False)
+            if not required:
                 continue  # Optional parameters can be missing
             raise ValueError(f"Missing required query parameter: {param_name}")
     for param_name in request.query_parameters:

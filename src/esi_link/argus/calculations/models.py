@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 
+from pydantic import BaseModel
+
 
 @dataclass(slots=True)
 class OrderSummaryItem:
@@ -42,6 +44,13 @@ class OrderSummary:
     type_id: int
     buy_summary: OrderSummaryItem
     sell_summary: OrderSummaryItem
+
+
+class OrderSummaries(BaseModel):
+    received_at: int
+    region_id: int
+    solar_system_id: int | None
+    summaries: dict[int, OrderSummary]
 
 
 @dataclass(slots=True)

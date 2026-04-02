@@ -259,6 +259,60 @@ class GetCorporationsCorporationIdBlueprints(EsiDataModel):
         return cls.model_validate(model_dict)
 
 
+@dataclass(slots=True, kw_only=True)
+class GetCorporationsCorporationIdIndustryJobsItem:
+    activity_id: int
+    blueprint_id: int
+    blueprint_location_id: int
+    blueprint_type_id: int
+    completed_character_id: int | None = None
+    completed_date: str | None = None
+    cost: float | None = None
+    duration: int
+    end_date: str
+    facility_id: int
+    installer_id: int
+    job_id: int
+    licensed_runs: int | None = None
+    location_id: int
+    output_location_id: int
+    pause_date: str | None = None
+    probability: float | None = None
+    product_type_id: int | None = None
+    runs: int
+    start_date: str
+    status: str
+    successful_runs: int | None = None
+
+
+class GetCorporationsCorporationIdIndustryJobs(EsiDataModel):
+    corporation_id: int
+    jobs: list[GetCorporationsCorporationIdIndustryJobsItem]
+
+    @classmethod
+    def from_response_data(cls, response_data: ResponseData) -> Self:
+        """Create a GetCorporationsCorporationIdIndustryJobs instance from ESI response data."""
+        operation_id = "GetCorporationsCorporationIdIndustryJobs"
+        if response_data.request.operation_id != operation_id:
+            raise ValueError(
+                f"Expected operation_id {operation_id}, got {response_data.request.operation_id}"
+            )
+        data_list: list[GetCorporationsCorporationIdIndustryJobsItem] = []
+        for item in response_data.data:
+            job_item = GetCorporationsCorporationIdIndustryJobsItem(**item)
+            data_list.append(job_item)
+        model_dict: dict[str, Any] = {
+            "operation_id": operation_id,
+            "response_date": response_data.response_date,
+            "received_at": response_data.received_at,
+            "corporation_id": int(
+                response_data.request.path_parameters["corporation_id"]
+            ),
+            "jobs": data_list,
+        }
+        return cls.model_validate(model_dict)
+
+
 # ------------------------------------------------------------------------------
 # Industry Models
 # ------------------------------------------------------------------------------
@@ -320,30 +374,30 @@ class GetIndustrySystems(EsiDataModel):
 
 
 @dataclass(slots=True)
-class GetMarketPricesItem:
+class GetMarketsPricesItem:
     type_id: int
     """The item type ID of the market price."""
-    adjusted_price: float | None
+    adjusted_price: float | None = None
     """The adjusted price of the item, calculated as a volume-weighted average of recent market prices."""
-    average_price: float | None
+    average_price: float | None = None
     """The average price of the item, calculated as a simple average of recent market prices."""
 
 
-class GetMarketPrices(EsiDataModel):
-    prices: dict[int, GetMarketPricesItem]
+class GetMarketsPrices(EsiDataModel):
+    prices: dict[int, GetMarketsPricesItem]
     """A mapping of item type IDs to their corresponding market price information."""
 
     @classmethod
     def from_response_data(cls, response_data: ResponseData) -> Self:
-        """Create a GetMarketPrices instance from ESI response data."""
-        operation_id = "GetMarketPrices"
+        """Create a GetMarketsPrices instance from ESI response data."""
+        operation_id = "GetMarketsPrices"
         if response_data.request.operation_id != operation_id:
             raise ValueError(
                 f"Expected operation_id {operation_id}, got {response_data.request.operation_id}"
             )
-        prices_dict: dict[int, GetMarketPricesItem] = {}
+        prices_dict: dict[int, GetMarketsPricesItem] = {}
         for item in response_data.data:
-            price_item = GetMarketPricesItem(**item)
+            price_item = GetMarketsPricesItem(**item)
             prices_dict[price_item.type_id] = price_item
         return cls.model_validate(
             {

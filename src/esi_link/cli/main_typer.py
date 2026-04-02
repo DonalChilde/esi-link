@@ -5,6 +5,7 @@ import logging
 import typer
 
 from esi_link import __app_name__, __version__
+from esi_link.cli.argus import app as argus_app
 from esi_link.cli.cache import app as cache_app
 from esi_link.cli.config_info import app as config_info_app
 from esi_link.cli.esi_auth.main_typer import app as esi_auth_app
@@ -30,6 +31,9 @@ app.add_typer(
 )
 app.add_typer(
     requests_app, name="requests", help="Commands for managing ESI Link requests."
+)
+app.add_typer(
+    argus_app, name="argus", help="Commands for working with ESI Link Argus data."
 )
 
 

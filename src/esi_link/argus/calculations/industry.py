@@ -2,7 +2,7 @@
 
 from eve_static_data.models.pydantic.datasets import BlueprintsDataset
 
-from esi_link.argus.models import GetIndustrySystems, GetMarketPrices
+from esi_link.argus.models import GetIndustrySystems, GetMarketsPrices
 
 
 class BillOfMaterials:
@@ -20,7 +20,7 @@ class IndustryCalculator:
         self,
         blueprints: BlueprintsDataset,
         cost_indices: GetIndustrySystems,
-        universe_pricing: GetMarketPrices,
+        universe_pricing: GetMarketsPrices,
     ):
         self.blueprints = blueprints
         self.cost_indices = cost_indices

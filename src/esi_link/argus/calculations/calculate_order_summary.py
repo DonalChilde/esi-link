@@ -96,6 +96,7 @@ def calculate_order_summary_detail(
         from the best price until reaching 5% of the total volume, then determining
         the price and volume at that threshold.
     """
+    # sort orders by price (descending for buys, ascending for sells) to calculate five percent metrics
     if is_buy_summary:
         orders = sorted(orders, key=lambda o: o.price, reverse=True)
     else:
@@ -113,11 +114,6 @@ def calculate_order_summary_detail(
         if order.type_id != type_id_check:
             msg = "All orders must be of the same type_id."
             raise ValueError(msg)
-    # sort orders by price (descending for buys, ascending for sells) to calculate five percent metrics
-    if is_buy_summary:
-        orders = sorted(orders, key=lambda o: o.price, reverse=True)
-    else:
-        orders = sorted(orders, key=lambda o: o.price)
 
     # Filter out outlier orders based on filter_factor
     if is_buy_summary:

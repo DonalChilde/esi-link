@@ -4,13 +4,13 @@ from esi_link.models_and_protocols import Request
 
 class RequestValidationError(EsiLinkError):
     def __init__(self, msg: str, request: Request, *args: object) -> None:
-        super().__init__(*args)
+        super().__init__(msg, *args)
         self.msg = msg
         self.request = request
 
 
 class RequestGroupValidationError(EsiLinkError):
     def __init__(self, msg: str, request_group_id: str, *args: object) -> None:
-        super().__init__(*args)
+        super().__init__(msg, *args)
         self.msg = msg
         self.request_group_id = request_group_id
