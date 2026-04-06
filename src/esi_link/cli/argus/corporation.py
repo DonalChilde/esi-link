@@ -98,6 +98,53 @@ def blueprints(
 
 
 @app.command()
+def blueprint_report(
+    ctx: typer.Context,
+    corporation_id: Annotated[
+        int,
+        typer.Argument(help="The corporation ID to fetch the blueprint report for."),
+    ],
+    character_id: Annotated[
+        int, typer.Argument(help="The character ID to use for authentication.")
+    ],
+    output_dir: Annotated[
+        Path, typer.Argument(help="The directory to save the blueprint report to.")
+    ],
+    terminal: Annotated[
+        bool,
+        typer.Option(
+            "--terminal",
+            help="Whether to print the blueprint report to the terminal. Defaults to False.",
+        ),
+    ] = False,
+    overwrite: Annotated[
+        bool,
+        typer.Option(
+            "--overwrite",
+            help="Whether to overwrite the output file if it already exists. Defaults to False.",
+        ),
+    ] = False,
+    lang: Annotated[
+        LangEnum,
+        typer.Option(
+            "-l", "--lang", help="Language for the ESI response. Defaults to 'en'."
+        ),
+    ] = LangEnum.EN,
+):
+    """Fetch a blueprint report for a corporation."""
+    # TODO: implement this command
+    # Produce a report of the ownership status of all blueprints in the game.
+    # - Requires the sde blueprints dataset,the market paths dataset, and the normalized types dataset.
+    # - output includes each published blueprint, with its market path,name, the count of owned originals, owned copies, and the best me and te of each.
+    # - keep the output flattened, with one line per blueprint, to make it easy to work with in tools like Excel or pandas.
+    # - make this an independent function that can be called with the blueprints and datasets as arguments.
+    # - can then make this a flag on the blueprints command, so that the data is fetched once and can be used for both the raw blueprints output and the report.
+    #   - maybe the flag can be the sde path? if the path is provided, then the report is generated, if not, then it's not. This way we don't have to fetch the sde data if the user doesn't want the report.
+    console = Console()
+    console.print("[yellow]This command is not yet implemented.[/yellow]")
+
+
+@app.command()
 def jobs(
     ctx: typer.Context,
     corporation_id: Annotated[
