@@ -1,5 +1,6 @@
 """Commands for working with Esi corporation data."""
 
+import asyncio
 from pathlib import Path
 from time import perf_counter
 from typing import Annotated
@@ -8,6 +9,8 @@ import typer
 from rich.console import Console
 from whenever import Instant
 
+from esi_link.argus import requests as argus_requests
+from esi_link.argus.reports.corporation_jobs import resolve_corporation_jobs
 from esi_link.cli.argus.data_factory import (
     get_corporation_blueprints,
     get_corporation_jobs,
@@ -195,14 +198,22 @@ def jobs(
     )
     console.print(f"Fetching industry jobs for corporation {corporation_id}...")
     try:
-        argus_jobs = get_corporation_jobs(
-            executor=executor,
+        jobs_task = argus_requests.corporation_jobs(
             corporation_id=corporation_id,
             character_id=character_id,
+            esi_link=executor,
             include_completed=include_completed,
-            console=console,
             lang=lang.value,
         )
+        argus_jobs = asyncio.run(jobs_task)
+        # argus_jobs = get_corporation_jobs(
+        #     executor=executor,
+        #     corporation_id=corporation_id,
+        #     character_id=character_id,
+        #     include_completed=include_completed,
+        #     console=console,
+        #     lang=lang.value,
+        # )
         date_str = Instant.from_timestamp_nanos(argus_jobs.received_at).format_iso()
         file_stem = f"corporation_{corporation_id}_jobs_{date_str}"
         file_stem = file_safe_string(file_stem)
@@ -212,6 +223,19 @@ def jobs(
             file_name=f"{file_stem}.json",
             overwrite=overwrite,
         )
+        resolved_tasks = resolve_corporation_jobs(
+            corp_jobs=argus_jobs, esi_link=executor
+        )
+        jobs_resolved = asyncio.run(resolved_tasks)
+        resolved_file_stem = f"corporation_{corporation_id}_jobs_resolved_{date_str}"
+        resolved_file_stem = file_safe_string(resolved_file_stem)
+        resolved_save_path = save_text_file(
+            text=jobs_resolved.model_dump_json(indent=2),
+            output_dir=output_dir,
+            file_name=f"{resolved_file_stem}.json",
+            overwrite=overwrite,
+        )
+        console.print(f"Resolved jobs data saved to {resolved_save_path}")
     except Exception as e:
         console.print(f"[red]Error fetching corporation jobs: {e}[/red]")
         raise typer.Exit(code=1) from e

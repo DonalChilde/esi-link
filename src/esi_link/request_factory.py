@@ -260,3 +260,22 @@ def market_orders(
         json_body=None,
         response_handlers=handlers,
     )
+
+
+def names_from_ids(
+    ids_: list[int],
+    handlers: list[ResponseHandlerConfig] | None = None,
+    lang: Lang = "en",
+) -> Request:
+    """Request factory for the PostUniverseNames operation."""
+    handlers = handlers or []
+    return Request(
+        request_id=uuid4(),
+        operation_id="PostUniverseNames",
+        path_parameters={},
+        query_parameters={},
+        auth_character_id=None,
+        lang=lang,
+        json_body=ids_,
+        response_handlers=handlers,
+    )

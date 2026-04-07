@@ -316,6 +316,54 @@ class GetCorporationsCorporationIdIndustryJobs(EsiDataModel):
         return cls.model_validate(model_dict)
 
 
+@dataclass(slots=True, kw_only=True)
+class PostUniverseNamesItem:
+    id_: int
+    name: str
+    category: str
+
+
+class PostUniverseNames(EsiDataModel):
+    names: dict[int, PostUniverseNamesItem]
+
+    @classmethod
+    def from_response_data(cls, response_data: ResponseData) -> Self:
+        """Create a PostUniverseNames instance from ESI response data."""
+        operation_id = "PostUniverseNames"
+        if response_data.request.operation_id != operation_id:
+            raise ValueError(
+                f"Expected operation_id {operation_id}, got {response_data.request.operation_id}"
+            )
+        names_dict: dict[int, PostUniverseNamesItem] = {}
+        for item in response_data.data:
+            name_item = PostUniverseNamesItem(
+                id_=item["id"], name=item["name"], category=item["category"]
+            )
+            names_dict[name_item.id_] = name_item
+        return cls.model_validate(
+            {
+                "operation_id": operation_id,
+                "response_date": response_data.response_date,
+                "received_at": response_data.received_at,
+                "names": names_dict,
+            }
+        )
+
+    def name(self, id_: int) -> str:
+        """Get the name for a given ID, or return a default string if the ID is not found."""
+        if id_ not in self.names:
+            logger.warning(f"ID {id_} not found in names dictionary.")
+            return f"Unknown ID {id_}"
+        return self.names[id_].name
+
+    def category(self, id_: int) -> str:
+        """Get the category for a given ID, or return a default string if the ID is not found."""
+        if id_ not in self.names:
+            logger.warning(f"ID {id_} not found in names dictionary.")
+            return f"Unknown ID {id_}"
+        return self.names[id_].category
+
+
 # ------------------------------------------------------------------------------
 # Industry Models
 # ------------------------------------------------------------------------------

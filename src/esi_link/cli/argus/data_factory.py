@@ -17,6 +17,7 @@ from esi_link.type_defs import Lang
 logger = logging.getLogger(__name__)
 
 
+# FIXME move this logic to argus.requests, minus the console printing.
 def get_character_blueprints(
     executor: EsiLink, character_id: int, console: Console, lang: Lang = "en"
 ) -> argus_models.GetCharactersCharacterIdBlueprints:
