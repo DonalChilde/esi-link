@@ -1,5 +1,6 @@
 """Industry calculations using the most basic inputs."""
 
+from enum import Enum
 from math import ceil, floor
 from typing import Any, TypedDict
 
@@ -30,6 +31,17 @@ RESEARCH_TIME_MULTIPLIER: list[float] = [
     4163 / 7,
     29660 / 21,
 ]
+
+
+class ActivityId(Enum):
+    """Constants for industry activity IDs."""
+
+    MANUFACTURING = 1
+    RESEARCHING_TIME_EFFICIENCY = 3
+    RESEARCHING_MATERIAL_EFFICIENCY = 4
+    COPYING = 5
+    INVENTION = 8
+    REACTIONS = 11
 
 
 # TODO at this level, can one cost dict cover all the actions?

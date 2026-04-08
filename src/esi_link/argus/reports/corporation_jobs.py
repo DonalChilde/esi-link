@@ -1,12 +1,14 @@
 """Report generation for corporation industry jobs."""
 
 from dataclasses import dataclass
+from typing import Literal
 
 from pydantic import BaseModel
 from whenever import Instant
 
 from esi_link import EsiLink
 from esi_link.argus import requests
+from esi_link.argus.calculations.industry_base_calculations import ActivityId
 from esi_link.argus.models import (
     GetCorporationsCorporationIdIndustryJobs,
     GetCorporationsCorporationIdIndustryJobsItem,
@@ -26,19 +28,11 @@ class CorporationJobsResolvedItem:
     blueprint_location: str
     blueprint: str
     completed_character: str | None
-    completed_date: str | None
-    """The date the job was completed. This is a string in ISO 8601 format."""
-    end_date: str
-    """The date the job is expected to be completed. This is a string in ISO 8601 format."""
     facility: str
     installer: str
     location: str
     output_location: str
-    pause_date: str | None
-    """The date the job was paused. This is a string in ISO 8601 format."""
     product: str | None
-    start_date: str
-    """The date the job was started. This is a string in ISO 8601 format."""
 
     item: GetCorporationsCorporationIdIndustryJobsItem
 
@@ -50,6 +44,87 @@ class CorporationJobsResolved(BaseModel):
     date: str
     """The date the report was generated. This is a string in ISO 8601 format."""
     jobs: list[CorporationJobsResolvedItem] = []
+
+
+SummaryGroup = Literal["manufacturing", "research", "reactions", "other"]
+
+
+def _activity_group(activity_id: int) -> SummaryGroup:
+    """Map an activity ID to a high-level summary group."""
+    if activity_id == ActivityId.MANUFACTURING.value:
+        return "manufacturing"
+    if activity_id in {
+        ActivityId.RESEARCHING_TIME_EFFICIENCY.value,
+        ActivityId.RESEARCHING_MATERIAL_EFFICIENCY.value,
+        ActivityId.COPYING.value,
+        ActivityId.INVENTION.value,
+    }:
+        return "research"
+    if activity_id == ActivityId.REACTIONS.value:
+        return "reactions"
+    return "other"
+
+
+def _is_completed(job: GetCorporationsCorporationIdIndustryJobsItem) -> bool:
+    """Determine if a job should be counted as completed in summary views."""
+    if job.completed_date is not None:
+        return True
+    return job.status in {"delivered", "cancelled", "reverted"}
+
+
+def _is_ready(job: GetCorporationsCorporationIdIndustryJobsItem) -> bool:
+    """Determine if a job should be counted as ready in summary views."""
+    end_date = Instant.parse_iso(job.end_date)
+    now = Instant.now()
+    if end_date < now and job.status == "active":
+        return True
+    return False
+
+
+def _is_active(job: GetCorporationsCorporationIdIndustryJobsItem) -> bool:
+    """Determine if a job should be counted as active in summary views."""
+    return job.status == "active"
+
+
+def _seconds_to_human(seconds: int) -> str:
+    """Convert seconds to a compact human readable duration string."""
+    if seconds <= 0:
+        return "0m"
+
+    days, remainder = divmod(seconds, 86_400)
+    hours, remainder = divmod(remainder, 3_600)
+    minutes, _ = divmod(remainder, 60)
+
+    parts: list[str] = []
+    if days:
+        parts.append(f"{days}d")
+    if hours:
+        parts.append(f"{hours}h")
+    if minutes or not parts:
+        parts.append(f"{minutes}m")
+    return " ".join(parts)
+
+
+def _job_runtime_display(job: GetCorporationsCorporationIdIndustryJobsItem) -> str:
+    """Return status display text for the job details table."""
+    if _is_completed(job):
+        return "COMPLETED"
+    if job.status == "paused":
+        return "PAUSED"
+    if job.status != "active":
+        return job.status.upper()
+
+    now = Instant.now()
+    end_at = Instant.parse_iso(job.end_date)
+    remaining_seconds = int((end_at - now).in_seconds())
+    return _seconds_to_human(remaining_seconds)
+
+
+def _safe_markdown_cell(value: str | None) -> str:
+    """Escape markdown table delimiters and replace missing values."""
+    if value is None or value == "":
+        return "-"
+    return value.replace("|", "\\|")
 
 
 async def resolve_corporation_jobs(
@@ -71,33 +146,21 @@ async def resolve_corporation_jobs(
     names = await requests.names_from_ids(ids_=ids_to_resolve, esi_link=esi_link)
     report_items: list[CorporationJobsResolvedItem] = []
     for job in corp_jobs.jobs:
-        completed_date = (
-            Instant.parse_rfc2822(job.completed_date).format_iso()
-            if job.completed_date
-            else None
-        )
-        end_date = job.end_date
-        start_date = job.start_date
-        pause_date = job.pause_date if job.pause_date else None
         completed_character = (
             names.name(job.completed_character_id)
             if job.completed_character_id
             else None
         )
         report_item = CorporationJobsResolvedItem(
-            activity=str(job.activity_id),
+            activity=ActivityId(job.activity_id).name,
             blueprint_location=names.name(job.blueprint_location_id),
             blueprint=names.name(job.blueprint_type_id),
             completed_character=completed_character,
-            completed_date=completed_date,
-            end_date=end_date,
             facility=names.name(job.facility_id),
             installer=names.name(job.installer_id),
             location=names.name(job.location_id),
             output_location=names.name(job.output_location_id),
-            pause_date=pause_date,
             product=names.name(job.product_type_id) if job.product_type_id else None,
-            start_date=start_date,
             item=job,
         )
         report_items.append(report_item)
@@ -139,3 +202,127 @@ def get_ids_from_corporation_jobs(
         add_id(job.product_type_id)
 
     return ids
+
+
+def generate_corporation_jobs_report(resolved_jobs: CorporationJobsResolved) -> str:
+    """Generates a human-readable report of a corporation's industry jobs.
+
+    Args:
+        resolved_jobs: The resolved corporation jobs data.
+
+    Returns:
+        A string representing the human-readable report.
+    """
+    summary: dict[str, dict[str, dict[str, int]]] = {}
+    for resolved_item in resolved_jobs.jobs:
+        installer = resolved_item.installer
+        if installer not in summary:
+            summary[installer] = {
+                "manufacturing": {
+                    "total": 0,
+                    "completed": 0,
+                    "ready": 0,
+                    "active": 0,
+                },
+                "research": {
+                    "total": 0,
+                    "completed": 0,
+                    "ready": 0,
+                    "active": 0,
+                },
+                "reactions": {
+                    "total": 0,
+                    "completed": 0,
+                    "ready": 0,
+                    "active": 0,
+                },
+                "other": {
+                    "total": 0,
+                    "completed": 0,
+                    "ready": 0,
+                    "active": 0,
+                },
+            }
+
+        group = _activity_group(resolved_item.item.activity_id)
+        summary[installer][group]["total"] += 1
+        if _is_completed(resolved_item.item):
+            summary[installer][group]["completed"] += 1
+        if _is_ready(resolved_item.item):
+            summary[installer][group]["ready"] += 1
+        if _is_active(resolved_item.item):
+            summary[installer][group]["active"] += 1
+
+    lines: list[str] = []
+    lines.append(f"# Corporation Jobs Report - {resolved_jobs.date}")
+    lines.append("")
+    lines.append(f"Corporation: {_safe_markdown_cell(resolved_jobs.name)}")
+    lines.append("")
+
+    lines.append("## Character Summary")
+    lines.append("")
+    lines.append(
+        "| Character | Manufacturing (T/C/R/A) | Research (T/C/R/A) | Reactions (T/C/R/A) | Total (T/C/R/A) |"
+    )
+    lines.append("|---|---:|---:|---:|---:|")
+
+    for installer in sorted(summary.keys()):
+        manufacturing = summary[installer]["manufacturing"]
+        research = summary[installer]["research"]
+        reactions = summary[installer]["reactions"]
+        other = summary[installer]["other"]
+
+        total = {
+            "total": manufacturing["total"]
+            + research["total"]
+            + reactions["total"]
+            + other["total"],
+            "completed": manufacturing["completed"]
+            + research["completed"]
+            + reactions["completed"]
+            + other["completed"],
+            "ready": manufacturing["ready"]
+            + research["ready"]
+            + reactions["ready"]
+            + other["ready"],
+            "active": manufacturing["active"]
+            + research["active"]
+            + reactions["active"]
+            + other["active"],
+        }
+
+        lines.append(
+            "| "
+            f"{_safe_markdown_cell(installer)} | "
+            f"{manufacturing['total']}/{manufacturing['completed']}/{manufacturing['ready']}/{manufacturing['active']} | "
+            f"{research['total']}/{research['completed']}/{research['ready']}/{research['active']} | "
+            f"{reactions['total']}/{reactions['completed']}/{reactions['ready']}/{reactions['active']} | "
+            f"{total['total']}/{total['completed']}/{total['ready']}/{total['active']} |"
+        )
+
+    lines.append("")
+    lines.append("## Jobs")
+    lines.append("")
+    lines.append(
+        "| Activity | Blueprint | Facility | Installer | Product | End Date | Status |"
+    )
+    lines.append("|---|---|---|---|---|---|---|")
+
+    sorted_jobs = sorted(
+        resolved_jobs.jobs,
+        key=lambda job: Instant.parse_iso(job.item.end_date).py_datetime(),
+    )
+    for resolved_item in sorted_jobs:
+        lines.append(
+            "| "
+            f"{_safe_markdown_cell(resolved_item.activity)} | "
+            f"{_safe_markdown_cell(resolved_item.blueprint)} | "
+            f"{_safe_markdown_cell(resolved_item.facility)} | "
+            f"{_safe_markdown_cell(resolved_item.installer)} | "
+            f"{_safe_markdown_cell(resolved_item.product)} | "
+            f"{_safe_markdown_cell(resolved_item.item.end_date)} | "
+            f"{_safe_markdown_cell(_job_runtime_display(resolved_item.item))} |"
+        )
+
+    lines.append("")
+    return "\n".join(lines)

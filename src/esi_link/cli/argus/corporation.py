@@ -10,7 +10,10 @@ from rich.console import Console
 from whenever import Instant
 
 from esi_link.argus import requests as argus_requests
-from esi_link.argus.reports.corporation_jobs import resolve_corporation_jobs
+from esi_link.argus.reports.corporation_jobs import (
+    generate_corporation_jobs_report,
+    resolve_corporation_jobs,
+)
 from esi_link.cli.argus.data_factory import (
     get_corporation_blueprints,
     get_corporation_jobs,
@@ -228,11 +231,22 @@ def jobs(
             overwrite=overwrite,
         )
         console.print(f"Resolved jobs data saved to {resolved_save_path}")
+        report = generate_corporation_jobs_report(resolved_jobs=jobs_resolved)
+        report_file_stem = f"corporation_{corporation_id}_jobs_report_{date_str}"
+        report_file_stem = file_safe_string(report_file_stem)
+        report_save_path = save_text_file(
+            text=report,
+            output_dir=output_dir,
+            file_name=f"{report_file_stem}.md",
+            overwrite=overwrite,
+        )
+        console.print(f"Jobs report saved to {report_save_path}")
     except Exception as e:
         console.print(f"[red]Error fetching corporation jobs: {e}[/red]")
         console.print_exception()
         raise typer.Exit(code=1) from e
+
     end = perf_counter()
     console.print(f"Jobs data saved to {save_path} in {end - start:.2f} seconds")
     if terminal:
-        console.print(argus_jobs.model_dump_json(indent=2))
+        console.print(report)

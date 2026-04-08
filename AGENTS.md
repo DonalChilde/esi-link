@@ -12,6 +12,7 @@ applyTo: "**/*.py"
 - Provide docstrings following PEP 257 conventions.
 - Break down complex functions into smaller, more manageable functions.
 - During development, use the virtual environment found at the project root - `./.venv`
+- use red/green TDD
 
 ## General Instructions
 

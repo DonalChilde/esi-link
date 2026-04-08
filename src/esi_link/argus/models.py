@@ -267,6 +267,10 @@ class GetCorporationsCorporationIdIndustryJobsItem:
     activity_id: int
     blueprint_id: int
     blueprint_location_id: int
+    """The location of the blueprint, which may be a station, a ship or an item_id if 
+    the blueprint is located within a container. If the value is an item_id, then the 
+    Character AssetList API must be queried to find the container using the given 
+    item_id to determine the correct location of the Blueprint."""
     blueprint_type_id: int
     completed_character_id: int | None = None
     completed_date: str | None = None
@@ -279,6 +283,8 @@ class GetCorporationsCorporationIdIndustryJobsItem:
     licensed_runs: int | None = None
     location_id: int
     output_location_id: int
+    """The location of the job, which may be a station, a ship or an item_id if the job 
+    is located within a container."""
     pause_date: str | None = None
     probability: float | None = None
     product_type_id: int | None = None
