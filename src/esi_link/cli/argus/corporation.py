@@ -206,14 +206,6 @@ def jobs(
             lang=lang.value,
         )
         argus_jobs = asyncio.run(jobs_task)
-        # argus_jobs = get_corporation_jobs(
-        #     executor=executor,
-        #     corporation_id=corporation_id,
-        #     character_id=character_id,
-        #     include_completed=include_completed,
-        #     console=console,
-        #     lang=lang.value,
-        # )
         date_str = Instant.from_timestamp_nanos(argus_jobs.received_at).format_iso()
         file_stem = f"corporation_{corporation_id}_jobs_{date_str}"
         file_stem = file_safe_string(file_stem)
@@ -238,6 +230,7 @@ def jobs(
         console.print(f"Resolved jobs data saved to {resolved_save_path}")
     except Exception as e:
         console.print(f"[red]Error fetching corporation jobs: {e}[/red]")
+        console.print_exception()
         raise typer.Exit(code=1) from e
     end = perf_counter()
     console.print(f"Jobs data saved to {save_path} in {end - start:.2f} seconds")

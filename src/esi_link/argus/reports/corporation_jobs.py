@@ -76,13 +76,9 @@ async def resolve_corporation_jobs(
             if job.completed_date
             else None
         )
-        end_date = Instant.parse_rfc2822(job.end_date).format_iso()
-        start_date = Instant.parse_rfc2822(job.start_date).format_iso()
-        pause_date = (
-            Instant.parse_rfc2822(job.pause_date).format_iso()
-            if job.pause_date
-            else None
-        )
+        end_date = job.end_date
+        start_date = job.start_date
+        pause_date = job.pause_date if job.pause_date else None
         completed_character = (
             names.name(job.completed_character_id)
             if job.completed_character_id
@@ -117,18 +113,29 @@ async def resolve_corporation_jobs(
 def get_ids_from_corporation_jobs(
     jobs: GetCorporationsCorporationIdIndustryJobs,
 ) -> set[int]:
-    """Extracts all unique IDs from a GetCorporationsCorporationIdIndustryJobs response."""
+    """Extracts all unique IDs from a GetCorporationsCorporationIdIndustryJobs response.
+
+    Filters out invalid IDs (zero or negative values) that could cause API errors.
+    """
     ids: set[int] = set()
-    ids.add(jobs.corporation_id)
+
+    # Helper function to safely add IDs
+    def add_id(id_value: int | None) -> None:
+        if id_value is not None and id_value > 0:
+            ids.add(id_value)
+
+    # Add corporation ID if valid
+    add_id(jobs.corporation_id)
+
     for job in jobs.jobs:
-        ids.add(job.blueprint_location_id)
-        ids.add(job.blueprint_type_id)
-        if job.completed_character_id is not None:
-            ids.add(job.completed_character_id)
-        ids.add(job.facility_id)
-        ids.add(job.installer_id)
-        ids.add(job.location_id)
-        ids.add(job.output_location_id)
-        if job.product_type_id is not None:
-            ids.add(job.product_type_id)
+        # Add all IDs with validation
+        add_id(job.blueprint_location_id)
+        add_id(job.blueprint_type_id)
+        add_id(job.completed_character_id)
+        add_id(job.facility_id)
+        add_id(job.installer_id)
+        add_id(job.location_id)
+        add_id(job.output_location_id)
+        add_id(job.product_type_id)
+
     return ids
