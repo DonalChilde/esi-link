@@ -14,10 +14,6 @@ from esi_link.argus.reports.corporation_jobs import (
     generate_corporation_jobs_report,
     resolve_corporation_jobs,
 )
-from esi_link.cli.argus.data_factory import (
-    get_corporation_blueprints,
-    get_corporation_jobs,
-)
 from esi_link.cli.helpers import (
     get_executor_from_settings_and_schema,
     get_settings_from_context,
@@ -76,20 +72,18 @@ def blueprints(
     )
     console.print(f"Fetching blueprints for corporation {corporation_id}...")
     try:
-        argus_blueprints = get_corporation_blueprints(
-            executor=executor,
+        blueprints_task = argus_requests.corporation_blueprints(
             corporation_id=corporation_id,
             character_id=character_id,
-            console=console,
+            esi_link=executor,
             lang=lang.value,
         )
-        date_str = Instant.from_timestamp_nanos(
-            argus_blueprints.received_at
-        ).format_iso()
+        blueprints = asyncio.run(blueprints_task)
+        date_str = Instant.from_timestamp_nanos(blueprints.received_at).format_iso()
         file_stem = f"corporation_{corporation_id}_blueprints_{date_str}"
         file_stem = file_safe_string(file_stem)
         save_path = save_text_file(
-            text=argus_blueprints.model_dump_json(indent=2),
+            text=blueprints.model_dump_json(indent=2),
             output_dir=output_dir,
             file_name=f"{file_stem}.json",
             overwrite=overwrite,
@@ -100,7 +94,7 @@ def blueprints(
     end = perf_counter()
     console.print(f"Blueprints data saved to {save_path} in {end - start:.2f} seconds")
     if terminal:
-        console.print(argus_blueprints.model_dump_json(indent=2))
+        console.print(blueprints.model_dump_json(indent=2))
 
 
 @app.command()

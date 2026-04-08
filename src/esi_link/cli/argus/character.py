@@ -1,5 +1,6 @@
 """Commands for working with Esi character data."""
 
+import asyncio
 from pathlib import Path
 from time import perf_counter
 from typing import Annotated
@@ -8,11 +9,7 @@ import typer
 from rich.console import Console
 from whenever import Instant
 
-from esi_link.cli.argus.data_factory import (
-    get_character_blueprints,
-    get_character_information,
-    get_character_jobs,
-)
+from esi_link.argus import requests as argus_requests
 from esi_link.cli.helpers import (
     get_executor_from_settings_and_schema,
     get_settings_from_context,
@@ -68,19 +65,15 @@ def blueprints(
         settings=settings, schema=stored_schema.esi_schema
     )
     try:
-        argus_blueprints = get_character_blueprints(
-            executor=executor,
-            character_id=character_id,
-            console=console,
-            lang=lang.value,
+        blueprints_task = argus_requests.character_blueprints(
+            character_id=character_id, esi_link=executor, lang=lang.value
         )
-        date_str = Instant.from_timestamp_nanos(
-            argus_blueprints.received_at
-        ).format_iso()
+        blueprints = asyncio.run(blueprints_task)
+        date_str = Instant.from_timestamp_nanos(blueprints.received_at).format_iso()
         file_stem = f"character_{character_id}_blueprints_{date_str}"
         file_stem = file_safe_string(file_stem)
         save_path = save_text_file(
-            text=argus_blueprints.model_dump_json(indent=2),
+            text=blueprints.model_dump_json(indent=2),
             output_dir=output_dir,
             file_name=f"{file_stem}.json",
             overwrite=overwrite,
@@ -91,7 +84,7 @@ def blueprints(
     end = perf_counter()
     console.print(f"Blueprints saved to {save_path} in {end - start:.2f} seconds.")
     if terminal:
-        console.print(argus_blueprints.model_dump_json(indent=2))
+        console.print(blueprints.model_dump_json(indent=2))
 
 
 @app.command()
@@ -136,19 +129,15 @@ def information(
         settings=settings, schema=stored_schema.esi_schema
     )
     try:
-        argus_character_info = get_character_information(
-            executor=executor,
-            character_id=character_id,
-            console=console,
-            lang=lang.value,
+        character_info_task = argus_requests.character_information(
+            character_id=character_id, esi_link=executor, lang=lang.value
         )
-        date_str = Instant.from_timestamp_nanos(
-            argus_character_info.received_at
-        ).format_iso()
+        character_info = asyncio.run(character_info_task)
+        date_str = Instant.from_timestamp_nanos(character_info.received_at).format_iso()
         file_stem = f"character_{character_id}_information_{date_str}"
         file_stem = file_safe_string(file_stem)
         save_path = save_text_file(
-            text=argus_character_info.model_dump_json(indent=2),
+            text=character_info.model_dump_json(indent=2),
             output_dir=output_dir,
             file_name=f"{file_stem}.json",
             overwrite=overwrite,
@@ -161,7 +150,7 @@ def information(
         f"Character information saved to {save_path} in {end - start:.2f} seconds."
     )
     if terminal:
-        console.print(argus_character_info.model_dump_json(indent=2))
+        console.print(character_info.model_dump_json(indent=2))
 
 
 def jobs(
@@ -214,18 +203,18 @@ def jobs(
         settings=settings, schema=stored_schema.esi_schema
     )
     try:
-        argus_jobs = get_character_jobs(
-            executor=executor,
+        jobs_task = argus_requests.character_jobs(
             character_id=character_id,
+            esi_link=executor,
             include_completed=include_completed,
-            console=console,
             lang=lang.value,
         )
-        date_str = Instant.from_timestamp_nanos(argus_jobs.received_at).format_iso()
+        jobs = asyncio.run(jobs_task)
+        date_str = Instant.from_timestamp_nanos(jobs.received_at).format_iso()
         file_stem = f"character_{character_id}_industry_jobs_{date_str}"
         file_stem = file_safe_string(file_stem)
         save_path = save_text_file(
-            text=argus_jobs.model_dump_json(indent=2),
+            text=jobs.model_dump_json(indent=2),
             output_dir=output_dir,
             file_name=f"{file_stem}.json",
             overwrite=overwrite,
@@ -238,4 +227,4 @@ def jobs(
         f"Character industry jobs saved to {save_path} in {end - start:.2f} seconds."
     )
     if terminal:
-        console.print(argus_jobs.model_dump_json(indent=2))
+        console.print(jobs.model_dump_json(indent=2))

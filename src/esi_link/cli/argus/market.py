@@ -1,5 +1,6 @@
 """Commands for working with Esi market data."""
 
+import asyncio
 from pathlib import Path
 from time import perf_counter
 from typing import Annotated
@@ -8,11 +9,8 @@ import typer
 from rich.console import Console
 from whenever import Instant
 
+from esi_link.argus import requests as argus_requests
 from esi_link.argus.calculations.calculate_order_summary import calculate_summaries
-from esi_link.cli.argus.data_factory import (
-    get_market_orders_for_region,
-    get_universe_market_prices,
-)
 from esi_link.cli.helpers import (
     get_executor_from_settings_and_schema,
     get_settings_from_context,
@@ -68,9 +66,10 @@ def orders(
     )
     console.print(f"Fetching market orders for region {region_id}...")
     try:
-        market_orders = get_market_orders_for_region(
-            executor=executor, region_id=region_id, console=console, lang=lang.value
+        orders_task = argus_requests.market_orders_region(
+            region_id=region_id, esi_link=executor, lang=lang.value
         )
+        market_orders = asyncio.run(orders_task)
         date_str = Instant.from_timestamp_nanos(market_orders.received_at).format_iso()
         file_stem = f"market_orders_region_{region_id}_{date_str}"
         file_stem = file_safe_string(file_stem)
@@ -151,9 +150,10 @@ def order_summaries(
     )
     console.print(f"Fetching market orders for region {region_id}...")
     try:
-        market_orders = get_market_orders_for_region(
-            executor=executor, region_id=region_id, console=console, lang=lang.value
+        orders_task = argus_requests.market_orders_region(
+            region_id=region_id, esi_link=executor, lang=lang.value
         )
+        market_orders = asyncio.run(orders_task)
         print(
             f"Calculating {len(market_orders.orders)} order summaries for region {region_id}..."
         )
@@ -238,9 +238,8 @@ def universe_prices(
     )
     console.print(f"Fetching market prices for the universe...")
     try:
-        market_prices = get_universe_market_prices(
-            executor=executor, console=console, lang=lang.value
-        )
+        prices_task = argus_requests.universe_prices(esi_link=executor, lang=lang.value)
+        market_prices = asyncio.run(prices_task)
         date_str = Instant.from_timestamp_nanos(market_prices.received_at).format_iso()
         file_stem = f"universe_market_prices_{date_str}"
         file_stem = file_safe_string(file_stem)
