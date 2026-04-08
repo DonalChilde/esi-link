@@ -1,6 +1,7 @@
 """Main entry point for the Esi Link CLI using Typer."""
 
 import logging
+from dataclasses import asdict
 
 import typer
 
@@ -44,8 +45,8 @@ def default_options(ctx: typer.Context):
     Insert pithy saying here
     """
     settings = get_settings()
-    setup_logging(log_dir=settings.log_dir)
+    setup_logging(log_dir=settings.log_directory)
     ctx.obj = {"esi-link-settings": settings}
     logger.info(
-        f"Starting {__app_name__} v{__version__} with settings: {settings.model_dump_json()}"
+        f"Starting {__app_name__} v{__version__} with settings: {asdict(settings)!r}"
     )

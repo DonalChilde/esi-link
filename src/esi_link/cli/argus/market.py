@@ -17,7 +17,6 @@ from esi_link.cli.helpers import (
 )
 from esi_link.helpers.file_safe_string import file_safe_string
 from esi_link.helpers.save_text_file import save_text_file
-from esi_link.schema.schema_manager import SchemaManager
 from esi_link.type_defs import LangEnum
 
 app = typer.Typer(
@@ -59,11 +58,7 @@ def orders(
     start = perf_counter()
     settings = get_settings_from_context(ctx)
     console = Console()
-    schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
-    stored_schema = schema_manager.get_latest_schema()
-    executor = get_executor_from_settings_and_schema(
-        settings=settings, schema=stored_schema.esi_schema
-    )
+    executor = get_executor_from_settings_and_schema(settings=settings)
     console.print(f"Fetching market orders for region {region_id}...")
     try:
         orders_task = argus_requests.market_orders_region(
@@ -143,11 +138,7 @@ def order_summaries(
     start = perf_counter()
     settings = get_settings_from_context(ctx)
     console = Console()
-    schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
-    stored_schema = schema_manager.get_latest_schema()
-    executor = get_executor_from_settings_and_schema(
-        settings=settings, schema=stored_schema.esi_schema
-    )
+    executor = get_executor_from_settings_and_schema(settings=settings)
     console.print(f"Fetching market orders for region {region_id}...")
     try:
         orders_task = argus_requests.market_orders_region(
@@ -231,11 +222,7 @@ def universe_prices(
     start = perf_counter()
     settings = get_settings_from_context(ctx)
     console = Console()
-    schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
-    stored_schema = schema_manager.get_latest_schema()
-    executor = get_executor_from_settings_and_schema(
-        settings=settings, schema=stored_schema.esi_schema
-    )
+    executor = get_executor_from_settings_and_schema(settings=settings)
     console.print(f"Fetching market prices for the universe...")
     try:
         prices_task = argus_requests.universe_prices(esi_link=executor, lang=lang.value)

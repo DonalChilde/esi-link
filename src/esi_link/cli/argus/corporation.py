@@ -20,7 +20,6 @@ from esi_link.cli.helpers import (
 )
 from esi_link.helpers.file_safe_string import file_safe_string
 from esi_link.helpers.save_text_file import save_text_file
-from esi_link.schema.schema_manager import SchemaManager
 from esi_link.type_defs import LangEnum
 
 app = typer.Typer(
@@ -65,11 +64,7 @@ def blueprints(
     start = perf_counter()
     settings = get_settings_from_context(ctx)
     console = Console()
-    schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
-    stored_schema = schema_manager.get_latest_schema()
-    executor = get_executor_from_settings_and_schema(
-        settings=settings, schema=stored_schema.esi_schema
-    )
+    executor = get_executor_from_settings_and_schema(settings=settings)
     console.print(f"Fetching blueprints for corporation {corporation_id}...")
     try:
         blueprints_task = argus_requests.corporation_blueprints(
@@ -188,11 +183,7 @@ def jobs(
     start = perf_counter()
     settings = get_settings_from_context(ctx)
     console = Console()
-    schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
-    stored_schema = schema_manager.get_latest_schema()
-    executor = get_executor_from_settings_and_schema(
-        settings=settings, schema=stored_schema.esi_schema
-    )
+    executor = get_executor_from_settings_and_schema(settings=settings)
     console.print(f"Fetching industry jobs for corporation {corporation_id}...")
     try:
         jobs_task = argus_requests.corporation_jobs(

@@ -1,5 +1,6 @@
 """Settings for the ESI Link application."""
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -25,8 +26,56 @@ ISSUER = "https://login.eveonline.com"
 """The issuer to use for ESI Auth tokens."""
 
 
-class EsiLinkSettings(BaseSettings):
+@dataclass(slots=True)
+class EsiLinkSettings:
     """Settings for the ESI Link application."""
+
+    application_directory: Path
+    log_directory: Path
+    schema_store_directory: Path
+    cache_root_directory: Path
+    diskcache_directory: Path
+    json_cache_directory: Path
+    cache_type: Literal["diskcache", "json"]
+    rate_limit_connection_period: int
+    rate_limit_connection_max_rate: int
+    auth_credentials_file: Path
+    auth_tokens_directory: Path
+    auth_token_refresh_threshold_seconds: int
+    auth_oauth_metadata_url: str
+    auth_cached_oauth_metadata_file: Path
+    auth_cached_metadata_max_age: int
+    auth_server_timeout: int
+    auth_audience: str
+    auth_issuer: str
+
+    @property
+    def cache_directory(self) -> Path:
+        """The directory for ESI Link cache files."""
+        if self.cache_type == "diskcache":
+            return self.diskcache_directory
+        elif self.cache_type == "json":
+            return self.json_cache_directory
+        else:
+            raise ValueError(f"Invalid cache type: {self.cache_type}")
+
+
+class EsiLinkSettingsPydantic(BaseSettings):
+    """Settings for the ESI Link application.
+
+    This settings class uses Pydantic for validation and loading from environment variables.
+    It includes properties for various directories and configuration options used by ESI Link,
+    such as schema URLs, cache settings, rate limiting settings, and ESI Auth settings.
+    The settings can be overridden by environment variables with the prefix "PFMSOFT_ESI_LINK_"
+    or by .esi-link.env files in the application directory or current working directory.
+
+    This is NOT the class used to configure the app, Its responsibility is loading settings
+    from environment variables and providing defaults. The EsiLinkSettings dataclass is
+    the main settings class used for the app, and it can be constructed from this Pydantic
+    settings class. This separation allows us to use Pydantic's powerful settings management
+    features while keeping the main settings class simple and focused on the application's
+    needs.
+    """
 
     app_dir: Path = Field(
         default=DEFAULT_APP_DIR,
@@ -161,12 +210,33 @@ class EsiLinkSettings(BaseSettings):
 
 def get_settings() -> EsiLinkSettings:
     """Get the ESI Link settings."""
-    settings = EsiLinkSettings()
+    pydantic_settings = EsiLinkSettingsPydantic()
+    settings = EsiLinkSettings(
+        application_directory=pydantic_settings.app_dir,
+        log_directory=pydantic_settings.log_dir,
+        schema_store_directory=pydantic_settings.schema_store_dir,
+        cache_root_directory=pydantic_settings.cache_root_dir,
+        diskcache_directory=pydantic_settings.cache_root_dir / "diskcache",
+        json_cache_directory=pydantic_settings.cache_root_dir / "json",
+        cache_type=pydantic_settings.cache_type,
+        rate_limit_connection_period=pydantic_settings.connection_period,
+        rate_limit_connection_max_rate=pydantic_settings.connection_max_rate,
+        auth_credentials_file=pydantic_settings.app_credentials_file,
+        auth_tokens_directory=pydantic_settings.tokens_dir,
+        auth_token_refresh_threshold_seconds=pydantic_settings.token_refresh_threshold_seconds,
+        auth_oauth_metadata_url=pydantic_settings.oauth_metadata_url,
+        auth_cached_oauth_metadata_file=pydantic_settings.cached_oauth_metadata_file,
+        auth_cached_metadata_max_age=pydantic_settings.cached_metadata_max_age,
+        auth_server_timeout=pydantic_settings.auth_server_timeout,
+        auth_audience=pydantic_settings.audience,
+        auth_issuer=pydantic_settings.issuer,
+    )
 
     # Ensure application directories exist
-    settings.app_dir.mkdir(parents=True, exist_ok=True)
-    settings.cache_directory.mkdir(parents=True, exist_ok=True)
-    settings.cached_oauth_metadata_file.parent.mkdir(parents=True, exist_ok=True)
+    settings.application_directory.mkdir(parents=True, exist_ok=True)
+    settings.diskcache_directory.mkdir(parents=True, exist_ok=True)
+    settings.json_cache_directory.mkdir(parents=True, exist_ok=True)
+    settings.auth_cached_oauth_metadata_file.parent.mkdir(parents=True, exist_ok=True)
     return settings
 
 

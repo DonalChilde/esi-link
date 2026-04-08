@@ -17,7 +17,6 @@ from esi_link.cli.helpers import (
 )
 from esi_link.cli.response_display_helpers import display_response_group_summary
 from esi_link.models_and_protocols import RequestGroup, Response
-from esi_link.schema.schema_manager import SchemaManager
 
 app = typer.Typer(
     no_args_is_help=True, help="Commands for testing ESI Link functionality."
@@ -25,6 +24,7 @@ app = typer.Typer(
 from esi_link import request_factory
 
 
+# FIXME use the error checking helper.
 @app.command()
 def status(
     ctx: typer.Context,
@@ -39,12 +39,7 @@ def status(
     settings = get_settings_from_context(ctx)
     console = Console()
     console.print("Preparing request...")
-    schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
-    stored_schema = schema_manager.get_latest_schema()
-    executor = get_executor_from_settings_and_schema(
-        settings=settings, schema=stored_schema.esi_schema
-    )
-
+    executor = get_executor_from_settings_and_schema(settings=settings)
     request = request_factory.esi_status(
         handlers=[
             esi_link.handler_factory.debug_file_response(output_dir=output_dir),
@@ -86,11 +81,7 @@ def pages(
     settings = get_settings_from_context(ctx)
     console = Console()
     console.print("Preparing request...")
-    schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
-    stored_schema = schema_manager.get_latest_schema()
-    executor = get_executor_from_settings_and_schema(
-        settings=settings, schema=stored_schema.esi_schema
-    )
+    executor = get_executor_from_settings_and_schema(settings=settings)
     request = request_factory.market_types_with_active_orders(
         handlers=[
             esi_link.handler_factory.debug_file_response(output_dir=output_dir),
@@ -138,11 +129,7 @@ def changelog(
     settings = get_settings_from_context(ctx)
     console = Console()
     console.print("Preparing request...")
-    schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
-    stored_schema = schema_manager.get_latest_schema()
-    executor = get_executor_from_settings_and_schema(
-        settings=settings, schema=stored_schema.esi_schema
-    )
+    executor = get_executor_from_settings_and_schema(settings=settings)
     request = request_factory.esi_changelog(
         handlers=[
             esi_link.handler_factory.debug_file_response(output_dir=output_dir),
@@ -188,11 +175,7 @@ def character_stats(
     settings = get_settings_from_context(ctx)
     console = Console()
     console.print("Preparing request...")
-    schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
-    stored_schema = schema_manager.get_latest_schema()
-    executor = get_executor_from_settings_and_schema(
-        settings=settings, schema=stored_schema.esi_schema
-    )
+    executor = get_executor_from_settings_and_schema(settings=settings)
     request = request_factory.character_stats(
         character_id=character_id,
         handlers=[
@@ -239,11 +222,7 @@ def character_info(
     settings = get_settings_from_context(ctx)
     console = Console()
     console.print("Preparing request...")
-    schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
-    stored_schema = schema_manager.get_latest_schema()
-    executor = get_executor_from_settings_and_schema(
-        settings=settings, schema=stored_schema.esi_schema
-    )
+    executor = get_executor_from_settings_and_schema(settings=settings)
     request = request_factory.character_information(
         character_id=character_id,
         handlers=[
@@ -292,11 +271,7 @@ def corporation_blueprints(
     settings = get_settings_from_context(ctx)
     console = Console()
     console.print("Preparing request...")
-    schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
-    stored_schema = schema_manager.get_latest_schema()
-    executor = get_executor_from_settings_and_schema(
-        settings=settings, schema=stored_schema.esi_schema
-    )
+    executor = get_executor_from_settings_and_schema(settings=settings)
     request = request_factory.corporation_blueprints(
         corporation_id=corporation_id,
         character_id=character_id,
@@ -345,11 +320,7 @@ def market_history(
     settings = get_settings_from_context(ctx)
     console = Console()
     console.print("Preparing request group...")
-    schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
-    stored_schema = schema_manager.get_latest_schema()
-    executor = get_executor_from_settings_and_schema(
-        settings=settings, schema=stored_schema.esi_schema
-    )
+    executor = get_executor_from_settings_and_schema(settings=settings)
     console.print("Fetching type IDs for market history requests...")
     type_ids_request = request_factory.market_types_with_active_orders()
     type_ids_group = RequestGroup(

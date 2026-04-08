@@ -22,7 +22,6 @@ from esi_link.helpers.pydantic.serialize_as_yaml import (
     serialize_as_yaml,
 )
 from esi_link.models_and_protocols import Request, RequestGroup
-from esi_link.schema.schema_manager import SchemaManager
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -55,16 +54,7 @@ def execute(
             f"Unsupported file format: {requests_file.suffix}. Supported formats are .json, .yaml, and .yml."
         )
 
-    schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
-    stored_schema = schema_manager.get_latest_schema()
-    executor = get_executor_from_settings_and_schema(
-        settings=settings,
-        schema=stored_schema.esi_schema,
-    )
-    console.print(
-        f"Executing with schema: {stored_schema.esi_schema.version} downloaded at {stored_schema.download_date.format_iso()}"
-    )
-
+    executor = get_executor_from_settings_and_schema(settings=settings)
     response_group = asyncio.run(executor.do_requests(request_group))
     error_count = sum(
         len(x.network_exception_messages) for x in response_group.responses.values()
@@ -113,12 +103,7 @@ def validate(
             f"Unsupported file format: {requests_file.suffix}. Supported formats are .json, .yaml, and .yml."
         )
 
-    schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
-    stored_schema = schema_manager.get_latest_schema()
-    executor = get_executor_from_settings_and_schema(
-        settings=settings,
-        schema=stored_schema.esi_schema,
-    )
+    executor = get_executor_from_settings_and_schema(settings=settings)
 
     # async def validate_requests():
 
