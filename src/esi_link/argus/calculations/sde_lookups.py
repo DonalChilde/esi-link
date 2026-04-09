@@ -1,5 +1,11 @@
-from eve_static_data.models.derived import NormalizedEveTypesDataset
+import logging
+from collections.abc import Iterable
+from dataclasses import dataclass
+
+from eve_static_data.models.derived import MarketPathsDataset, NormalizedEveTypesDataset
 from eve_static_data.models.pydantic.datasets import BlueprintsDataset
+
+logger = logging.getLogger(__name__)
 
 
 def manufactured_items_produced_by_blueprints(
@@ -157,6 +163,17 @@ def published_type_ids(
     return frozenset(published)
 
 
+def market_type_ids(
+    normalized_eve_types: NormalizedEveTypesDataset,
+) -> frozenset[int]:
+    """Returns a set of item type IDs that have a market group ID."""
+    market_types: set[int] = set()
+    for type_id, type_info in normalized_eve_types.records.items():
+        if type_info.marketGroupID is not None:
+            market_types.add(type_id)
+    return frozenset(market_types)
+
+
 def manufactured_items_blueprint_lookup(
     blueprints: BlueprintsDataset, published_type_ids: set[int] | None
 ) -> dict[int, int]:
@@ -209,3 +226,46 @@ def blueprints_in_market(
         if eve_type.marketGroupID is not None:
             in_market.add(blueprint.blueprintTypeID)
     return frozenset(in_market)
+
+
+@dataclass
+class MarketPathName:
+    type_id: int
+    market_path: str
+    name: str
+
+
+def types_market_path_name(
+    type_ids: Iterable[int],
+    normalized_eve_types: NormalizedEveTypesDataset,
+    market_paths: MarketPathsDataset,
+) -> dict[int, MarketPathName]:
+    """Returns a mapping of type IDs to their market path and name.
+
+    TODO move this to eve_static_data as a derived dataset, with all market type_ids.
+    In many cases, this could be loaded instead of the full normalized EVE types dataset.
+    Or, offer normalized eve types in market, and not in market datasets. Investigate
+    the size differences and loading times of these datasets to determine if this would be a worthwhile optimization.
+
+    If a type ID does not have a market group the market path will be set to "Unknown path".
+    If a type ID is not found in the normalized EVE types dataset, a ValueError will be raised.
+    """
+    mapping: dict[int, MarketPathName] = {}
+    for type_id in type_ids:
+        eve_type = normalized_eve_types.records.get(type_id)
+        if eve_type is None:
+            msg = f"Type ID {type_id} not found in normalized EVE types dataset."
+            logger.warning(msg)
+            raise ValueError(msg)
+        market_group_id = eve_type.marketGroupID
+        market_path = (
+            market_paths.records.get(market_group_id) if market_group_id else None
+        )
+        mapping[type_id] = MarketPathName(
+            type_id=type_id,
+            market_path=market_path.delimited_str_path()
+            if market_path
+            else "Unknown path",
+            name=eve_type.name,
+        )
+    return mapping

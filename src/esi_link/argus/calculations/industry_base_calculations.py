@@ -54,73 +54,6 @@ class JobCosts(TypedDict):
     alpha: float
 
 
-# class ManufacturingCosts(TypedDict):
-#     """TypedDict for manufacturing costs."""
-
-#     job_cost: float
-#     facility_tax: float
-#     scc: float
-#     alpha: float
-
-
-# class ResearchCosts(TypedDict):
-#     """TypedDict for research costs."""
-
-#     job_cost: float
-#     facility_tax: float
-#     scc: float
-#     alpha: float
-
-
-# class CopyCosts(TypedDict):
-#     """TypedDict for copy costs."""
-
-#     job_cost: float
-#     facility_tax: float
-#     scc: float
-#     alpha: float
-
-
-# class InventionCosts(TypedDict):
-#     """TypedDict for invention costs."""
-
-#     job_cost: float
-#     facility_tax: float
-#     scc: float
-#     alpha: float
-
-
-# class ReactionCosts(TypedDict):
-#     """TypedDict for reaction costs."""
-
-#     job_cost: float
-#     facility_tax: float
-#     scc: float
-#     alpha: float
-
-
-# def materials_for_manufacturing_eiv(
-#     base_materials: dict[int, int], runs: int
-# ) -> dict[int, int]:
-#     """Calculates the materials required for manufacturing based on base materials and runs."""
-#     required_materials: dict[int, int] = {}
-#     for material_id, quantity in base_materials.items():
-#         required_materials[material_id] = quantity * runs
-#     return required_materials
-
-
-# def materials_for_copy_invention_eiv(
-#     base_materials: dict[int, int],
-# ) -> dict[int, int]:
-#     """Calculates the materials required for copy and invention based on base materials."""
-
-#     # Copy and invention use the base materials directly, no runs multiplier.
-#     # This is different from manufacturing where runs are applied.
-#     required_materials: dict[int, int] = base_materials.copy()
-
-#     return required_materials
-
-
 def reprocess(base_materials: dict[int, int], reprocess_yield: float) -> dict[int, int]:
     """Calculates the materials obtained from reprocessing.
 
@@ -149,6 +82,7 @@ def eiv(
 
     EIV is calculated from the base materials of a blueprint, with no ME correction.
     For manufacturing and copy jobs, supply the number of runs to get the total EIV.
+    Invention EIV is calculated from the material requirements from the produced T2 blueprint.
 
     Args:
         base_materials (dict[int, int]): A dictionary of material IDs and their quantities.

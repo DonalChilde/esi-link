@@ -4,7 +4,7 @@ from typing import Annotated
 from uuid import uuid4
 
 import typer
-from eve_static_data import ESDLoader
+from eve_static_data import SDELoader
 
 from esi_link import EsiLink, request_factory
 from esi_link.argus.calculations.sde_lookups import blueprints_in_market
@@ -46,7 +46,7 @@ def check_blueprints(
         ),
     ] = None,
 ):
-    sde_loader = ESDLoader(sde_path)
+    sde_loader = SDELoader(sde_path)
     eve_types = sde_loader.derived_datasets.normalized_eve_types()
     market_paths = sde_loader.derived_datasets.market_paths()
     response_group = make_requests(
@@ -137,14 +137,14 @@ def make_requests(
 ) -> ResponseGroup:
     """Helper function to create a RequestGroup for character and corporation blueprints."""
     settings = get_settings()
-    schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
+    schema_manager = SchemaManager(schema_directory=settings.schema_store_directory)
     stored_schema = schema_manager.get_latest_schema()
     esi_link = EsiLink(
         schema=stored_schema.esi_schema,
         cache_type="diskcache",
         cache_directory=settings.cache_directory,
-        credentials_file=settings.app_credentials_file,
-        tokens_dir=settings.tokens_dir,
+        credentials_file=settings.auth_credentials_file,
+        tokens_dir=settings.auth_tokens_directory,
     )
 
     character_request = request_factory.character_blueprints(character_id=character_id)
