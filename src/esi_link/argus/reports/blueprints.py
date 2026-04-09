@@ -60,21 +60,22 @@ def owned_blueprints_report_corporation(
 ) -> dict[int, BlueprintReport]:
     """Returns a mapping of owned corporation blueprint type IDs to their market path and name."""
     reports: dict[int, BlueprintReport] = {}
-    path_names = types_market_path_name(
-        type_ids=corporation_blueprints.blueprints,
-        normalized_eve_types=normalized_eve_types,
-        market_paths=market_paths,
-    )
     for bp_type_id, bps in corporation_blueprints.blueprints.items():
-        path_name = path_names.get(bp_type_id)
-        if path_name is None:
-            eve_type = normalized_eve_types.records.get(bp_type_id)
-            name = eve_type.name if eve_type else "Unknown type"
-            path_name = MarketPathName(
-                type_id=bp_type_id,
-                market_path="NOT IN MARKET",
-                name=name,
+        eve_type = normalized_eve_types.records.get(bp_type_id)
+        if eve_type is None:
+            raise ValueError(
+                f"Type ID {bp_type_id} not found in normalized EVE types dataset."
             )
+        name = eve_type.name if eve_type else "Unknown type"
+        if eve_type and eve_type.marketGroupID:
+            market_path_record = market_paths.records.get(eve_type.marketGroupID)
+            if market_path_record is None:
+                raise ValueError(
+                    f"Market group ID {eve_type.marketGroupID} not found in market paths dataset."
+                )
+            market_path = market_path_record.delimited_str_path()
+        else:
+            market_path = "UNKNOWN MARKET PATH"
         bpc = 0
         bpc_runs = 0
         bpo = 0
@@ -102,8 +103,8 @@ def owned_blueprints_report_corporation(
                 )
         report = BlueprintReport(
             type_id=bp_type_id,
-            market_path=path_name.market_path,
-            name=path_name.name,
+            market_path=market_path,
+            name=name,
             bpc=bpc,
             bpc_runs=bpc_runs,
             bpo=bpo,
