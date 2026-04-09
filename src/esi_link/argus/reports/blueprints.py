@@ -51,6 +51,8 @@ class BlueprintReport:
 
 
 # TODO Make sure owned blueprint report includes invented bps.
+
+
 def owned_blueprints_report_corporation(
     corporation_blueprints: GetCorporationsCorporationIdBlueprints,
     normalized_eve_types: NormalizedEveTypesDataset,
@@ -66,7 +68,13 @@ def owned_blueprints_report_corporation(
     for bp_type_id, bps in corporation_blueprints.blueprints.items():
         path_name = path_names.get(bp_type_id)
         if path_name is None:
-            raise ValueError(f"Type ID {bp_type_id} not found in market paths dataset.")
+            eve_type = normalized_eve_types.records.get(bp_type_id)
+            name = eve_type.name if eve_type else "Unknown type"
+            path_name = MarketPathName(
+                type_id=bp_type_id,
+                market_path="NOT IN MARKET",
+                name=name,
+            )
         bpc = 0
         bpc_runs = 0
         bpo = 0
