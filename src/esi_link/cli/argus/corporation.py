@@ -1,15 +1,22 @@
 """Commands for working with Esi corporation data."""
 
 import asyncio
+import json
+from dataclasses import asdict
 from pathlib import Path
 from time import perf_counter
 from typing import Annotated
 
 import typer
+from eve_static_data import SDELoader
 from rich.console import Console
 from whenever import Instant
 
 from esi_link.argus import requests as argus_requests
+from esi_link.argus.reports.blueprints import (
+    missing_blueprints,
+    owned_blueprints_report_corporation,
+)
 from esi_link.argus.reports.corporation_jobs import (
     generate_corporation_jobs_report,
     resolve_corporation_jobs,
@@ -18,6 +25,7 @@ from esi_link.cli.helpers import (
     get_executor_from_settings_and_schema,
     get_settings_from_context,
 )
+from esi_link.helpers.dict_writer import write_dicts_to_csv
 from esi_link.helpers.file_safe_string import file_safe_string
 from esi_link.helpers.save_text_file import save_text_file
 from esi_link.type_defs import LangEnum
@@ -59,6 +67,13 @@ def blueprints(
             "-l", "--lang", help="Language for the ESI response. Defaults to 'en'."
         ),
     ] = LangEnum.EN,
+    sde_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--sde-path",
+            help="Optional path to the EVE Static Data Export (SDE) directory. If provided, a blueprint report will be generated in addition to the raw blueprints data.",
+        ),
+    ] = None,
 ):
     """Fetch blueprints for a corporation."""
     start = perf_counter()
@@ -83,6 +98,56 @@ def blueprints(
             file_name=f"{file_stem}.json",
             overwrite=overwrite,
         )
+        if sde_path:
+            console.print("Generating blueprint report...")
+            sde_loader = SDELoader(sde_path)
+            eve_types = sde_loader.derived_datasets.normalized_eve_types()
+            market_paths = sde_loader.derived_datasets.market_paths()
+            report = owned_blueprints_report_corporation(
+                corporation_blueprints=blueprints,
+                normalized_eve_types=eve_types,
+                market_paths=market_paths,
+            )
+            report_as_dict = {k: asdict(v) for k, v in report.items()}
+            report_file_stem = (
+                f"corporation_{corporation_id}_blueprints_report_{date_str}"
+            )
+            report_file_stem = file_safe_string(report_file_stem)
+            report_save_path = save_text_file(
+                text=json.dumps(report_as_dict, indent=2),
+                output_dir=output_dir,
+                file_name=f"{report_file_stem}.json",
+                overwrite=overwrite,
+            )
+            write_dicts_to_csv(
+                report_as_dict.values(),
+                report_save_path.with_suffix(".csv"),
+                overwrite,
+            )
+            console.print(f"Blueprints report saved to {report_save_path}")
+            missing = missing_blueprints(
+                owned_blueprints=set(blueprints.blueprints),
+                normalized_eve_types=eve_types,
+                market_paths=market_paths,
+                blueprints=sde_loader.sde_datasets.blueprints(),
+            )
+            missing_as_dict = {k: asdict(v) for k, v in missing.items()}
+            missing_file_stem = (
+                f"corporation_{corporation_id}_blueprints_missing_report_{date_str}"
+            )
+            missing_file_stem = file_safe_string(missing_file_stem)
+            missing_save_path = save_text_file(
+                text=json.dumps(missing_as_dict, indent=2),
+                output_dir=output_dir,
+                file_name=f"{missing_file_stem}.json",
+                overwrite=overwrite,
+            )
+            write_dicts_to_csv(
+                missing_as_dict.values(),
+                missing_save_path.with_suffix(".csv"),
+                overwrite,
+            )
+            console.print(f"Missing blueprints report saved to {missing_save_path}")
     except Exception as e:
         console.print(f"[red]Error fetching corporation blueprints: {e}[/red]")
         raise typer.Exit(code=1) from e

@@ -24,11 +24,16 @@ def missing_blueprints(
         only_published=True,
     )
     missing = in_market - owned_blueprints
-    return types_market_path_name(
+    missing_report = types_market_path_name(
         type_ids=missing,
         normalized_eve_types=normalized_eve_types,
         market_paths=market_paths,
     )
+    # sort by market path, then name
+    missing_report = dict(
+        sorted(missing_report.items(), key=lambda x: (x[1].market_path, x[1].name))
+    )
+    return missing_report
 
 
 @dataclass
@@ -45,13 +50,13 @@ class BlueprintReport:
     bpo_te: int = 0
 
 
+# TODO Make sure owned blueprint report includes invented bps.
 def owned_blueprints_report_corporation(
     corporation_blueprints: GetCorporationsCorporationIdBlueprints,
     normalized_eve_types: NormalizedEveTypesDataset,
     market_paths: MarketPathsDataset,
 ) -> dict[int, BlueprintReport]:
     """Returns a mapping of owned corporation blueprint type IDs to their market path and name."""
-    # TODO add extra info to the report, such as quantity, BPC/BPO, ME/TE, etc. This will likely require changes to the data model and report structure.
     reports: dict[int, BlueprintReport] = {}
     path_names = types_market_path_name(
         type_ids=corporation_blueprints.blueprints,
@@ -72,12 +77,12 @@ def owned_blueprints_report_corporation(
         for blueprint in bps:
             if blueprint.quantity == -2:  # BPC
                 bpc_runs += blueprint.runs if blueprint.runs else 0
-                bpc += blueprint.quantity
+                bpc += 1
                 # record the highest ME and TE for the BPC.
                 bpc_me = max(bpc_me, blueprint.material_efficiency)
                 bpc_te = max(bpc_te, blueprint.time_efficiency)
             elif blueprint.quantity == -1:  # BPO
-                bpo += blueprint.quantity
+                bpo += 1
                 # record the highest ME and TE for the BPO.
                 bpo_me = max(bpo_me, blueprint.material_efficiency)
                 bpo_te = max(bpo_te, blueprint.time_efficiency)
@@ -100,4 +105,6 @@ def owned_blueprints_report_corporation(
             bpo_te=bpo_te,
         )
         reports[bp_type_id] = report
+    # sort by market path, then name
+    reports = dict(sorted(reports.items(), key=lambda x: (x[1].market_path, x[1].name)))
     return reports
