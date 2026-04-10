@@ -427,3 +427,38 @@ async def market_orders_region(
     rd = make_response_data(response=response)
     orders = argus_models.GetMarketsRegionIdOrders.from_response_data(response_data=rd)
     return orders
+
+
+async def universe_type_ids(
+    esi_link: EsiLink,
+    lang: Lang = "en",
+) -> argus_models.GetUniverseTypes:
+    """Fetches the universe type IDs from the ESI API.
+
+    Args:
+        esi_link: An instance of EsiLink to use for API calls.
+        lang: The language to use for the API response. Defaults to "en".
+
+    Returns:
+        A GetUniverseTypes instance containing the universe type IDs.
+
+    Raises:
+        ValueError: If the API call fails or returns a > 399 status code.
+    """
+    request = request_factory.universe_types(lang=lang)
+    request_group = RequestGroup(
+        group_id=uuid4(), requests={request.request_id: request}
+    )
+    response_group = await esi_link.do_requests(request_group)
+    response = response_group.responses[request.request_id]
+    try:
+        raise_for_network_errors(response)
+    except EsiLinkError as e:
+        logger.error("Network error while fetching universe type IDs: %s", e)
+        raise ValueError(f"Failed to fetch universe type IDs. {e}") from e
+
+    rd = make_response_data(response=response)
+    type_ids = argus_models.GetUniverseTypes.from_response_data(response_data=rd)
+    # sort type IDs for more consistent output and easier testing
+    type_ids.type_ids.sort()
+    return type_ids

@@ -322,6 +322,28 @@ class GetCorporationsCorporationIdIndustryJobs(EsiDataModel):
         return cls.model_validate(model_dict)
 
 
+class GetUniverseTypes(EsiDataModel):
+    type_ids: list[int]
+
+    @classmethod
+    def from_response_data(cls, response_data: ResponseData) -> Self:
+        """Create a GetUniverseTypes instance from ESI response data."""
+        operation_id = "GetUniverseTypes"
+        if response_data.request.operation_id != operation_id:
+            raise ValueError(
+                f"Expected operation_id {operation_id}, got {response_data.request.operation_id}"
+            )
+        type_ids = [int(item) for item in response_data.data]
+        return cls.model_validate(
+            {
+                "operation_id": operation_id,
+                "response_date": response_data.response_date,
+                "received_at": response_data.received_at,
+                "type_ids": type_ids,
+            }
+        )
+
+
 @dataclass(slots=True, kw_only=True)
 class PostUniverseNamesItem:
     id_: int

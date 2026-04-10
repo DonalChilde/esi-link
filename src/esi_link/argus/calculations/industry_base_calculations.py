@@ -75,19 +75,16 @@ def reprocess(base_materials: dict[int, int], reprocess_yield: float) -> dict[in
     return reprocessed_materials
 
 
-def eiv(
-    base_materials: dict[int, int], adjusted_prices: dict[int, float], runs: int = 1
-) -> float:
+def eiv(base_materials: dict[int, int], adjusted_prices: dict[int, float]) -> float:
     """Calculates the estimated item value (EIV) of a set of materials.
 
     EIV is calculated from the base materials of a blueprint, with no ME correction.
-    For manufacturing and copy jobs, supply the number of runs to get the total EIV.
+
     Invention EIV is calculated from the material requirements from the produced T2 blueprint.
 
     Args:
         base_materials (dict[int, int]): A dictionary of material IDs and their quantities.
         adjusted_prices (dict[int, float]): A dictionary of material IDs and their adjusted prices.
-        runs (int): The number of runs for the job. Defaults to 1.
 
     Returns:
         float: The estimated item value of the materials.
@@ -95,11 +92,12 @@ def eiv(
     total_value = 0.0
     for material_id, quantity in base_materials.items():
         if material_id in adjusted_prices:
-            total_value += adjusted_prices[material_id] * quantity * runs
+            total_value += adjusted_prices[material_id] * quantity
         else:
             raise ValueError(
                 f"Material ID {material_id} not found in adjusted_prices dictionary."
             )
+
     return total_value
 
 

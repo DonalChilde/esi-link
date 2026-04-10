@@ -279,3 +279,20 @@ def names_from_ids(
         json_body=ids_,
         response_handlers=handlers,
     )
+
+
+def universe_types(
+    handlers: list[ResponseHandlerConfig] | None = None, lang: Lang = "en"
+) -> Request:
+    """Request factory for the GetUniverseTypes operation."""
+    handlers = handlers or []
+    return Request(
+        request_id=uuid4(),
+        operation_id="GetUniverseTypes",
+        path_parameters={},
+        query_parameters={"page": 1},
+        auth_character_id=None,
+        lang=lang,
+        json_body=None,
+        response_handlers=handlers,
+    )
