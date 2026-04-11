@@ -9,7 +9,7 @@ from rich.json import JSON
 from rich.prompt import Confirm
 
 from esi_link.cli.esi_auth.helpers import load_credentials
-from esi_link.cli.helpers import get_settings_from_context
+from esi_link.cli.helpers import get_esi_link_settings_from_context
 from esi_link.esi_auth.models import EveAppCredentials
 
 app = typer.Typer(no_args_is_help=True)
@@ -18,7 +18,7 @@ app = typer.Typer(no_args_is_help=True)
 @app.command()
 def show(ctx: typer.Context):
     """Show the stored app credentials."""
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     console = Console()
     credentials = load_credentials(settings, console)
     console.print(JSON.from_data(credentials.model_dump(mode="json")))
@@ -36,7 +36,7 @@ def add(
     Expects a JSON file in the format of EveAppCredentials. The file is read
     and validated, and then stored in the app.
     """
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     console = Console()
     if settings.app_credentials_file.exists():
         console.print(
@@ -60,7 +60,7 @@ def add(
 @app.command()
 def remove(ctx: typer.Context):
     """Remove the stored app credentialsand associated token files."""
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     console = Console()
     if not settings.app_credentials_file.exists():
         console.print(

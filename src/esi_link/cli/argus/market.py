@@ -11,10 +11,8 @@ from whenever import Instant
 
 from esi_link.argus import requests as argus_requests
 from esi_link.argus.calculations.calculate_order_summary import calculate_summaries
-from esi_link.cli.helpers import (
-    get_executor_from_settings_and_schema,
-    get_settings_from_context,
-)
+from esi_link.cli.argus.helpers import get_argus_settings_from_context
+from esi_link.cli.helpers import get_executor_from_settings_and_schema
 from esi_link.helpers.file_safe_string import file_safe_string
 from esi_link.helpers.save_text_file import save_text_file
 from esi_link.type_defs import LangEnum
@@ -56,9 +54,10 @@ def orders(
 ):
     """Fetch market orders for a region."""
     start = perf_counter()
-    settings = get_settings_from_context(ctx)
+    argus_settings = get_argus_settings_from_context(ctx)
+    esi_link_settings = argus_settings.esi_link_settings
     console = Console()
-    executor = get_executor_from_settings_and_schema(settings=settings)
+    executor = get_executor_from_settings_and_schema(settings=esi_link_settings)
     console.print(f"Fetching market orders for region {region_id}...")
     try:
         orders_task = argus_requests.market_orders_region(
@@ -136,9 +135,10 @@ def order_summaries(
 ):
     """Fetch market order summaries for a region and type, optionally additional summaries filtered by solar system."""
     start = perf_counter()
-    settings = get_settings_from_context(ctx)
+    argus_settings = get_argus_settings_from_context(ctx)
+    esi_link_settings = argus_settings.esi_link_settings
     console = Console()
-    executor = get_executor_from_settings_and_schema(settings=settings)
+    executor = get_executor_from_settings_and_schema(settings=esi_link_settings)
     console.print(f"Fetching market orders for region {region_id}...")
     try:
         orders_task = argus_requests.market_orders_region(
@@ -220,9 +220,10 @@ def universe_prices(
 ):
     """Fetch market prices for all items in the universe."""
     start = perf_counter()
-    settings = get_settings_from_context(ctx)
+    argus_settings = get_argus_settings_from_context(ctx)
+    esi_link_settings = argus_settings.esi_link_settings
     console = Console()
-    executor = get_executor_from_settings_and_schema(settings=settings)
+    executor = get_executor_from_settings_and_schema(settings=esi_link_settings)
     console.print(f"Fetching market prices for the universe...")
     try:
         prices_task = argus_requests.universe_prices(esi_link=executor, lang=lang.value)

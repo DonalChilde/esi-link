@@ -12,7 +12,7 @@ from rich.rule import Rule
 from rich.table import Table
 from whenever import Instant
 
-from esi_link.cli.helpers import get_settings_from_context
+from esi_link.cli.helpers import get_esi_link_settings_from_context
 from esi_link.helpers.datetime_filename import file_safe_iso_datetime_string
 from esi_link.helpers.download_schema import (
     download_schema,
@@ -61,7 +61,7 @@ def download(
     console = Console()
     compat_date = compatibility_date or current_compatibility_date()
     console.print(f"Downloading ESI schema for compatibility date {compat_date}...")
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     schema_download = asyncio.run(
         download_schema(compatibility_date=compat_date, url=settings.esi_schema_url)
     )
@@ -116,7 +116,7 @@ def changelog(
     """Show the changelog for the ESI schema."""
     console = Console()
     console.print("Fetching ESI schema changelog...")
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     changelog = asyncio.run(
         download_schema_changelog(url=settings.esi_schema_changelog_url)
     )
@@ -177,7 +177,7 @@ def operations(
     recent schema matching the compatibility date will be used.
     """
     console = Console()
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     store_manager = SchemaManager(schema_directory=settings.schema_store_dir)
     try:
         stored_schema = get_schema(
@@ -223,7 +223,7 @@ def operations(
 def available_schemas(ctx: typer.Context):
     """List the available ESI schemas in the schema store."""
     console = Console()
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     store_manager = SchemaManager(schema_directory=settings.schema_store_dir)
     schemas = store_manager.available_schemas()
     table = Table(title="Available ESI Schemas")

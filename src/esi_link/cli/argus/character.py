@@ -10,10 +10,8 @@ from rich.console import Console
 from whenever import Instant
 
 from esi_link.argus import requests as argus_requests
-from esi_link.cli.helpers import (
-    get_executor_from_settings_and_schema,
-    get_settings_from_context,
-)
+from esi_link.cli.argus.helpers import get_argus_settings_from_context
+from esi_link.cli.helpers import get_executor_from_settings_and_schema
 from esi_link.helpers.file_safe_string import file_safe_string
 from esi_link.helpers.save_text_file import save_text_file
 from esi_link.type_defs import LangEnum
@@ -55,10 +53,11 @@ def blueprints(
 ):
     """Fetch blueprints for a character."""
     start = perf_counter()
-    settings = get_settings_from_context(ctx)
+    argus_settings = get_argus_settings_from_context(ctx)
+    esi_link_settings = argus_settings.esi_link_settings
     console = Console()
+    executor = get_executor_from_settings_and_schema(settings=esi_link_settings)
     console.print(f"Fetching blueprints for character {character_id}...")
-    executor = get_executor_from_settings_and_schema(settings=settings)
     try:
         blueprints_task = argus_requests.character_blueprints(
             character_id=character_id, esi_link=executor, lang=lang.value
@@ -115,10 +114,11 @@ def information(
 ):
     """Fetch information for a character."""
     start = perf_counter()
-    settings = get_settings_from_context(ctx)
+    argus_settings = get_argus_settings_from_context(ctx)
+    esi_link_settings = argus_settings.esi_link_settings
     console = Console()
+    executor = get_executor_from_settings_and_schema(settings=esi_link_settings)
     console.print(f"Fetching information for character {character_id}...")
-    executor = get_executor_from_settings_and_schema(settings=settings)
     try:
         character_info_task = argus_requests.character_information(
             character_id=character_id, esi_link=executor, lang=lang.value
@@ -185,10 +185,11 @@ def jobs(
 ):
     """Fetch industry jobs for a character."""
     start = perf_counter()
-    settings = get_settings_from_context(ctx)
+    argus_settings = get_argus_settings_from_context(ctx)
+    esi_link_settings = argus_settings.esi_link_settings
     console = Console()
+    executor = get_executor_from_settings_and_schema(settings=esi_link_settings)
     console.print(f"Fetching industry jobs for character {character_id}...")
-    executor = get_executor_from_settings_and_schema(settings=settings)
     try:
         jobs_task = argus_requests.character_jobs(
             character_id=character_id,

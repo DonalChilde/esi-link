@@ -6,7 +6,7 @@ from rich.json import JSON
 from whenever import Instant
 
 from esi_link.cli.esi_auth.helpers import load_cached_oauth_metadata
-from esi_link.cli.helpers import get_settings_from_context
+from esi_link.cli.helpers import get_esi_link_settings_from_context
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -19,7 +19,7 @@ def show(ctx: typer.Context):
     If the metadata is expired, it will be refreshed automatically and the new metadata
     will be displayed.
     """
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     console = Console()
     cached_metadata = load_cached_oauth_metadata(settings, console)
     expires_in = (

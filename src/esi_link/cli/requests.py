@@ -9,8 +9,8 @@ import typer
 from rich.console import Console
 
 from esi_link.cli.helpers import (
+    get_esi_link_settings_from_context,
     get_executor_from_settings_and_schema,
-    get_settings_from_context,
 )
 from esi_link.factory import EsiLinkObjectFactory
 from esi_link.helpers.pydantic.serialize_as_json import (
@@ -43,7 +43,7 @@ def execute(
     ],
 ):
     """Execute the ESI Link CLI command."""
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     console = Console()
     if requests_file.suffix.lower() in [".yaml", ".yml"]:
         request_group = load_from_yaml(requests_file, RequestGroup)
@@ -92,7 +92,7 @@ def validate(
 
     Validates requests, and reports errors to console.
     """
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     console = Console()
     if requests_file.suffix.lower() in [".yaml", ".yml"]:
         request_group = load_from_yaml(requests_file, RequestGroup)
@@ -126,7 +126,7 @@ def group_stub(ctx: typer.Context):
     # output a stub RequestGroup to a file or terminal for use as a template.
     # Option for JSON or YAML output.
 
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     # Here you would add the logic for the group stub command using the settings
     print(f"Group stub with settings: {settings}")
 
@@ -138,7 +138,7 @@ def request_stub(ctx: typer.Context):
     # Option for JSON or YAML output.
     # option to specify operation_id, and have parameters generated.
 
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     # Here you would add the logic for the stub command using the settings
     print(f"Stub with settings: {settings}")
 
@@ -148,6 +148,6 @@ def handlers(ctx: typer.Context):
     """Handlers command."""
     # List the available handlers for use in the RequestGroups, and their parameters.
     # Get the doc string from the handler for details?
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     # Here you would add the logic for the handlers command using the settings
     print(f"Handlers with settings: {settings}")

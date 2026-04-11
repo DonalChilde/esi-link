@@ -12,7 +12,7 @@ from esi_link import USER_AGENT
 from esi_link.cli.esi_auth.helpers import (
     get_authenticator,
 )
-from esi_link.cli.helpers import get_settings_from_context
+from esi_link.cli.helpers import get_esi_link_settings_from_context
 from esi_link.esi_auth.auth_provider import AuthProvider
 from esi_link.esi_auth.simple_json_store import CharacterTokenManager
 
@@ -32,7 +32,7 @@ def add(
     ] = False,
 ):
     """Add a new CharacterToken."""
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     console = Console()
     authenticator = get_authenticator(settings, console)
     token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
@@ -82,7 +82,7 @@ def list(
     ctx: typer.Context,
 ):
     """List all CharacterTokens."""
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     console = Console()
     authenticator = get_authenticator(settings, console)
     token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
@@ -112,7 +112,7 @@ def auth_headers(
     ],
 ):
     """Show the auth headers for a CharacterToken by character ID."""
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     console = Console()
     authenticator = get_authenticator(settings, console)
     token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
@@ -141,7 +141,7 @@ def remove(
     ],
 ):
     """Remove and revoke a CharacterToken by character ID."""
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     console = Console()
     authenticator = get_authenticator(settings, console)
     token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
@@ -172,7 +172,7 @@ def refresh(
     ],
 ):
     """Refresh a CharacterToken by character ID."""
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     console = Console()
     authenticator = get_authenticator(settings, console)
     token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
@@ -202,7 +202,7 @@ def refresh_all(
     ctx: typer.Context,
 ):
     """Refresh all CharacterTokens."""
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     console = Console()
     authenticator = get_authenticator(settings, console)
     token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)

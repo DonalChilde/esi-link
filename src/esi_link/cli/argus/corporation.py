@@ -21,10 +21,8 @@ from esi_link.argus.reports.corporation_jobs import (
     generate_corporation_jobs_report,
     resolve_corporation_jobs,
 )
-from esi_link.cli.helpers import (
-    get_executor_from_settings_and_schema,
-    get_settings_from_context,
-)
+from esi_link.cli.argus.helpers import get_argus_settings_from_context
+from esi_link.cli.helpers import get_executor_from_settings_and_schema
 from esi_link.helpers.dict_writer import write_dicts_to_csv
 from esi_link.helpers.file_safe_string import file_safe_string
 from esi_link.helpers.save_text_file import save_text_file
@@ -77,9 +75,10 @@ def blueprints(
 ):
     """Fetch blueprints for a corporation."""
     start = perf_counter()
-    settings = get_settings_from_context(ctx)
+    argus_settings = get_argus_settings_from_context(ctx)
+    esi_link_settings = argus_settings.esi_link_settings
     console = Console()
-    executor = get_executor_from_settings_and_schema(settings=settings)
+    executor = get_executor_from_settings_and_schema(settings=esi_link_settings)
     console.print(f"Fetching blueprints for corporation {corporation_id}...")
     try:
         blueprints_task = argus_requests.corporation_blueprints(
@@ -100,6 +99,7 @@ def blueprints(
         )
         if sde_path:
             console.print("Generating blueprint report...")
+            # TODO use the
             sde_loader = SDELoader(sde_path)
             eve_types = sde_loader.derived_datasets.normalized_eve_types()
             market_paths = sde_loader.derived_datasets.market_paths()
@@ -246,9 +246,10 @@ def jobs(
 ):
     """Fetch industry jobs for a corporation."""
     start = perf_counter()
-    settings = get_settings_from_context(ctx)
+    argus_settings = get_argus_settings_from_context(ctx)
+    esi_link_settings = argus_settings.esi_link_settings
     console = Console()
-    executor = get_executor_from_settings_and_schema(settings=settings)
+    executor = get_executor_from_settings_and_schema(settings=esi_link_settings)
     console.print(f"Fetching industry jobs for corporation {corporation_id}...")
     try:
         jobs_task = argus_requests.corporation_jobs(

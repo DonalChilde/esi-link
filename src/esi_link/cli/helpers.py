@@ -11,7 +11,7 @@ from esi_link.schema.schema_manager import SchemaManager
 from esi_link.settings import EsiLinkSettings
 
 
-def get_settings_from_context(ctx: typer.Context) -> EsiLinkSettings:
+def get_esi_link_settings_from_context(ctx: typer.Context) -> EsiLinkSettings:
     """Helper function to get the ESI Link settings from the Typer context."""
     if ctx.obj is None or "esi-link-settings" not in ctx.obj:
         raise ValueError("ESI Link settings not found in context.")

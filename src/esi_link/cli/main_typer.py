@@ -6,6 +6,7 @@ from dataclasses import asdict
 import typer
 
 from esi_link import __app_name__, __version__
+from esi_link.argus.settings import ArgusSettings
 from esi_link.cli.argus import app as argus_app
 from esi_link.cli.cache import app as cache_app
 from esi_link.cli.config_info import app as config_info_app
@@ -47,6 +48,13 @@ def default_options(ctx: typer.Context):
     settings = get_settings()
     setup_logging(log_dir=settings.log_directory)
     ctx.obj = {"esi-link-settings": settings}
+    # Make an argus-settings field for now, this can be removed when Argus is split from ESI Link and has its own app.
+    argus_settings = ArgusSettings(
+        application_directory=settings.application_directory / "argus",
+        sde_directory=settings.application_directory / "argus" / "sde",
+        esi_link_settings=settings,
+    )
+    ctx.obj["argus-settings"] = argus_settings
     logger.info(
         f"Starting {__app_name__} v{__version__} with settings: {asdict(settings)!r}"
     )

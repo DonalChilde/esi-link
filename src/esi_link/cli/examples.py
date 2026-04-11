@@ -12,8 +12,8 @@ from rich.json import JSON
 
 import esi_link.handler_factory
 from esi_link.cli.helpers import (
+    get_esi_link_settings_from_context,
     get_executor_from_settings_and_schema,
-    get_settings_from_context,
 )
 from esi_link.cli.response_display_helpers import display_response_group_summary
 from esi_link.models_and_protocols import RequestGroup, Response
@@ -36,7 +36,7 @@ def status(
     ] = None,
 ):
     """Run tests for ESI Link."""
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     console = Console()
     console.print("Preparing request...")
     executor = get_executor_from_settings_and_schema(settings=settings)
@@ -78,7 +78,7 @@ def pages(
     ] = None,
 ):
     """Test handling of paged requests."""
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     console = Console()
     console.print("Preparing request...")
     executor = get_executor_from_settings_and_schema(settings=settings)
@@ -126,7 +126,7 @@ def changelog(
     ] = None,
 ):
     """Test a request with an optional response handler."""
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     console = Console()
     console.print("Preparing request...")
     executor = get_executor_from_settings_and_schema(settings=settings)
@@ -172,7 +172,7 @@ def character_stats(
     ] = None,
 ):
     """Test a request with an optional response handler."""
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     console = Console()
     console.print("Preparing request...")
     executor = get_executor_from_settings_and_schema(settings=settings)
@@ -219,7 +219,7 @@ def character_info(
     ] = None,
 ):
     """Example ESI request for the GetCharactersCharacterId operation."""
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     console = Console()
     console.print("Preparing request...")
     executor = get_executor_from_settings_and_schema(settings=settings)
@@ -268,7 +268,7 @@ def corporation_blueprints(
     ] = None,
 ):
     """Example ESI request for the GetCorporationsCorporationIdBlueprints operation."""
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     console = Console()
     console.print("Preparing request...")
     executor = get_executor_from_settings_and_schema(settings=settings)
@@ -317,7 +317,7 @@ def market_history(
     one request per type ID. Saves the responses to a JSONL file in the specified output
     directory, and any response errors in an `errors` subdirectory.
     """
-    settings = get_settings_from_context(ctx)
+    settings = get_esi_link_settings_from_context(ctx)
     console = Console()
     console.print("Preparing request group...")
     executor = get_executor_from_settings_and_schema(settings=settings)
