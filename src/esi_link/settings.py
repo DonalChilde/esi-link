@@ -26,12 +26,6 @@ ISSUER = "https://login.eveonline.com"
 """The issuer to use for ESI Auth tokens."""
 
 
-# TODO add object creation methods to settings class, so we can do something like settings.AuthProvider().
-# This is because all the settings are here any way, and it make sense to have a shortcut.
-
-# TODO consider using the argus settings idea to split esi-auth again.
-
-
 @dataclass(slots=True)
 class EsiLinkSettings:
     """Settings for the ESI Link application."""

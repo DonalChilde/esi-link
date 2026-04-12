@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from uuid import uuid4
 
 from esi_link import EsiLink, request_factory
-from esi_link.argus import models as argus_models
+from esi_link.argus.models import esi_models as esi_models
 from esi_link.errors import EsiLinkError
 from esi_link.helpers.make_response_data import make_response_data
 from esi_link.helpers.raise_for_errors import raise_for_network_errors
@@ -54,7 +54,7 @@ def _prepare_post_universe_name_ids(ids_: Iterable[int]) -> tuple[list[int], lis
 
 async def corporation_blueprints(
     corporation_id: int, character_id: int, esi_link: EsiLink, lang: Lang = "en"
-) -> argus_models.GetCorporationsCorporationIdBlueprints:
+) -> esi_models.GetCorporationsCorporationIdBlueprints:
     """Fetches the corporation's blueprints from the ESI API.
 
     Args:
@@ -86,7 +86,7 @@ async def corporation_blueprints(
         raise ValueError(f"Failed to fetch corporation blueprints. {e}") from e
 
     rd = make_response_data(response=response)
-    blueprints = argus_models.GetCorporationsCorporationIdBlueprints.from_response_data(
+    blueprints = esi_models.GetCorporationsCorporationIdBlueprints.from_response_data(
         response_data=rd
     )
     return blueprints
@@ -98,7 +98,7 @@ async def corporation_jobs(
     esi_link: EsiLink,
     include_completed: bool = False,
     lang: Lang = "en",
-) -> argus_models.GetCorporationsCorporationIdIndustryJobs:
+) -> esi_models.GetCorporationsCorporationIdIndustryJobs:
     """Fetches the corporation's industry jobs from the ESI API.
 
     Args:
@@ -131,7 +131,7 @@ async def corporation_jobs(
         logger.error("Network error while fetching corporation jobs: %s", e)
         raise ValueError(f"Failed to fetch corporation jobs. {e}") from e
     rd = make_response_data(response=response)
-    jobs = argus_models.GetCorporationsCorporationIdIndustryJobs.from_response_data(
+    jobs = esi_models.GetCorporationsCorporationIdIndustryJobs.from_response_data(
         response_data=rd
     )
     return jobs
@@ -139,7 +139,7 @@ async def corporation_jobs(
 
 async def names_from_ids(
     ids_: Iterable[int], esi_link: EsiLink
-) -> argus_models.PostUniverseNames:
+) -> esi_models.PostUniverseNames:
     """Given an iterable of IDs, returns a dictionary mapping each ID to its name.
 
     The ESI API has a limit of 1000 IDs per request. This function automatically
@@ -184,7 +184,7 @@ async def names_from_ids(
     logger.info("Sending %s batch request(s) to ESI", len(id_batches))
 
     all_names_dict: dict[int, object] = {}
-    first_batch_response: argus_models.PostUniverseNames | None = None
+    first_batch_response: esi_models.PostUniverseNames | None = None
 
     for batch_idx, batch_ids in enumerate(id_batches, 1):
         logger.debug(
@@ -207,9 +207,7 @@ async def names_from_ids(
             raise ValueError(f"Failed to resolve names for batch {batch_idx}.") from e
 
         rd = make_response_data(response=response)
-        batch_names = argus_models.PostUniverseNames.from_response_data(
-            response_data=rd
-        )
+        batch_names = esi_models.PostUniverseNames.from_response_data(response_data=rd)
 
         if first_batch_response is None:
             first_batch_response = batch_names
@@ -224,7 +222,7 @@ async def names_from_ids(
     if first_batch_response is None:
         raise ValueError(f"Failed to resolve any IDs. No successful batch responses.")
 
-    names = argus_models.PostUniverseNames.model_validate(
+    names = esi_models.PostUniverseNames.model_validate(
         {
             "operation_id": first_batch_response.operation_id,
             "response_date": first_batch_response.response_date,
@@ -238,7 +236,7 @@ async def names_from_ids(
 
 async def character_blueprints(
     character_id: int, esi_link: EsiLink, lang: Lang = "en"
-) -> argus_models.GetCorporationsCorporationIdIndustryJobs:
+) -> esi_models.GetCorporationsCorporationIdIndustryJobs:
     """Fetches the character's blueprints from the ESI API.
 
     Args:
@@ -268,17 +266,15 @@ async def character_blueprints(
         raise ValueError(f"Failed to fetch character blueprints. {e}") from e
 
     rd = make_response_data(response=response)
-    blueprints = (
-        argus_models.GetCorporationsCorporationIdIndustryJobs.from_response_data(
-            response_data=rd
-        )
+    blueprints = esi_models.GetCorporationsCorporationIdIndustryJobs.from_response_data(
+        response_data=rd
     )
     return blueprints
 
 
 async def character_information(
     character_id: int, esi_link: EsiLink, lang: Lang = "en"
-) -> argus_models.GetCharactersCharacterId:
+) -> esi_models.GetCharactersCharacterId:
     """Fetches the character's information from the ESI API.
 
     Args:
@@ -308,7 +304,7 @@ async def character_information(
         raise ValueError(f"Failed to fetch character information. {e}") from e
 
     rd = make_response_data(response=response)
-    character_info = argus_models.GetCharactersCharacterId.from_response_data(
+    character_info = esi_models.GetCharactersCharacterId.from_response_data(
         response_data=rd
     )
     return character_info
@@ -319,7 +315,7 @@ async def character_jobs(
     esi_link: EsiLink,
     include_completed: bool = False,
     lang: Lang = "en",
-) -> argus_models.GetCharactersCharacterIdIndustryJobs:
+) -> esi_models.GetCharactersCharacterIdIndustryJobs:
     """Fetches the character's industry jobs from the ESI API.
 
     Args:
@@ -351,7 +347,7 @@ async def character_jobs(
         raise ValueError(f"Failed to fetch character jobs. {e}") from e
 
     rd = make_response_data(response=response)
-    jobs = argus_models.GetCharactersCharacterIdIndustryJobs.from_response_data(
+    jobs = esi_models.GetCharactersCharacterIdIndustryJobs.from_response_data(
         response_data=rd
     )
     return jobs
@@ -360,7 +356,7 @@ async def character_jobs(
 async def universe_prices(
     esi_link: EsiLink,
     lang: Lang = "en",
-) -> argus_models.GetMarketsPrices:
+) -> esi_models.GetMarketsPrices:
     """Fetches the universe prices from the ESI API.
 
     Args:
@@ -386,7 +382,7 @@ async def universe_prices(
         raise ValueError(f"Failed to fetch universe prices. {e}") from e
 
     rd = make_response_data(response=response)
-    prices = argus_models.GetMarketsPrices.from_response_data(response_data=rd)
+    prices = esi_models.GetMarketsPrices.from_response_data(response_data=rd)
     return prices
 
 
@@ -394,7 +390,7 @@ async def market_orders_region(
     region_id: int,
     esi_link: EsiLink,
     lang: Lang = "en",
-) -> argus_models.GetMarketsRegionIdOrders:
+) -> esi_models.GetMarketsRegionIdOrders:
     """Fetches the market orders for a region from the ESI API.
 
     Args:
@@ -425,14 +421,14 @@ async def market_orders_region(
         ) from e
 
     rd = make_response_data(response=response)
-    orders = argus_models.GetMarketsRegionIdOrders.from_response_data(response_data=rd)
+    orders = esi_models.GetMarketsRegionIdOrders.from_response_data(response_data=rd)
     return orders
 
 
 async def universe_type_ids(
     esi_link: EsiLink,
     lang: Lang = "en",
-) -> argus_models.GetUniverseTypes:
+) -> esi_models.GetUniverseTypes:
     """Fetches the universe type IDs from the ESI API.
 
     Args:
@@ -458,7 +454,7 @@ async def universe_type_ids(
         raise ValueError(f"Failed to fetch universe type IDs. {e}") from e
 
     rd = make_response_data(response=response)
-    type_ids = argus_models.GetUniverseTypes.from_response_data(response_data=rd)
+    type_ids = esi_models.GetUniverseTypes.from_response_data(response_data=rd)
     # sort type IDs for more consistent output and easier testing
     type_ids.type_ids.sort()
     return type_ids

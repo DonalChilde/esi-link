@@ -58,8 +58,8 @@ applyTo: "**/*.py"
 
 - `src/esi_link/` - Main package code
 - `tests/` - Test suite mirroring src structure
-- `cli/` - Command-line interface using Typer
-- `helpers/` - Utility functions
+- `src/esi_link/cli/` - Command-line interface using Typer
+- `src/esi_link/helpers/` - Utility functions
 
 ## Dependencies
 
