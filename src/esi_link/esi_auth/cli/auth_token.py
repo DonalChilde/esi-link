@@ -9,11 +9,11 @@ from rich.console import Console
 from rich.json import JSON
 
 from esi_link import USER_AGENT
-from esi_link.cli.esi_auth.helpers import (
-    get_authenticator,
-)
 from esi_link.cli.helpers import get_esi_link_settings_from_context
 from esi_link.esi_auth.auth_provider import AuthProvider
+from esi_link.esi_auth.cli.helpers import (
+    get_authenticator,
+)
 from esi_link.esi_auth.simple_json_store import CharacterTokenManager
 
 app = typer.Typer(no_args_is_help=True)

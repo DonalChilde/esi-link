@@ -5,8 +5,8 @@ from rich.console import Console
 from rich.json import JSON
 from whenever import Instant
 
-from esi_link.cli.esi_auth.helpers import load_cached_oauth_metadata
 from esi_link.cli.helpers import get_esi_link_settings_from_context
+from esi_link.esi_auth.cli.helpers import load_cached_oauth_metadata
 
 app = typer.Typer(no_args_is_help=True)
 

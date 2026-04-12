@@ -4,9 +4,9 @@ import logging
 
 import typer
 
-from esi_link.cli.esi_auth.app_credentials import app as app_credentials_app
-from esi_link.cli.esi_auth.auth_token import app as auth_token_app
-from esi_link.cli.esi_auth.oauth_settings import app as oauth_settings_app
+from esi_link.esi_auth.cli.app_credentials import app as app_credentials_app
+from esi_link.esi_auth.cli.auth_token import app as auth_token_app
+from esi_link.esi_auth.cli.oauth_settings import app as oauth_settings_app
 
 logger = logging.getLogger(__name__)
 app = typer.Typer(no_args_is_help=True)

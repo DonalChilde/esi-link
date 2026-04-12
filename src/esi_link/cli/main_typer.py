@@ -8,10 +8,10 @@ from esi_link.argus.cli.main_typer import app as argus_app
 from esi_link.cli.cache import app as cache_app
 from esi_link.cli.callback import default_options
 from esi_link.cli.config_info import app as config_info_app
-from esi_link.cli.esi_auth.main_typer import app as esi_auth_app
 from esi_link.cli.esi_schema import app as esi_schema_app
 from esi_link.cli.examples import app as examples_app
 from esi_link.cli.requests import app as requests_app
+from esi_link.esi_auth.cli.main_typer import app as esi_auth_app
 
 logger = logging.getLogger(__name__)
 app = typer.Typer(
