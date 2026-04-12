@@ -14,4 +14,11 @@ __description__ = "A simple library for managing EVE Online ESI authentication t
 # FIXME implement esi-auth refactor to use:
 # - settings mangement eg argus and eve-static-data
 # - move constants to this module
-# - move cli commands to this package, reflecting the eventual split of esi-auth from esi-link, and the eventual split of argus from esi-link
+OAUTH_METADATA_URL = (
+    "https://login.eveonline.com/.well-known/oauth-authorization-server"
+)
+"""URL to fetch OAuth metadata from the ESI auth server."""
+AUDIENCE = "EVE Online"
+"""The audience to use for ESI Auth tokens."""
+ISSUER = "https://login.eveonline.com"
+"""The issuer to use for ESI Auth tokens."""
