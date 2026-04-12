@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.13"
 
 [options]
-exclude-newer = "2026-04-03T21:31:12.566911021Z"
+exclude-newer = "2026-04-05T00:01:15.607860292Z"
 exclude-newer-span = "P1W"
 
 [[package]]
@@ -458,7 +458,7 @@ dev = [
 [[package]]
 name = "eve-static-data"
 version = "0.2.3"
-source = { git = "https://github.com/DonalChilde/eve-static-data?branch=main#0e88da64370a1c339e271597dbe8da62b1a69c51" }
+source = { git = "https://github.com/DonalChilde/eve-static-data?branch=main#965aa9f993cf15d7989451e0518fac273db405b8" }
 dependencies = [
     { name = "aiohttp" },
     { name = "pydantic" },

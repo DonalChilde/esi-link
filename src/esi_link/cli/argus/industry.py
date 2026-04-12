@@ -5,13 +5,15 @@ from time import perf_counter
 from typing import Annotated
 
 import typer
-from eve_static_data import SDELoader
 from rich.console import Console
 from whenever import Instant
 
 from esi_link.argus import requests as argus_requests
 from esi_link.argus.calculations.eiv import calculate_eivs
-from esi_link.cli.argus.helpers import get_argus_settings_from_context
+from esi_link.cli.argus.helpers import (
+    check_for_sde_before_use,
+    get_argus_settings_from_context,
+)
 from esi_link.cli.helpers import get_executor_from_settings_and_schema
 from esi_link.helpers.file_safe_string import file_safe_string
 from esi_link.helpers.save_text_file import save_text_file
@@ -25,7 +27,6 @@ app = typer.Typer(
 @app.command()
 def eivs(
     ctx: typer.Context,
-    sde_path: Annotated[Path, typer.Argument(help="The path to the SDE.")],
     output_dir: Annotated[
         Path, typer.Argument(help="The directory to save the eiv data to.")
     ],
@@ -56,7 +57,8 @@ def eivs(
     esi_link_settings = argus_settings.esi_link_settings
     console = Console()
     executor = get_executor_from_settings_and_schema(settings=esi_link_settings)
-    sde_loader = SDELoader(sde_path)
+    check_for_sde_before_use(argus_settings=argus_settings, console=console)
+    sde_loader = argus_settings.esd_settings.sde_loader()
     boms = sde_loader.derived_datasets.bills_of_materials()
     console.print(f"Fetching market prices for the universe...")
     try:

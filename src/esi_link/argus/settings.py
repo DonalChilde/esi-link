@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from eve_static_data import SDELoader
+from eve_static_data.settings import EveStaticDataSettings
 from pydantic_settings import BaseSettings
 
 from esi_link.settings import EsiLinkSettings
@@ -16,6 +17,7 @@ class ArgusSettings:
     application_directory: Path
     sde_directory: Path
     # log_directory: Path
+    esd_settings: EveStaticDataSettings
     esi_link_settings: EsiLinkSettings
 
     def sde_loader(self) -> SDELoader:

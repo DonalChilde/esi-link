@@ -8,7 +8,6 @@ from time import perf_counter
 from typing import Annotated
 
 import typer
-from eve_static_data import SDELoader
 from rich.console import Console
 from whenever import Instant
 
@@ -21,7 +20,10 @@ from esi_link.argus.reports.corporation_jobs import (
     generate_corporation_jobs_report,
     resolve_corporation_jobs,
 )
-from esi_link.cli.argus.helpers import get_argus_settings_from_context
+from esi_link.cli.argus.helpers import (
+    check_for_sde_before_use,
+    get_argus_settings_from_context,
+)
 from esi_link.cli.helpers import get_executor_from_settings_and_schema
 from esi_link.helpers.dict_writer import write_dicts_to_csv
 from esi_link.helpers.file_safe_string import file_safe_string
@@ -99,8 +101,8 @@ def blueprints(
         )
         if sde_path:
             console.print("Generating blueprint report...")
-            # TODO use the
-            sde_loader = SDELoader(sde_path)
+            check_for_sde_before_use(argus_settings=argus_settings, console=console)
+            sde_loader = argus_settings.esd_settings.sde_loader()
             eve_types = sde_loader.derived_datasets.normalized_eve_types()
             market_paths = sde_loader.derived_datasets.market_paths()
             report = owned_blueprints_report_corporation(

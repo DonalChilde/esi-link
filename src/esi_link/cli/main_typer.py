@@ -4,11 +4,13 @@ import logging
 from dataclasses import asdict
 
 import typer
+from eve_static_data.settings import EveStaticDataSettings
 
 from esi_link import __app_name__, __version__
 from esi_link.argus.settings import ArgusSettings
 from esi_link.cli.argus import app as argus_app
 from esi_link.cli.cache import app as cache_app
+from esi_link.cli.callback import default_options
 from esi_link.cli.config_info import app as config_info_app
 from esi_link.cli.esi_auth.main_typer import app as esi_auth_app
 from esi_link.cli.esi_schema import app as esi_schema_app
@@ -18,7 +20,11 @@ from esi_link.logging_config import setup_logging
 from esi_link.settings import get_settings
 
 logger = logging.getLogger(__name__)
-app = typer.Typer(no_args_is_help=True)
+app = typer.Typer(
+    no_args_is_help=True,
+    callback=default_options,
+    help="Esi Link Command Line Interface.",
+)
 app.add_typer(
     esi_schema_app, name="schema", help="ESI schema information and management."
 )
@@ -39,22 +45,34 @@ app.add_typer(
 )
 
 
-@app.callback(invoke_without_command=True)
-def default_options(ctx: typer.Context):
-    """Esi Link Command Line Interface.
+# @app.callback(invoke_without_command=True)
+# def default_options(ctx: typer.Context):
+#     """Esi Link Command Line Interface.
 
-    Insert pithy saying here
-    """
-    settings = get_settings()
-    setup_logging(log_dir=settings.log_directory)
-    ctx.obj = {"esi-link-settings": settings}
-    # Make an argus-settings field for now, this can be removed when Argus is split from ESI Link and has its own app.
-    argus_settings = ArgusSettings(
-        application_directory=settings.application_directory / "argus",
-        sde_directory=settings.application_directory / "argus" / "sde",
-        esi_link_settings=settings,
-    )
-    ctx.obj["argus-settings"] = argus_settings
-    logger.info(
-        f"Starting {__app_name__} v{__version__} with settings: {asdict(settings)!r}"
-    )
+#     Insert pithy saying here
+#     """
+#     settings = get_settings()
+#     setup_logging(log_dir=settings.log_directory)
+#     ctx.obj = {"esi-link-settings": settings}
+#     # Make an argus-settings field for now, this can be removed when Argus is split from ESI Link and has its own app.
+
+#     esd_settings = EveStaticDataSettings(
+#         application_directory=settings.application_directory
+#         / "argus"
+#         / "eve-static-data",
+#         logging_directory=settings.log_directory / "eve-static-data",
+#         sde_directory=settings.application_directory
+#         / "argus"
+#         / "eve-static-data"
+#         / "sde",
+#     )
+#     argus_settings = ArgusSettings(
+#         application_directory=settings.application_directory / "argus",
+#         sde_directory=settings.application_directory / "argus" / "sde",
+#         esi_link_settings=settings,
+#         esd_settings=esd_settings,
+#     )
+#     ctx.obj["argus-settings"] = argus_settings
+#     logger.info(
+#         f"Starting {__app_name__} v{__version__} with settings: {asdict(settings)!r}"
+#     )
