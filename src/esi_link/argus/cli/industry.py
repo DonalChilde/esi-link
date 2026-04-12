@@ -10,7 +10,7 @@ from whenever import Instant
 
 from esi_link.argus import requests as argus_requests
 from esi_link.argus.calculations.eiv import calculate_eivs
-from esi_link.cli.argus.helpers import (
+from esi_link.argus.cli.helpers import (
     check_for_sde_before_use,
     get_argus_settings_from_context,
 )

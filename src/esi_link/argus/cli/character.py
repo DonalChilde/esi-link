@@ -10,7 +10,7 @@ from rich.console import Console
 from whenever import Instant
 
 from esi_link.argus import requests as argus_requests
-from esi_link.cli.argus.helpers import get_argus_settings_from_context
+from esi_link.argus.cli.helpers import get_argus_settings_from_context
 from esi_link.cli.helpers import get_executor_from_settings_and_schema
 from esi_link.helpers.file_safe_string import file_safe_string
 from esi_link.helpers.save_text_file import save_text_file

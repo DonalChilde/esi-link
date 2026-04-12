@@ -4,7 +4,7 @@ import logging
 
 import typer
 
-from esi_link.cli.argus import app as argus_app
+from esi_link.argus.cli.main_typer import app as argus_app
 from esi_link.cli.cache import app as cache_app
 from esi_link.cli.callback import default_options
 from esi_link.cli.config_info import app as config_info_app
