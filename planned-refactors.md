@@ -57,6 +57,7 @@ included here because i do most of my thinking in this project.....
 - add simplified region-constellation-solarsystem with names, security, high/low/null, empire faction. k-space, worm hole, triglavian? to derived datasets, as this is a most common requirement. one dataset.
 - add market_group.types derived dataset to mirror whats available from ESI.
 
+
 ## argus
 
 - Add display and warning about the build_number of the currently supported sde dataset,

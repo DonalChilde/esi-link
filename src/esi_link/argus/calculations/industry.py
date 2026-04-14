@@ -2,7 +2,7 @@
 
 from eve_static_data.models.pydantic.datasets import BlueprintsDataset
 
-from esi_link.argus.models import GetIndustrySystems, GetMarketsPrices
+from esi_link.argus.models.esi_models import GetIndustrySystems, GetMarketsPrices
 
 
 class BillOfMaterials:

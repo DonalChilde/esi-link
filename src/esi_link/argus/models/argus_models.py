@@ -14,10 +14,34 @@ from uuid import UUID
 
 
 @dataclass(slots=True)
+class SdeDataset:
+    sde_source: str
+    """The build number if sourced from the SDE, or `ESI` if sourced from ESI."""
+    valid_date: str
+    """The release date if sourced from the SDE, or the date of retrieval if sourced from ESI."""
+
+
+@dataclass(slots=True)
+class MetaLevel:
+    type_id: int
+    meta_level: int
+
+
+@dataclass(slots=True)
+class MetaLevels(SdeDataset):
+    records: dict[int, MetaLevel]
+
+
+@dataclass(slots=True)
 class Category:
     category_id: int
     name: str
     published: bool
+
+
+@dataclass(slots=True)
+class Categories(SdeDataset):
+    records: dict[int, Category]
 
 
 @dataclass(slots=True)
@@ -29,11 +53,41 @@ class Group:
 
 
 @dataclass(slots=True)
+class Groups(SdeDataset):
+    records: dict[int, Group]
+
+
+@dataclass(slots=True)
 class MarketGroup:
     market_group_id: int
     name: str
     types: set[int]
     parent_group_id: int | None
+
+
+@dataclass(slots=True)
+class MarketGroups(SdeDataset):
+    records: dict[int, MarketGroup]
+
+    def market_path(self, market_group_id: int) -> tuple[int, ...]:
+        """Return the path of market groups from the given market group up to the root."""
+        path: list[int] = []
+        current_group_id = market_group_id
+        while current_group_id is not None:
+            group = self.records[current_group_id]
+            path.append(group.market_group_id)
+            current_group_id = group.parent_group_id
+        return tuple(reversed(path))
+
+    def market_path_names(self, market_group_id: int) -> tuple[str, ...]:
+        """Return the path of market group names from the given market group up to the root."""
+        path_names: list[str] = []
+        current_group_id = market_group_id
+        while current_group_id is not None:
+            group = self.records[current_group_id]
+            path_names.append(group.name)
+            current_group_id = group.parent_group_id
+        return tuple(reversed(path_names))
 
 
 @dataclass(slots=True)
@@ -43,18 +97,27 @@ class MetaGroup:
 
 
 @dataclass(slots=True)
+class MetaGroups(SdeDataset):
+    records: dict[int, MetaGroup]
+
+
+@dataclass(slots=True)
 class EveType:
     type_id: int
     name: str
-    group: Group
-    market_group: MarketGroup | None
-    meta_level: int | None
+    group_id: int
+    market_group_id: int | None
     portion_size: int | None
     published: bool
     volume: float | None
     basePrice: float | None
     capacity: float | None
-    meta_group: MetaGroup | None
+    meta_group_id: int | None
+
+
+@dataclass(slots=True)
+class EveTypes(SdeDataset):
+    records: dict[int, EveType]
 
 
 @dataclass(slots=True)
@@ -86,17 +149,106 @@ class ManufacturingBlueprint:
     """The unique id of the actual blueprint, if any."""
 
 
+@dataclass(slots=True)
+class CopyingBlueprint:
+    """A copying blueprint, which can be used to produce blueprints."""
+
+    blueprint_object_id: int
+    name: str
+    ...
+
+
+@dataclass(slots=True)
+class ResearchingBlueprint:
+    """A researching blueprint, which can be used to research blueprints."""
+
+    blueprint_object_id: int
+    name: str
+    ...
+
+
+@dataclass(slots=True)
+class InventionBlueprint:
+    """An invention blueprint, which can be used to invent blueprints."""
+
+    blueprint_object_id: int
+    name: str
+    ...
+
+
 class GroupProviderProtocol(Protocol):
-    def group(self, group_id: int) -> Group: ...
+    def groups(self, group_ids: set[int]) -> dict[int, Group]:
+        """Return a dictionary of group_id to Group for the given group_ids."""
+        ...
+
+    def groups_dataset(self) -> Groups:
+        """Return the Groups dataset, which includes metadata about the dataset, as well as the actual groups."""
+        ...
+
+
+class CategoryProviderProtocol(Protocol):
+    def categories(self, category_ids: set[int]) -> dict[int, Category]:
+        """Return a dictionary of category_id to Category for the given category_ids."""
+        ...
+
+    def categories_dataset(self) -> Categories:
+        """Return the Categories dataset, which includes metadata about the dataset, as well as the actual categories."""
+        ...
+
+
+class MetaLevelProviderProtocol(Protocol):
+    def meta_levels(self, type_ids: set[int]) -> dict[int, MetaLevel]:
+        """Return a dictionary of type_id to MetaLevel for the given type_ids."""
+        ...
+
+    def meta_levels_dataset(self) -> MetaLevels:
+        """Return the MetaLevels dataset, which includes metadata about the dataset, as well as the actual meta levels."""
+        ...
 
 
 class MarketGroupProviderProtocol(Protocol):
-    def market_group(self, market_group_id: int) -> MarketGroup: ...
+    def market_groups(self, market_group_ids: set[int]) -> dict[int, MarketGroup]:
+        """Return a dictionary of market_group_id to MarketGroup for the given market_group_ids."""
+        ...
+
+    def market_groups_dataset(self) -> MarketGroups:
+        """Return the MarketGroups dataset, which includes metadata about the dataset, as well as the actual market groups."""
+        ...
+
+
+@dataclass(slots=True)
+class RegionSimple:
+    region_id: int
+    name: str
+
+
+@dataclass(slots=True)
+class RegionSimpleDataset(SdeDataset):
+    records: dict[int, RegionSimple]
+
+
+@dataclass(slots=True)
+class SolarSystemSimple:
+    system_id: int
+    name: str
+    region_id: int
+    security_status: float
+
+
+@dataclass(slots=True)
+class SolarSystemSimpleDataset(SdeDataset):
+    records: dict[int, SolarSystemSimple]
 
 
 class EveTypeProviderProtocol(Protocol):
     # needs localizedTypes, groups, market_groups, meta_groups,meta_levels
-    def eve_type(self, type_id: int) -> EveType: ...
+    def eve_types(self, type_ids: set[int]) -> dict[int, EveType]:
+        """Return a dictionary of type_id to EveType for the given type_ids."""
+        ...
+
+    def eve_types_dataset(self) -> EveTypes:
+        """Return the EveTypes dataset, which includes metadata about the dataset, as well as the actual eve types."""
+        ...
 
 
 class EIVProviderProtocol(Protocol):
@@ -114,25 +266,32 @@ class ManufacturingFacilityProviderProtocol(Protocol):
 
 
 class BlueprintProviderProtocol(Protocol):
-    def manufacturing_blueprint_by_produces_type_id(
-        self, produces_type_id: int
-    ) -> ManufacturingBlueprint | None: ...
-    def manufacturing_blueprint_by_blueprint_type_id(
-        self, blueprint_type_id: int
-    ) -> ManufacturingBlueprint | None: ...
-    def manufacturing_blueprint_by_blueprint_object_id(
-        self, blueprint_object_id: int
-    ) -> ManufacturingBlueprint | None: ...
-    def manufacturing_products(self) -> set[int]:
-        """Return a set of type_ids that can be produced by the blueprints provided by this provider."""
+    def manufacturing_blueprints(
+        self, blueprint_type_ids: set[int] | None
+    ) -> dict[int, ManufacturingBlueprint]:
+        """Return a dictionary of blueprint_type_id to ManufacturingBlueprint for the given blueprint_type_ids. If blueprint_type_ids is None, return all blueprints."""
         ...
 
-    def manufacturing_blueprints(self) -> set[int]:
-        """Return a set of blueprint_type_ids for the blueprints provided by this provider."""
+    def copying_blueprints(
+        self, blueprint_object_ids: set[int] | None
+    ) -> dict[int, CopyingBlueprint]:
+        """Return a dictionary of blueprint_object_id to CopyingBlueprint for the given blueprint_object_ids. If blueprint_object_ids is None, return all copying blueprints."""
         ...
 
-    def manufacturing_blueprint_objects(self) -> set[int]:
-        """Return a set of blueprint_object_ids for the blueprints provided by this provider."""
+    def researching_blueprints(
+        self, blueprint_object_ids: set[int] | None
+    ) -> dict[int, ResearchingBlueprint]:
+        """Return a dictionary of blueprint_object_id to ResearchingBlueprint for the given blueprint_object_ids. If blueprint_object_ids is None, return all researching blueprints."""
+        ...
+
+    def invention_blueprints(
+        self, blueprint_object_ids: set[int] | None
+    ) -> dict[int, InventionBlueprint]:
+        """Return a dictionary of blueprint_object_id to InventionBlueprint for the given blueprint_object_ids. If blueprint_object_ids is None, return all invention blueprints."""
+        ...
+
+    def manufacturing_products(self) -> set[tuple[int, int]]:
+        """Return a set of tuple[type_id, blueprint_id] that can be produced by the blueprints provided by this provider."""
         ...
 
 
@@ -191,3 +350,25 @@ class ManufactureProtocol(Protocol):
             ValueError: If the number of runs is invalid, or if there is insufficient data to calculate the BOM.
         """
         ...
+
+
+class ArgusStaticDataProviderProtocol(
+    GroupProviderProtocol,
+    CategoryProviderProtocol,
+    MetaLevelProviderProtocol,
+    MarketGroupProviderProtocol,
+    BlueprintProviderProtocol,
+    EveTypeProviderProtocol,
+):
+    """A Protocol that defines access to all the static data required by the Argus module.
+
+    While this data is mostly backed by the SDE, this abstraction allows us to change the
+    underlying data source without affecting the rest of the codebase.
+
+    Top level items needed:
+     - Blueprints
+     - Maps
+     - Categories
+
+
+    """

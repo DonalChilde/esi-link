@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 
-from esi_link.argus.models import (
+from esi_link.argus.models.esi_models import (
     CollectedMarketOrders,
     GetMarketsRegionIdOrders,
     GetMarketsRegionIdOrdersItem,

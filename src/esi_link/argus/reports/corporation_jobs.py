@@ -9,7 +9,7 @@ from whenever import Instant
 from esi_link import EsiLink
 from esi_link.argus import requests
 from esi_link.argus.calculations.industry_base_calculations import ActivityId
-from esi_link.argus.models import (
+from esi_link.argus.models.esi_models import (
     GetCorporationsCorporationIdIndustryJobs,
     GetCorporationsCorporationIdIndustryJobsItem,
 )
@@ -116,7 +116,7 @@ def _job_runtime_display(job: GetCorporationsCorporationIdIndustryJobsItem) -> s
 
     now = Instant.now()
     end_at = Instant.parse_iso(job.end_date)
-    remaining_seconds = int((end_at - now).in_seconds())
+    remaining_seconds = int((end_at - now).total("seconds"))
     return _seconds_to_human(remaining_seconds)
 
 
@@ -310,7 +310,7 @@ def generate_corporation_jobs_report(resolved_jobs: CorporationJobsResolved) -> 
 
     sorted_jobs = sorted(
         resolved_jobs.jobs,
-        key=lambda job: Instant.parse_iso(job.item.end_date).py_datetime(),
+        key=lambda job: Instant.parse_iso(job.item.end_date),
     )
     for resolved_item in sorted_jobs:
         lines.append(

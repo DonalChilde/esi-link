@@ -8,7 +8,7 @@ from esi_link.argus.calculations.sde_lookups import (
     blueprints_in_market,
     types_market_path_name,
 )
-from esi_link.argus.models import GetCorporationsCorporationIdBlueprints
+from esi_link.argus.models.esi_models import GetCorporationsCorporationIdBlueprints
 
 
 def missing_blueprints(

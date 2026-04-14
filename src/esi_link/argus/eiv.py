@@ -1,5 +1,6 @@
+"""EIVProvider implementation for calculating the Estimated Item Value (EIV) of a given type_id."""
+
 from esi_link.argus.models.argus_models import (
-    BlueprintProviderProtocol,
     EIVProviderProtocol,
     ManufacturingBlueprint,
 )
@@ -9,11 +10,12 @@ from esi_link.argus.models.esi_models import GetMarketsPrices
 class EIVProvider(EIVProviderProtocol):
     def __init__(
         self,
-        prices_provider: GetMarketsPrices,
-        blueprint_provider: BlueprintProviderProtocol,
+        universe_prices: GetMarketsPrices,
+        manufacturing_blueprints: dict[int, ManufacturingBlueprint],
     ):
-        self.prices_provider = prices_provider
-        self.blueprint_provider = blueprint_provider
+        """Initialize the EIVProvider with the necessary data."""
+        self.universe_prices = universe_prices
+        self.manufacturing_blueprints = manufacturing_blueprints
 
     def eiv(self, type_id: int) -> float:
         """Calculate the EIV for a given type_id.
@@ -21,8 +23,8 @@ class EIVProvider(EIVProviderProtocol):
         Raises:
             ValueError: If the type_id is invalid, or if there is insufficient data to calculate the EIV.
         """
-        blueprint: ManufacturingBlueprint | None = (
-            self.blueprint_provider.manufacturing_blueprint_by_produces_type_id(type_id)
+        blueprint: ManufacturingBlueprint | None = self.manufacturing_blueprints.get(
+            type_id
         )
         if blueprint is None:
             raise ValueError(f"No manufacturing blueprint found for type_id {type_id}.")
@@ -33,7 +35,7 @@ class EIVProvider(EIVProviderProtocol):
             )
         total_cost = 0.0
         for material in materials:
-            market_prices = self.prices_provider.prices.get(material.type_id)
+            market_prices = self.universe_prices.prices.get(material.type_id)
             if market_prices is None:
                 raise ValueError(
                     f"No market prices found for type_id {material.type_id}."

@@ -3,7 +3,7 @@ import logging
 from eve_static_data.models.derived.bill_of_materials import BillsOfMaterialsDataset
 
 from esi_link.argus.calculations.industry_base_calculations import eiv as calculate_eiv
-from esi_link.argus.models import GetMarketsPrices
+from esi_link.argus.models.esi_models import GetMarketsPrices
 
 logger = logging.getLogger(__name__)
 
