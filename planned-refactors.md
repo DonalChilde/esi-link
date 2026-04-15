@@ -40,7 +40,7 @@ def example_callback(ctx: typer.Context):
   would make it easier to use the settings classes to create the necessary objects for
   authentication and API access. This should be a convenience method, and should not be
   the only way to access the api.
-- Add an sqlite based cache option, backed with raw sql and dataclasses.
+- Add an sqlite based cache option, backed with raw sql and dataclasses. Do this sooner as a learning project looking towards a more complicated database for argus.
 
 ## esi-auth
 
@@ -63,26 +63,17 @@ included here because i do most of my thinking in this project.....
 - Add display and warning about the build_number of the currently supported sde dataset,
   the current schema (online) and the dataset to import.
 - Add sqlite database to store application information between runs.
+- Add a separate database for SDE data.
+- Add a separate database for market history
 - Create audit classes and functions for industry calculations.
   - the goal is to be able to display the work after calculation.
   - To save memory, mayb the top level can collect things like facility profile, system indexes, and names to typeID.
   - This could also be similar to a "project" type build info collection, where parts are planned to be made in different locations.
-- abstract access to static data so that access layer can change. For right now, Classes that hold the sde datasets
-  are fine, but later the data might live in the sqlite database, or be backed by ESI. 
-    - offer individual attribute access, and complete type object access e.g. normalizedEveType style.
-```python
-class EveTypes:
-    def __init__(self, localized_eve_types_dataset, localized_market_groups_dataset,etc):
-        self.etc = etc
-    def type_name(self,type_id)->str:
-        return "lookup name of type and return"
-    def is_published(self,type_id)->bool:
-        return True
-    def flattened_type(self,type_id)->dict[str,Any]:
-        # return one eve type object, type and attributes to be determined.
-        return {}
-```
 - as location names finer than solarsystem are a pita, but dont change that much, get them from ESI and cache them. May need to wait for sqlite database.
+- avoid network calls in the report generation functions. If necessary, collect names first and pass into the report function.
+- Argus CLI commands only need the value added commands, eg. no need for a raw regional orders cli command, That could be just a regular esi-link command.
+  But reports, and order summaries are appropriate, and the raw data could be saved then too....
+- Add market-hub-report command, to pull orders for the five (?) hub regions, and give summaries for region and hub system. Include report order count and isk volume per system.
 
 
 

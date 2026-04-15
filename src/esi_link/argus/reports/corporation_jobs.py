@@ -127,6 +127,7 @@ def _safe_markdown_cell(value: str | None) -> str:
     return value.replace("|", "\\|")
 
 
+# TODO refactor this such that the necessary names are passed in as arguments instead of making API calls within the report generation function. This will make it easier to test and reuse the report generation logic with different data sources.
 async def resolve_corporation_jobs(
     corp_jobs: GetCorporationsCorporationIdIndustryJobs, esi_link: EsiLink
 ) -> CorporationJobsResolved:
