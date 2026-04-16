@@ -1097,6 +1097,19 @@ class ResponseGroupHandlerManagerProtocol(Protocol):
 
 
 class CacheManagerProtocol:
+    # TODO Returned CachedResponses should not have any connection to the cache data.
+    # This would happen naturally with some cache implemetations, like a per file cache
+    # where each CachedResponse is read from a separate file, but for in-memory caches
+    # we need to make sure that the CachedResponse instances returned by get, set, and
+    # refresh are copies of the data stored in the cache, to avoid unintended side effects
+    # from modifying the returned CachedResponse directly. This should be called out in
+    # the docstrings for these methods, and we should make sure to implement this behavior
+    # in any in-memory cache implementations.
+
+    # TODO change the prtocol to async, to allow for async cache implementations, e.g.,
+    # a cache that uses an async database client.
+
+    # TODO batch writes to the cache, and provide a hot cache for recently accessed items. See Claude's suggestions for cache management strategies.
     def __enter__(self) -> Self:
         """Enter the runtime context related to this object."""
         return self
