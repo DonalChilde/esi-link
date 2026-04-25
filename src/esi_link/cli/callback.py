@@ -4,7 +4,7 @@ import logging
 from dataclasses import asdict
 
 import typer
-from eve_static_data.settings import EveStaticDataSettings
+from eve_static_data.settings import get_settings as get_esd_settings
 
 from esi_link import __app_name__, __version__
 from esi_link.argus.settings import ArgusSettings
@@ -24,16 +24,11 @@ def default_options(ctx: typer.Context):
     ctx.obj = {"esi-link-settings": settings}
     # Make an argus-settings field for now, this can be removed when Argus is split from ESI Link and has its own app.
 
-    esd_settings = EveStaticDataSettings(
-        application_directory=settings.application_directory
-        / "argus"
-        / "eve-static-data",
-        logging_directory=settings.log_directory / "eve-static-data",
-        sde_directory=settings.application_directory
-        / "argus"
-        / "eve-static-data"
-        / "sde",
+    esd_settings = get_esd_settings()
+    esd_settings.application_directory = (
+        settings.application_directory / "argus" / "eve-static-data"
     )
+
     # When Argus is split, esd_settings will be set from the ArgusSettings dataclass
     ctx.obj["esd-settings"] = esd_settings
     argus_settings = ArgusSettings(

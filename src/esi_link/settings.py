@@ -208,9 +208,12 @@ class EsiLinkSettingsPydantic(BaseSettings):
     )
 
 
-def get_settings() -> EsiLinkSettings:
+def get_settings(
+    pydantic_settings: EsiLinkSettingsPydantic | None = None,
+) -> EsiLinkSettings:
     """Get the ESI Link settings."""
-    pydantic_settings = EsiLinkSettingsPydantic()
+    if pydantic_settings is None:
+        pydantic_settings = EsiLinkSettingsPydantic()
     settings = EsiLinkSettings(
         application_directory=pydantic_settings.app_dir,
         log_directory=pydantic_settings.log_dir,

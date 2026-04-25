@@ -1,6 +1,33 @@
 """Argus is a legendary giant from Greek mythology, known for his many eyes and his role as a watchman."""
 
 from dataclasses import dataclass
+from pathlib import Path
+from uuid import NAMESPACE_URL, uuid5
+
+import typer
+
+__author__ = "Chad Lowe"
+__email__ = "pfmsoft.dev@gmail.com"
+__app_name__ = "argus"
+__license__ = "MIT"
+__url__ = "https://github.com/DonalChilde/esi-link"  # FIXME update when Argus is split from ESI Link and has its own repo
+
+#######################################################################################
+# Update in pyproject.toml, as uv build backend does not yet support dynamic metadata #
+# https://github.com/astral-sh/uv/issues/11718                                        #
+#######################################################################################
+__description__ = "A command line first interface to the Eve Online API"
+# The short X.Y.Z version.
+__version__ = "0.1.0"
+# The full version, including alpha/beta/rc tags.
+__release__ = __version__
+#######################################################################################
+APP_NAMESPACE = "pfmsoft"
+APPLICATION_NAME = "argus"
+DEFAULT_APP_DIR = Path(typer.get_app_dir(f"{APP_NAMESPACE}-{APPLICATION_NAME}"))
+USER_AGENT = f"{__app_name__}/{__version__} (+{__url__})"
+ARGUS_NAMESPACE = uuid5(NAMESPACE_URL, "argus")
+
 
 # FIXME refactor:
 # - set up Package fields here, for eventual split of Argus from ESI Link, and eventual split of ESI Auth from ESI Link
