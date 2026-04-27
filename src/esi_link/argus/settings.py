@@ -24,6 +24,7 @@ class ArgusSettings:
     application_directory: Path
     sde_directory: Path
     # log_directory: Path
+    derived_data_directory: Path
     esd_settings: EveStaticDataSettings
     esi_link_settings: EsiLinkSettings
 
@@ -48,6 +49,10 @@ class ArgusSettingsPydantic(BaseSettings):
         default=DEFAULT_APP_DIR / "sde",
         description="The directory where the EVE Static Data Export (SDE) is stored.",
     )
+    derived_data_directory: Path = Field(
+        default=DEFAULT_APP_DIR / "sde" / "derived",
+        description="The directory where Argus will store its derived datasets.",
+    )
     log_directory: Path = Field(
         default=DEFAULT_APP_DIR / "logs",
         description="The directory where Argus will store its logs.",
@@ -62,10 +67,11 @@ class ArgusSettingsPydantic(BaseSettings):
     # )
 
 
-# FIXME: the way the esi-link and esd settings models are initialized here is flawed.
-# using get settings does not cascade the directory settings for subdirs under application direcrtory.
-# This will be an issue when argus splits from esi-link, right now the proper settings
-# objects will be set in the callback.
+# FIXME: After argus split, Verify that the settings are correctly cascading the application directory to
+# the esi-link and eve-static-data settings, and that the derived data directory is
+# correctly set under the application directory as well. This may require adjustments to
+# the get_settings function and the Pydantic settings classes to ensure that all paths are
+# correctly constructed based on the application directory.
 
 
 def get_settings() -> ArgusSettings:
@@ -88,6 +94,8 @@ def get_settings() -> ArgusSettings:
     argus_settings = ArgusSettings(
         application_directory=argus_pydantic_settings.application_directory,
         sde_directory=argus_pydantic_settings.sde_directory,
+        derived_data_directory=argus_pydantic_settings.derived_data_directory,
+        # log_directory=argus_pydantic_settings.log_directory,
         esd_settings=esd_settings,
         esi_link_settings=esi_link_settings,
     )

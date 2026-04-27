@@ -110,6 +110,13 @@ class DerivedWriter:
         root_model = YD.EveTypesRoot(root=published_types)
         self._write_root_model(root_model, DerivedFiles.PUBLISHED_TYPES.filename())
 
+    def write_published_blueprints(
+        self, published_blueprints: dict[int, YR.Blueprints]
+    ) -> None:
+        """Write the published blueprints to a file."""
+        root_model = YD.BlueprintsRoot(root=published_blueprints)
+        self._write_root_model(root_model, DerivedFiles.PUBLISHED_BLUEPRINTS.filename())
+
 
 def data_exists(derived_path: Path) -> list[DerivedFiles]:
     """Check if any derived dataset files exist."""
