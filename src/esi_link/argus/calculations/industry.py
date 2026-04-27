@@ -1,6 +1,7 @@
 """Module for industry-related calculations."""
 
-from eve_static_data.models.pydantic.datasets import BlueprintsDataset
+from eve_static_data.models import yaml_records as YR
+from eve_static_data.models.common import Lang
 
 from esi_link.argus.models.esi_models import GetIndustrySystems, GetMarketsPrices
 
@@ -18,7 +19,7 @@ class BillOfMaterials:
 class IndustryCalculator:
     def __init__(
         self,
-        blueprints: BlueprintsDataset,
+        blueprints: dict[int, YR.Blueprints],
         cost_indices: GetIndustrySystems,
         universe_pricing: GetMarketsPrices,
     ):

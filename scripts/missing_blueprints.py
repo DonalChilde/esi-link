@@ -7,7 +7,7 @@ import typer
 from eve_static_data import SDELoader
 
 from esi_link import EsiLink, request_factory
-from esi_link.argus.calculations.sde_lookups import blueprints_in_market
+from esi_link.argus.helpers.sde_lookups import blueprints_in_market
 from esi_link.argus.models import (
     GetCharactersCharacterIdBlueprints,
     GetCorporationsCorporationIdBlueprints,

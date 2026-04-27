@@ -9,11 +9,12 @@ from rich.console import Console
 from whenever import Instant
 
 from esi_link.argus import requests as argus_requests
-from esi_link.argus.calculations.eiv import calculate_eivs
+from esi_link.argus.calculations.eiv import calculate_manufacturing_eivs
 from esi_link.argus.cli.helpers import (
     check_for_sde_before_use,
     get_argus_settings_from_context,
 )
+from esi_link.argus.data import ArgusDataLoader
 from esi_link.cli.helpers import get_executor_from_settings_and_schema
 from esi_link.helpers.file_safe_string import file_safe_string
 from esi_link.helpers.save_text_file import save_text_file
@@ -55,16 +56,19 @@ def eivs(
     start = perf_counter()
     argus_settings = get_argus_settings_from_context(ctx)
     esi_link_settings = argus_settings.esi_link_settings
+    loader = ArgusDataLoader(argus_settings.sde_directory)
     console = Console()
     executor = get_executor_from_settings_and_schema(settings=esi_link_settings)
     check_for_sde_before_use(argus_settings=argus_settings, console=console)
-    sde_loader = argus_settings.esd_settings.sde_loader()
-    boms = sde_loader.derived_datasets.bills_of_materials()
+
     console.print(f"Fetching market prices for the universe...")
     try:
         prices_task = argus_requests.universe_prices(esi_link=executor, lang=lang.value)
         market_prices = asyncio.run(prices_task)
-        eiv_results = calculate_eivs(boms=boms, prices=market_prices)
+        blueprints = loader.derived_dataset_loader.published_blueprints()
+        eiv_results = calculate_manufacturing_eivs(
+            blueprints=blueprints, universe_pricing=market_prices
+        )
 
         date_str = Instant.from_timestamp_nanos(market_prices.received_at).format_iso()
         file_stem = f"eivs_{date_str}"

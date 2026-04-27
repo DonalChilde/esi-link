@@ -34,6 +34,10 @@ def default_options(ctx: typer.Context):
     argus_settings = ArgusSettings(
         application_directory=settings.application_directory / "argus",
         sde_directory=settings.application_directory / "argus" / "sde",
+        derived_data_directory=settings.application_directory
+        / "argus"
+        / "sde"
+        / "derived-data",
         esi_link_settings=settings,
         esd_settings=esd_settings,
     )

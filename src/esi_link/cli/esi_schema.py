@@ -65,7 +65,7 @@ def download(
     schema_download = asyncio.run(
         download_schema(compatibility_date=compat_date, url=settings.esi_schema_url)
     )
-    schema_manager = SchemaManager(schema_directory=settings.schema_store_dir)
+    schema_manager = SchemaManager(schema_directory=settings.schema_store_directory)
     esi_schema = EsiSchema.from_raw_schema(schema_download.raw_schema)
     schema_manager.add_schema(esi_schema, schema_download.download_date)
     console.print(f"ESI schema downloaded and added to app schema store.")
@@ -178,7 +178,7 @@ def operations(
     """
     console = Console()
     settings = get_esi_link_settings_from_context(ctx)
-    store_manager = SchemaManager(schema_directory=settings.schema_store_dir)
+    store_manager = SchemaManager(schema_directory=settings.schema_store_directory)
     try:
         stored_schema = get_schema(
             schema_manager=store_manager,
@@ -224,7 +224,7 @@ def available_schemas(ctx: typer.Context):
     """List the available ESI schemas in the schema store."""
     console = Console()
     settings = get_esi_link_settings_from_context(ctx)
-    store_manager = SchemaManager(schema_directory=settings.schema_store_dir)
+    store_manager = SchemaManager(schema_directory=settings.schema_store_directory)
     schemas = store_manager.available_schemas()
     table = Table(title="Available ESI Schemas")
     table.add_column("Compatibility Date", style="cyan")

@@ -1,33 +1,45 @@
 import logging
 
-from eve_static_data.models.derived.bill_of_materials import BillsOfMaterialsDataset
+from eve_static_data.models import yaml_records as YR
 
-from esi_link.argus.calculations.industry_base_calculations import eiv as calculate_eiv
 from esi_link.argus.models.esi_models import GetMarketsPrices
 
 logger = logging.getLogger(__name__)
 
 
-def calculate_eivs(
-    boms: BillsOfMaterialsDataset, prices: GetMarketsPrices
+def calculate_manufacturing_eivs(
+    blueprints: dict[int, YR.Blueprints],
+    universe_pricing: GetMarketsPrices,
 ) -> dict[int, float]:
-    """Calculate the EIV for each type_id in the manufacturing BOMs."""
+    """Calculate the EIV for all manufacturing blueprints."""
     eivs: dict[int, float] = {}
-    adjusted_prices: dict[int, float] = {
-        k: v.adjusted_price
-        for k, v in prices.prices.items()
-        if v.adjusted_price is not None
+    prices: dict[int, float] = {
+        type_id: price.adjusted_price
+        for type_id, price in universe_pricing.prices.items()
+        if price.adjusted_price is not None
     }
-    for manufacturing_bom in boms.manufacturing_boms.values():
-        try:
-            eivs[manufacturing_bom.type_id] = calculate_eiv(
-                manufacturing_bom.base_materials, adjusted_prices
-            )
-        except Exception as e:
-            logger.error(
-                f"Error calculating EIV for type_id {manufacturing_bom.type_id}: {e}"
-            )
-            eivs[
-                manufacturing_bom.type_id
-            ] = -1.0  # Use -1 to indicate an error in calculation
+    for blueprint in blueprints.values():
+        if blueprint.activities.manufacturing is not None:
+            if blueprint.activities.manufacturing.materials is not None:
+                try:
+                    eiv = calculate_eiv(
+                        blueprint.activities.manufacturing.materials,
+                        prices,
+                    )
+                    eivs[blueprint.blueprintTypeID] = eiv
+                except ValueError as e:
+                    logger.warning(
+                        f"Could not calculate EIV for blueprint {blueprint.blueprintTypeID}: {e}"
+                    )
     return eivs
+
+
+def calculate_eiv(materials: list[YR.Materials], prices: dict[int, float]) -> float:
+    """Calculate the EIV for a given list of materials and their prices."""
+    total_eiv = 0.0
+    for material in materials:
+        price = prices.get(material.typeID)
+        if price is None:
+            raise ValueError(f"Price not found for type ID {material.typeID}")
+        total_eiv += material.quantity * price
+    return total_eiv

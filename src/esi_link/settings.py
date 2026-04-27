@@ -33,6 +33,8 @@ class EsiLinkSettings:
     application_directory: Path
     log_directory: Path
     schema_store_directory: Path
+    esi_schema_url: str
+    esi_schema_changelog_url: str
     cache_root_directory: Path
     diskcache_directory: Path
     json_cache_directory: Path
@@ -218,6 +220,8 @@ def get_settings(
         application_directory=pydantic_settings.app_dir,
         log_directory=pydantic_settings.log_dir,
         schema_store_directory=pydantic_settings.schema_store_dir,
+        esi_schema_url=pydantic_settings.esi_schema_url,
+        esi_schema_changelog_url=pydantic_settings.esi_schema_changelog_url,
         cache_root_directory=pydantic_settings.cache_root_dir,
         diskcache_directory=pydantic_settings.cache_root_dir / "diskcache",
         json_cache_directory=pydantic_settings.cache_root_dir / "json",
