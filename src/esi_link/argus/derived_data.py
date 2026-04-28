@@ -96,7 +96,7 @@ class DerivedWriter:
         """Write a root model to a file."""
         file_path = self.derived_path / filename
         try:
-            with file_path.open("wx", encoding="utf-8") as f:
+            with file_path.open("x", encoding="utf-8") as f:
                 f.write(root_model.model_dump_json(indent=2))
         except FileExistsError as e:
             raise ValueError(

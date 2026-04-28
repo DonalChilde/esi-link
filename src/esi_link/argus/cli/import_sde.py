@@ -3,6 +3,7 @@
 The commands to download, unpack, export, and validate are provided elsewhere.
 """
 
+import logging
 from pathlib import Path
 from typing import Annotated
 
@@ -10,6 +11,8 @@ import typer
 
 from esi_link.argus.cli.helpers import get_argus_settings_from_context
 from esi_link.argus.data import ArgusDataImporter
+
+logger = logging.getLogger(__name__)
 
 app = typer.Typer(
     no_args_is_help=True,
@@ -33,5 +36,5 @@ def import_sde(
         importer.import_sde(input_path)
         typer.echo(f"SDE data imported successfully from {input_path}.")
     except Exception as e:
-        typer.echo(f"Error importing SDE data from {input_path}: {e}")
-        raise typer.Exit(code=1) from e
+        logger.exception(f"Failed to import SDE data from {input_path}. {e}")
+        raise e
