@@ -71,6 +71,7 @@ applyTo: "**/*.py"
 - typer - CLI framework
 - whenever - Date/time handling
 - esi-auth - Managing authentication tokens for the EVE Esi.
+- eve-static-data - Managing EVE Online SDE data.
 
 ## Development Commands
 
