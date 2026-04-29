@@ -2,8 +2,6 @@
 
 import typer
 
-from esi_link.cli.callback import default_options
-
 from .character import app as character_app
 from .corporation import app as corporation_app
 from .industry import app as industry_app

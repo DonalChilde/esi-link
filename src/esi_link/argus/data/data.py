@@ -6,7 +6,7 @@ from pathlib import Path
 
 from eve_static_data import SdeYamlDatasetLoader
 
-from esi_link.argus import derived_data as DD
+from esi_link.argus.data import derived_data as DD
 
 logger = logging.getLogger(__name__)
 
