@@ -1,4 +1,4 @@
-"""ArgusData manages access to data stored by Argus."""
+"""ArgusSdeData manages access to SDE data stored by Argus."""
 
 import logging
 from dataclasses import dataclass
@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class ArgusDataStatus:
-    """Status of the Argus data."""
+class ArgusSdeDataStatus:
+    """Status of the Argus SDE data."""
 
     sde_path: Path
     derived_path: Path
@@ -21,9 +21,9 @@ class ArgusDataStatus:
     release_date: str | None = None
 
 
-class ArgusDataLoader:
+class ArgusSdeDataLoader:
     def __init__(self, sde_path: Path, derived_path: Path | None = None):
-        """ArgusDataLoader is responsible for loading data for the Argus app.
+        """ArgusSdeDataLoader is responsible for loading SDE data for the Argus app.
 
         Data must be available at time of creation.
         """
@@ -69,9 +69,9 @@ class ArgusDataLoader:
         """Get a loader for derived datasets."""
         return self._derived_loader
 
-    def status(self) -> ArgusDataStatus:
+    def status(self) -> ArgusSdeDataStatus:
         """Get the status of the app sde data."""
-        return ArgusDataStatus(
+        return ArgusSdeDataStatus(
             sde_path=self.sde_path,
             derived_path=self._derived_path,
             build_number=self.sde_loader.buildNumber,
@@ -79,9 +79,9 @@ class ArgusDataLoader:
         )
 
 
-class ArgusDataImporter:
+class ArgusSdeDataImporter:
     def __init__(self, sde_destination_path: Path, derived_data_path: Path):
-        """ArgusDataImporter is responsible for importing data into the Argus app."""
+        """ArgusSdeDataImporter is responsible for importing SDE data into the Argus app."""
         self.sde_destination_path = sde_destination_path
         self.derived_data_path = derived_data_path
 
