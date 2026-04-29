@@ -14,7 +14,7 @@ from esi_link.argus.cli.helpers import (
     check_for_sde_before_use,
     get_argus_settings_from_context,
 )
-from esi_link.argus.data import ArgusDataLoader
+from esi_link.argus.data.sde_data import ArgusSdeDataLoader
 from esi_link.cli.helpers import get_executor_from_settings_and_schema
 from esi_link.helpers.file_safe_string import file_safe_string
 from esi_link.helpers.save_text_file import save_text_file
@@ -56,7 +56,7 @@ def eivs(
     start = perf_counter()
     argus_settings = get_argus_settings_from_context(ctx)
     esi_link_settings = argus_settings.esi_link_settings
-    loader = ArgusDataLoader(argus_settings.sde_directory)
+    loader = ArgusSdeDataLoader(argus_settings.sde_directory)
     console = Console()
     executor = get_executor_from_settings_and_schema(settings=esi_link_settings)
     check_for_sde_before_use(argus_settings=argus_settings, console=console)

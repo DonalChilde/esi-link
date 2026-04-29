@@ -10,7 +10,7 @@ from typing import Annotated
 import typer
 
 from esi_link.argus.cli.helpers import get_argus_settings_from_context
-from esi_link.argus.data import ArgusDataImporter
+from esi_link.argus.data.sde_data import ArgusSdeDataImporter
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ def import_sde(
 ):
     """Import the SDE data into the Argus app."""
     argus_settings = get_argus_settings_from_context(ctx)
-    importer = ArgusDataImporter(
+    importer = ArgusSdeDataImporter(
         argus_settings.sde_directory, argus_settings.derived_data_directory
     )
     try:

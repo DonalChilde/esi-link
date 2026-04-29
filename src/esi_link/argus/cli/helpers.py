@@ -7,7 +7,7 @@ from eve_static_data import SdeYamlDatasetLoader
 from eve_static_data.models.yaml_datasets import SdeInfoRoot
 from rich.console import Console
 
-from esi_link.argus.data import ArgusDataLoader
+from esi_link.argus.data.sde_data import ArgusSdeDataLoader
 from esi_link.argus.settings import ArgusSettings
 
 
