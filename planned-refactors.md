@@ -29,6 +29,12 @@
 - esi-link EsiLinkSettings should contain an EsiAuthSettings instance to hold those settings. 
   - EsiLinkSettingsPydantic can hold individual esi-auth settings, and they are resolved in get_settings()
   - esi-link.get_settings will construct an EsiAuthSettingsPydantic object, and feed it to esi-auth.get_settings()
+- esi-link Refactor object models and functions for esi-link
+  - Move to a functional paradigm
+  - immutable returns
+  - dataclass models with RootModel serializers
+  - return tuple[dict[uuid,response], dict[uuid,response]] for success failure.
+  - re functional example at https://www.youtube.com/watch?v=A7lGxqCuFN4
 
 ### General
 
