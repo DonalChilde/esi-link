@@ -19,6 +19,8 @@
   only attempt authentication when making requests that require it. This would improve
   the usability of the application for users who do not need authentication, and would
   also make it more robust in cases where credentials are not available or not needed.
+- Integrate esi-link and esi-auth, as we no longer plan to release esi-auth separately
+
 
 ### ADD
 - argus - Add market-hub-report command, to pull orders for the five (?) hub regions, and give summaries for region and hub system. Include report order count and isk volume per system.
