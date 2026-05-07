@@ -3,7 +3,7 @@ name = "esi-link"
 # https://packaging.python.org/en/latest/specifications/pyproject-toml/#dynamic
 # https://github.com/astral-sh/uv/issues/11718
 # dynamic = ["version", "description"]
-version = "0.2.1"
+version = "0.3.0"
 description = "A command line first interface to the Eve Online API"
 readme = "README.md"
 authors = [{ name = "Chad Lowe", email = "pfmsoft.dev@gmail.com" }]
@@ -12,7 +12,6 @@ dependencies = [
     "aiohttp>=3.12.15",
     "aiolimiter>=1.2.1",
     "diskcache>=5.6.3",
-    "eve-static-data",
     "pydantic>=2.11.7",
     "pydantic-settings>=2.10.1",
     "pyjwt[crypto]>=2.12.0",
@@ -50,7 +49,6 @@ dev = ["pytest>=8.4.1", "pytest-cov>=6.2.1", "ruff>=0.12.11", "scriv>=1.7.0"]
 exclude-newer = "1 week"
 
 [tool.uv.sources]
-eve-static-data = { git = "https://github.com/DonalChilde/eve-static-data", branch = "main" }
 
 [tool.pytest.ini_options]
 pythonpath = "src"

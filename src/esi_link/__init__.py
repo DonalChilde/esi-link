@@ -17,7 +17,7 @@ __url__ = "https://github.com/DonalChilde/esi-link"
 #######################################################################################
 __description__ = "A command line first interface to the Eve Online API"
 # The short X.Y.Z version.
-__version__ = "0.2.1"
+__version__ = "0.3.0"
 # The full version, including alpha/beta/rc tags.
 __release__ = __version__
 #######################################################################################
