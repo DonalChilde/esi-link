@@ -1,6 +1,6 @@
 """Models for ESI Auth."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TypedDict
 
 from pydantic import BaseModel, ConfigDict
@@ -23,6 +23,11 @@ class OauthToken:
     token_type: str
     expires_in: int
     refresh_token: str
+
+
+@dataclass(slots=True, frozen=True)
+class DecodedToken:
+    pass
 
 
 class OauthMetadata(TypedDict):
@@ -49,7 +54,8 @@ class CachedMetadata(TypedDict):
     fetched_at: int
 
 
-class EveAppCredentials(BaseModel):
+@dataclass(slots=True, frozen=True)
+class EsiAppCredentials:
     """EVE application credentials.
 
     Field names match the JSON keys returned by the ESI app registration page.
@@ -61,19 +67,18 @@ class EveAppCredentials(BaseModel):
     clientId: str
     clientSecret: str
     callbackUrl: str
-    scopes: list[str]
-
-    model_config = ConfigDict(frozen=True)
+    scopes: list[str] = field(default_factory=list[str])
 
 
-class CharacterToken(BaseModel):
+@dataclass(slots=True, frozen=True)
+class CharacterToken:
     character_id: int
     character_name: str
     created: int
+    """Creation time as a UNIX timestamp."""
     expires: int
+    """Expiration time as a UNIX timestamp."""
     oauth_token: OauthToken
-
-    model_config = ConfigDict(frozen=True)
 
     @property
     def expires_in(self) -> int:
@@ -82,11 +87,15 @@ class CharacterToken(BaseModel):
 
 
 @dataclass(slots=True, frozen=True)
-class RequestParams:
-    url: str
+class AuthenticationRequestParams:
+    redirect_url: str
+    """URL to redirect the user to for authentication."""
     state: str
+    """CSRF protection string to validate the callback."""
     code_verifier: str
+    """Code verifier for PKCE."""
     code_challenge: str
+    """Code challenge for PKCE."""
 
 
 @dataclass(slots=True, frozen=True)
