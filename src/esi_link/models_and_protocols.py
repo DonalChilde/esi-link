@@ -1,6 +1,7 @@
 """Models for ESI Link."""
 
 import json
+import logging
 from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -9,12 +10,12 @@ from typing import Any, Literal, Protocol, Self, cast
 from uuid import UUID, uuid4
 
 import aiohttp
-
-# from pydantic import BaseModel, ConfigDict, Field
 from whenever import Instant
 
 from esi_link.helpers.resolve_json_ref import resolve_internal_refs
 from esi_link.type_defs import Lang
+
+logger = logging.getLogger(__name__)
 
 
 def _get_current_instant() -> Instant:
@@ -83,11 +84,17 @@ class Request:
 
     request_id: UUID = field(default_factory=uuid4)
     operation_id: str
+    compatibility_date: str | None = None
     path_parameters: dict[str, str | int | float] = {}
     query_parameters: dict[str, str | int | float] = {}
-    auth_character_id: int | None = None
+    authorization_id: int | None = None
     lang: Lang = "en"
     json_body: Any | None = None
+    """The JSON body of the request, if applicable. This is used for POST, PUT, PATCH requests."""
+    save_directory: str | None = None
+    """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
+    save_filename: str | None = None
+    """The filename to save the response data to, if applicable. If not provided, but a save_directory is provided, a default filename will be used ."""
 
 
 @dataclass(slots=True, kw_only=True)
@@ -98,17 +105,16 @@ class RuntimeRequest:
 
 @dataclass(slots=True, kw_only=True)
 class RequestGroup:
-    """Represents a batch of ESI requests to be executed.
-
-    This model exists mostly for serialization purposes, with the imagined use being
-    a set of requests that are loaded from disk and run repeatedly over time. For instance,
-    downloading a fresh set of pricing data every day.
-    """
+    """Represents a batch of ESI requests to be executed."""
 
     created_on: Instant = field(default_factory=_get_current_instant)
     group_id: UUID
     description: str = ""
     requests: dict[UUID, Request]
+    save_directory: str | None = None
+    """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
+    save_filename: str | None = None
+    """The filename to save the response group data to, if applicable. If not provided, but a save_directory is provided, a default filename will be used."""
 
 
 @dataclass(slots=True, kw_only=True)
@@ -119,7 +125,6 @@ class X_ratelimit:
     used: str
 
 
-# TODO consider forcing headers to lower case on ingestion.
 @dataclass(slots=True, kw_only=True)
 class HttpResponse:
     """Represents the data of an ESI response."""
@@ -130,6 +135,17 @@ class HttpResponse:
     body_text: str
     received_at: int = -1
     """The timestamp when the response was received, as a Unix timestamp in nanoseconds."""
+    _headers_lower: dict[str, str] = field(init=False, repr=False)
+
+    def __post_init__(self):
+        """Create a lower case version of the headers for easier access to common headers like ETag and Last-Modified."""
+        self._headers_lower = {k.lower(): v for k, v in self.headers.items()}
+        if len(self.headers) != len(self._headers_lower):
+            logger.warning(
+                "Duplicate headers found when converting to lower case. This may lead to unexpected behavior when accessing headers. Original headers: %s, Lower case headers: %s",
+                self.headers,
+                self._headers_lower,
+            )
 
     @property
     def received_at_instant(self) -> Instant | None:
@@ -141,30 +157,22 @@ class HttpResponse:
     @property
     def etag(self) -> str | None:
         """Extract the ETag from the response headers, if present."""
-        return (
-            self.headers.get("ETag")
-            or self.headers.get("Etag")
-            or self.headers.get("etag")
-        )
+        return self._headers_lower.get("etag")
 
     @property
     def last_modified(self) -> str | None:
         """Extract the Last-Modified header from the response headers, if present."""
-        return (
-            self.headers.get("Last-Modified")
-            or self.headers.get("Last-modified")
-            or self.headers.get("last-modified")
-        )
+        return self._headers_lower.get("last-modified")
 
     @property
     def expires(self) -> str | None:
         """Extract the Expires header from the response headers, if present."""
-        return self.headers.get("Expires") or self.headers.get("expires")
+        return self._headers_lower.get("expires")
 
     @property
     def date(self) -> str | None:
         """Extract the Date header from the response headers, if present."""
-        return self.headers.get("Date") or self.headers.get("date")
+        return self._headers_lower.get("date")
 
     @property
     def date_as_instant(self) -> Instant | None:
@@ -180,11 +188,7 @@ class HttpResponse:
     @property
     def cache_control(self) -> str | None:
         """Extract the Cache-Control header from the response headers, if present."""
-        return (
-            self.headers.get("Cache-Control")
-            or self.headers.get("Cache-control")
-            or self.headers.get("cache-control")
-        )
+        return self._headers_lower.get("cache-control")
 
     @property
     def max_age(self) -> int | None:
