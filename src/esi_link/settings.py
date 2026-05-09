@@ -4,11 +4,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from jwt.jwks_client import PyJWKClient
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from whenever import Instant
 
-from esi_link import DEFAULT_APP_DIR, __app_name__, __version__
+from esi_link import DEFAULT_APP_DIR, USER_AGENT, __app_name__, __version__
 
 _app_env_prefix = "PFMSOFT_ESI_LINK_"
 
@@ -16,6 +17,7 @@ ESI_SCHEMA_URL = "https://esi.evetech.net/meta/openapi.json"
 """The URL to download the ESI schema from."""
 ESI_SCHEMA_CHANGELOG_URL = "https://esi.evetech.net/meta/changelog.json"
 """The URL to download the ESI schema changelog from."""
+# FIXME these are defined in two places, here and in OauthMetadata. Consider a more consistent location for these constants between projects.
 OAUTH_METADATA_URL = (
     "https://login.eveonline.com/.well-known/oauth-authorization-server"
 )
@@ -24,6 +26,7 @@ AUDIENCE = "EVE Online"
 """The audience to use for ESI Auth tokens."""
 ISSUER = "https://login.eveonline.com"
 """The issuer to use for ESI Auth tokens."""
+JWKS_URI = "https://login.eveonline.com/oauth/jwks"
 
 
 @dataclass(slots=True)
@@ -42,7 +45,6 @@ class EsiLinkSettings:
     rate_limit_connection_period: int
     rate_limit_connection_max_rate: int
     auth_credentials_file: Path
-    auth_tokens_directory: Path
     auth_token_refresh_threshold_seconds: int
     auth_oauth_metadata_url: str
     auth_cached_oauth_metadata_file: Path
@@ -50,6 +52,10 @@ class EsiLinkSettings:
     auth_server_timeout: int
     auth_audience: str
     auth_issuer: str
+    auth_jwks_uri: str
+
+    user_agent: str = USER_AGENT
+    _jwks_client: PyJWKClient | None = None
 
     @property
     def cache_directory(self) -> Path:
@@ -60,6 +66,15 @@ class EsiLinkSettings:
             return self.json_cache_directory
         else:
             raise ValueError(f"Invalid cache type: {self.cache_type}")
+
+    @property
+    def jwks_client(self) -> PyJWKClient:
+        """Get a PyJWKClient instance for fetching and caching JWKS keys from the ESI auth server."""
+        if self._jwks_client is None:
+            self._jwks_client = PyJWKClient(
+                self.auth_jwks_uri, headers={"User-Agent": USER_AGENT}
+            )
+        return self._jwks_client
 
 
 class EsiLinkSettingsPydantic(BaseSettings):
@@ -152,12 +167,7 @@ class EsiLinkSettingsPydantic(BaseSettings):
     @property
     def app_credentials_file(self) -> Path:
         """The path to the application credential JSON file."""
-        return self.app_dir / "esi-auth" / "credentials.json"
-
-    @property
-    def tokens_dir(self) -> Path:
-        """The directory for ESI Auth token JSON files."""
-        return self.app_dir / "esi-auth" / "tokens"
+        return self.app_dir / "auth" / "credentials.json"
 
     token_refresh_threshold_seconds: int = Field(
         default=300,
@@ -200,6 +210,11 @@ class EsiLinkSettingsPydantic(BaseSettings):
         description="The issuer to use for ESI Auth tokens.",
     )
     """The issuer to use for ESI Auth tokens."""
+    jwks_uri: str = Field(
+        default=JWKS_URI,
+        description="The JWKS URI to use for fetching public keys to verify ESI Auth tokens.",
+    )
+    """The JWKS URI to use for fetching public keys to verify ESI Auth tokens."""
 
     model_config = SettingsConfigDict(
         env_file=(
@@ -229,7 +244,6 @@ def get_settings(
         rate_limit_connection_period=pydantic_settings.connection_period,
         rate_limit_connection_max_rate=pydantic_settings.connection_max_rate,
         auth_credentials_file=pydantic_settings.app_credentials_file,
-        auth_tokens_directory=pydantic_settings.tokens_dir,
         auth_token_refresh_threshold_seconds=pydantic_settings.token_refresh_threshold_seconds,
         auth_oauth_metadata_url=pydantic_settings.oauth_metadata_url,
         auth_cached_oauth_metadata_file=pydantic_settings.cached_oauth_metadata_file,
@@ -237,6 +251,7 @@ def get_settings(
         auth_server_timeout=pydantic_settings.auth_server_timeout,
         auth_audience=pydantic_settings.audience,
         auth_issuer=pydantic_settings.issuer,
+        auth_jwks_uri=pydantic_settings.jwks_uri,
     )
 
     # Ensure application directories exist

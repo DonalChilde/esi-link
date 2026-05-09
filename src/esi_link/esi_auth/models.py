@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from typing import TypedDict
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, RootModel
 from whenever import Instant
 
 
@@ -70,6 +70,9 @@ class EsiAppCredentials:
     scopes: list[str] = field(default_factory=list[str])
 
 
+EsiAppCredentialsRoot = RootModel[EsiAppCredentials]
+
+
 @dataclass(slots=True, frozen=True)
 class CharacterToken:
     character_id: int
@@ -84,6 +87,21 @@ class CharacterToken:
     def expires_in(self) -> int:
         """Return the number of seconds until the token expires."""
         return self.expires - Instant.now().timestamp()
+
+    @property
+    def access_token(self) -> str:
+        """Return the access token string."""
+        return self.oauth_token.access_token
+
+    @property
+    def refresh_token(self) -> str:
+        """Return the refresh token string."""
+        return self.oauth_token.refresh_token
+
+    @property
+    def auth_headers(self) -> dict[str, str]:
+        """Return the auth headers to use for authenticated requests to ESI."""
+        return {"Authorization": f"Bearer {self.access_token}"}
 
 
 @dataclass(slots=True, frozen=True)

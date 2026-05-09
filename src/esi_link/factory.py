@@ -7,11 +7,6 @@ from aiolimiter import AsyncLimiter
 
 from esi_link.cache.diskcache_cache import DiskCache
 from esi_link.cache.json_disk_cache import JsonDiskCache
-from esi_link.esi_auth.auth_provider import AuthProvider
-from esi_link.esi_auth.authenticator import Authenticator
-from esi_link.esi_auth.credentials_provider import CredentialsProvider
-from esi_link.esi_auth.protocols import AuthProviderProtocol
-from esi_link.esi_auth.simple_json_store import CharacterTokenManager
 from esi_link.handlers.plugin_manager.response_group_plugin_loader import (
     ResponseGroupHandlerPluginLoader,
 )

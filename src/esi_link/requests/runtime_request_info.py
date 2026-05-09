@@ -1,7 +1,7 @@
 """Module for generating runtime request information from ESI requests."""
 
 from esi_link import USER_AGENT
-from esi_link.esi_auth.protocols import AuthProviderProtocol
+from esi_link.esi_auth.auth_store import AuthStoreDisk
 from esi_link.handlers.response.manager import ResponseHandlerManager
 from esi_link.models_and_protocols import (
     EsiSchema,
@@ -20,14 +20,14 @@ class RuntimeRequestInfoGenerator(RuntimeRequestInfoGeneratorProtocol):
     def __init__(
         self,
         schema: EsiSchema,
-        auth: AuthProviderProtocol,
+        auth_store: AuthStoreDisk,
         auth_min_seconds: int = 300,
         url_generator: UrlGeneratorProtocol | None = None,
         response_handler_manager: ResponseHandlerManagerProtocol | None = None,
     ) -> None:
         """Initialize the RuntimeRequestInfoGenerator."""
         self.schema = schema
-        self.auth = auth
+        self.auth_store = auth_store
         self.auth_min_seconds = auth_min_seconds
 
         self.url_generator = url_generator or UrlGenerator()

@@ -757,7 +757,7 @@ async def main():
         console.print(f"Character Name: {character_name}")
         console.print(f"Token Expiration Time: {expiration_time}")
         console.print(
-            f"Token expires in {(expiration_time - Instant.now()).in_seconds():2f} seconds"
+            f"Token expires in {(expiration_time - Instant.now()).total('seconds'):2f} seconds"
         )
         console.print("")
 
@@ -824,7 +824,7 @@ async def main():
         console.print(f"Character Name: {character_name}")
         console.print(f"Token Expiration Time: {expiration_time}")
         console.print(
-            f"Token expires in {(expiration_time - Instant.now()).in_seconds():2f} seconds"
+            f"Token expires in {(expiration_time - Instant.now()).total('seconds'):2f} seconds"
         )
         console.print("")
 

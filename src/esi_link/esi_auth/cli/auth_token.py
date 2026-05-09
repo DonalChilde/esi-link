@@ -1,248 +1,248 @@
-"""CLI commands for managing CharacterTokens."""
+# """CLI commands for managing CharacterTokens."""
 
-import asyncio
-from typing import Annotated, Any
+# import asyncio
+# from typing import Annotated, Any
 
-import aiohttp
-import typer
-from rich.console import Console
-from rich.json import JSON
+# import aiohttp
+# import typer
+# from rich.console import Console
+# from rich.json import JSON
 
-from esi_link import USER_AGENT
-from esi_link.cli.helpers import get_esi_link_settings_from_context
-from esi_link.esi_auth.auth_provider import AuthProvider
-from esi_link.esi_auth.cli.helpers import (
-    get_authenticator,
-)
-from esi_link.esi_auth.simple_json_store import CharacterTokenManager
+# from esi_link import USER_AGENT
+# from esi_link.cli.helpers import get_esi_link_settings_from_context
+# from esi_link.esi_auth.auth_provider import AuthProvider
+# from esi_link.esi_auth.cli.helpers import (
+#     get_authenticator,
+# )
+# from esi_link.esi_auth.simple_json_store import CharacterTokenManager
 
-app = typer.Typer(no_args_is_help=True)
-
-
-@app.command()
-def add(
-    ctx: typer.Context,
-    test_token: Annotated[
-        bool,
-        typer.Option(
-            "-t",
-            "--test-token",
-            help="Make a request to the EVE ESI to prove the token is working",
-        ),
-    ] = False,
-):
-    """Add a new CharacterToken."""
-    settings = get_esi_link_settings_from_context(ctx)
-    console = Console()
-    authenticator = get_authenticator(settings, console)
-    token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
-    request_params = authenticator.prepare_for_request()
-
-    console.print(f"Navigate to the following URL to authenticate:\n")
-    console.print(f"[link={request_params.url}]......Click ME......[/link]\n")
-    console.print(
-        f"Or copy and paste the URL into your browser if your terminal does not support clickable links.\n"
-    )
-    console.print(f"{request_params.url}\n")
-
-    console.print(f"Listening on {authenticator.callback_url} for callback...\n")
-    console.print(
-        "The local server can take a second to start. If the link gives an error, try reloading the page after a moment.\n"
-    )
-    # Launch a web server to listen for the callback and get the authorization code.
-    # then get and validate the token to make a CharacterToken.
-    try:
-        character_token = asyncio.run(
-            authenticator.request_character_token(request_params)
-        )
-    except Exception as e:
-        console.print(f"[red]Error requesting character token: {e}[/red]\n")
-        raise typer.Exit(code=1) from e
-    try:
-        token_manager.add_token(character_token)
-    except Exception as e:
-        console.print(f"[red]Error saving token: {e}[/red]\n")
-        raise typer.Exit(code=1) from e
-    console.print(f"Token for {character_token.character_name} added successfully.\n")
-    if test_token:
-        console.print(f"Testing token by fetching character attributes from ESI...\n")
-        try:
-            attributes = asyncio.run(
-                get_character_attributes(character_token.character_id, token_manager)
-            )
-            console.print(f"Token is valid. Character attributes:")
-            console.print(JSON.from_data(attributes))
-        except Exception as e:
-            console.print(f"[red]Error testing token: {e}[/red]\n")
-            raise typer.Exit(code=1) from e
+# app = typer.Typer(no_args_is_help=True)
 
 
-@app.command()
-def list(
-    ctx: typer.Context,
-):
-    """List all CharacterTokens."""
-    settings = get_esi_link_settings_from_context(ctx)
-    console = Console()
-    authenticator = get_authenticator(settings, console)
-    token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
+# @app.command()
+# def add(
+#     ctx: typer.Context,
+#     test_token: Annotated[
+#         bool,
+#         typer.Option(
+#             "-t",
+#             "--test-token",
+#             help="Make a request to the EVE ESI to prove the token is working",
+#         ),
+#     ] = False,
+# ):
+#     """Add a new CharacterToken."""
+#     settings = get_esi_link_settings_from_context(ctx)
+#     console = Console()
+#     authenticator = get_authenticator(settings, console)
+#     token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
+#     request_params = authenticator.prepare_for_request()
 
-    try:
-        tokens = asyncio.run(token_manager.list_tokens(min_seconds=-1))
-    except Exception as e:
-        console.print(f"[red]Error listing tokens: {e}[/red]\n")
-        raise typer.Exit(code=1) from e
+#     console.print(f"Navigate to the following URL to authenticate:\n")
+#     console.print(f"[link={request_params.redirect_url}]......Click ME......[/link]\n")
+#     console.print(
+#         f"Or copy and paste the URL into your browser if your terminal does not support clickable links.\n"
+#     )
+#     console.print(f"{request_params.redirect_url}\n")
 
-    if not tokens:
-        console.print("No tokens found.\n")
-        return
-
-    console.print(f"Found {len(tokens)} token(s):\n")
-    for token in tokens:
-        console.print(
-            f"- {token.character_name} (ID: {token.character_id}), Expires in: {token.expires_in} seconds\n"
-        )
-
-
-@app.command()
-def auth_headers(
-    ctx: typer.Context,
-    character_id: Annotated[
-        int, typer.Argument(help="ID of the character token to show auth headers for.")
-    ],
-):
-    """Show the auth headers for a CharacterToken by character ID."""
-    settings = get_esi_link_settings_from_context(ctx)
-    console = Console()
-    authenticator = get_authenticator(settings, console)
-    token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
-
-    try:
-        token = asyncio.run(token_manager.get_token(character_id, min_seconds=-1))
-        console.print(
-            f"Auth headers for {token.character_name} (ID: {token.character_id}):\n"
-        )
-        console.print(
-            f"{{'Authorization': 'Bearer {token.oauth_token.access_token}'}}\n"
-        )
-    except KeyError as e:
-        console.print(f"[red]No token found for character ID {character_id}[/red]\n")
-        raise typer.Exit(code=1) from e
-    except Exception as e:
-        console.print(f"[red]Error getting token: {e}[/red]\n")
-        raise typer.Exit(code=1) from e
-
-
-@app.command()
-def remove(
-    ctx: typer.Context,
-    character_id: Annotated[
-        int, typer.Argument(help="ID of the character token to remove.")
-    ],
-):
-    """Remove and revoke a CharacterToken by character ID."""
-    settings = get_esi_link_settings_from_context(ctx)
-    console = Console()
-    authenticator = get_authenticator(settings, console)
-    token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
-
-    try:
-        token = asyncio.run(token_manager.get_token(character_id, min_seconds=-1))
-
-        async def revoke():
-            async with aiohttp.ClientSession() as session:
-                await authenticator.revoke_character_token(token, session)
-
-        asyncio.run(revoke())
-        token_manager.remove_token(character_id)
-        console.print(f"Token for character ID {character_id} removed successfully.\n")
-    except KeyError as e:
-        console.print(f"[red]No token found for character ID {character_id}[/red]\n")
-        raise typer.Exit(code=1) from e
-    except Exception as e:
-        console.print(f"[red]Error removing token: {e}[/red]\n")
-        raise typer.Exit(code=1) from e
+#     console.print(f"Listening on {authenticator.callback_url} for callback...\n")
+#     console.print(
+#         "The local server can take a second to start. If the link gives an error, try reloading the page after a moment.\n"
+#     )
+#     # Launch a web server to listen for the callback and get the authorization code.
+#     # then get and validate the token to make a CharacterToken.
+#     try:
+#         character_token = asyncio.run(
+#             authenticator.request_character_token(request_params)
+#         )
+#     except Exception as e:
+#         console.print(f"[red]Error requesting character token: {e}[/red]\n")
+#         raise typer.Exit(code=1) from e
+#     try:
+#         token_manager.add_token(character_token)
+#     except Exception as e:
+#         console.print(f"[red]Error saving token: {e}[/red]\n")
+#         raise typer.Exit(code=1) from e
+#     console.print(f"Token for {character_token.character_name} added successfully.\n")
+#     if test_token:
+#         console.print(f"Testing token by fetching character attributes from ESI...\n")
+#         try:
+#             attributes = asyncio.run(
+#                 get_character_attributes(character_token.character_id, token_manager)
+#             )
+#             console.print(f"Token is valid. Character attributes:")
+#             console.print(JSON.from_data(attributes))
+#         except Exception as e:
+#             console.print(f"[red]Error testing token: {e}[/red]\n")
+#             raise typer.Exit(code=1) from e
 
 
-@app.command()
-def refresh(
-    ctx: typer.Context,
-    character_id: Annotated[
-        int, typer.Argument(help="ID of the character token to refresh.")
-    ],
-):
-    """Refresh a CharacterToken by character ID."""
-    settings = get_esi_link_settings_from_context(ctx)
-    console = Console()
-    authenticator = get_authenticator(settings, console)
-    token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
+# @app.command()
+# def list(
+#     ctx: typer.Context,
+# ):
+#     """List all CharacterTokens."""
+#     settings = get_esi_link_settings_from_context(ctx)
+#     console = Console()
+#     authenticator = get_authenticator(settings, console)
+#     token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
 
-    try:
-        token = asyncio.run(token_manager.get_token(character_id, min_seconds=-1))
-        console.print(
-            f"Token for {token.character_name}-{token.character_id} expires in {token.expires_in} seconds.\n"
-        )
-        token = asyncio.run(token_manager.get_token(character_id, min_seconds=9000))
-        console.print(
-            f"Token for {token.character_name}-{token.character_id} has been refreshed, expires in {token.expires_in} seconds.\n"
-        )
-        return
-    except KeyError as e:
-        console.print(f"[red]No token found for character ID {character_id}[/red]\n")
-        raise typer.Exit(code=1) from e
-    except Exception as e:
-        console.print(
-            f"[red]Error refreshing token for character ID {character_id}: {e}[/red]\n"
-        )
-        raise typer.Exit(code=1) from e
+#     try:
+#         tokens = asyncio.run(token_manager.list_tokens(min_seconds=-1))
+#     except Exception as e:
+#         console.print(f"[red]Error listing tokens: {e}[/red]\n")
+#         raise typer.Exit(code=1) from e
+
+#     if not tokens:
+#         console.print("No tokens found.\n")
+#         return
+
+#     console.print(f"Found {len(tokens)} token(s):\n")
+#     for token in tokens:
+#         console.print(
+#             f"- {token.character_name} (ID: {token.character_id}), Expires in: {token.expires_in} seconds\n"
+#         )
 
 
-@app.command()
-def refresh_all(
-    ctx: typer.Context,
-):
-    """Refresh all CharacterTokens."""
-    settings = get_esi_link_settings_from_context(ctx)
-    console = Console()
-    authenticator = get_authenticator(settings, console)
-    token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
+# @app.command()
+# def auth_headers(
+#     ctx: typer.Context,
+#     character_id: Annotated[
+#         int, typer.Argument(help="ID of the character token to show auth headers for.")
+#     ],
+# ):
+#     """Show the auth headers for a CharacterToken by character ID."""
+#     settings = get_esi_link_settings_from_context(ctx)
+#     console = Console()
+#     authenticator = get_authenticator(settings, console)
+#     token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
 
-    try:
-        tokens = asyncio.run(token_manager.list_tokens(min_seconds=9000))
-        if not tokens:
-            console.print("No tokens found.\n")
-            return
+#     try:
+#         token = asyncio.run(token_manager.get_token(character_id, min_seconds=-1))
+#         console.print(
+#             f"Auth headers for {token.character_name} (ID: {token.character_id}):\n"
+#         )
+#         console.print(
+#             f"{{'Authorization': 'Bearer {token.oauth_token.access_token}'}}\n"
+#         )
+#     except KeyError as e:
+#         console.print(f"[red]No token found for character ID {character_id}[/red]\n")
+#         raise typer.Exit(code=1) from e
+#     except Exception as e:
+#         console.print(f"[red]Error getting token: {e}[/red]\n")
+#         raise typer.Exit(code=1) from e
 
-        console.print(f"Refreshed {len(tokens)} token(s):\n")
-        for token in tokens:
-            console.print(
-                f"- {token.character_name} (ID: {token.character_id}), Expires in: {token.expires_in} seconds"
-            )
-    except Exception as e:
-        console.print(f"[red]Error refreshing tokens: {e}[/red]\n")
-        raise typer.Exit(code=1) from e
+
+# @app.command()
+# def remove(
+#     ctx: typer.Context,
+#     character_id: Annotated[
+#         int, typer.Argument(help="ID of the character token to remove.")
+#     ],
+# ):
+#     """Remove and revoke a CharacterToken by character ID."""
+#     settings = get_esi_link_settings_from_context(ctx)
+#     console = Console()
+#     authenticator = get_authenticator(settings, console)
+#     token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
+
+#     try:
+#         token = asyncio.run(token_manager.get_token(character_id, min_seconds=-1))
+
+#         async def revoke():
+#             async with aiohttp.ClientSession() as session:
+#                 await authenticator.revoke_character_token(token, session)
+
+#         asyncio.run(revoke())
+#         token_manager.remove_token(character_id)
+#         console.print(f"Token for character ID {character_id} removed successfully.\n")
+#     except KeyError as e:
+#         console.print(f"[red]No token found for character ID {character_id}[/red]\n")
+#         raise typer.Exit(code=1) from e
+#     except Exception as e:
+#         console.print(f"[red]Error removing token: {e}[/red]\n")
+#         raise typer.Exit(code=1) from e
 
 
-async def get_character_attributes(
-    character_id: int, token_manager: CharacterTokenManager
-) -> dict[str, Any]:
-    """Get character attributes from ESI using the token.
+# @app.command()
+# def refresh(
+#     ctx: typer.Context,
+#     character_id: Annotated[
+#         int, typer.Argument(help="ID of the character token to refresh.")
+#     ],
+# ):
+#     """Refresh a CharacterToken by character ID."""
+#     settings = get_esi_link_settings_from_context(ctx)
+#     console = Console()
+#     authenticator = get_authenticator(settings, console)
+#     token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
 
-    Demonstrates use of the AuthProvider and CharacterTokenManager to get a valid token
-    and make an authenticated request to ESI.
-    """
-    auth_provider = AuthProvider(token_manager)
-    character_auth = await auth_provider.character_auth(character_id)
-    async with aiohttp.ClientSession() as session:
-        headers: dict[str, str] = {
-            "User-Agent": USER_AGENT,
-        }
-        headers.update(character_auth.auth_headers)
-        url = f"https://esi.evetech.net/characters/{character_id}/attributes"
-        async with session.get(url, headers=headers) as response:
-            if response.status != 200:
-                raise Exception(
-                    f"Failed to get character attributes: {response.status} {response.reason}"
-                )
-            data = await response.json()
-            return data
+#     try:
+#         token = asyncio.run(token_manager.get_token(character_id, min_seconds=-1))
+#         console.print(
+#             f"Token for {token.character_name}-{token.character_id} expires in {token.expires_in} seconds.\n"
+#         )
+#         token = asyncio.run(token_manager.get_token(character_id, min_seconds=9000))
+#         console.print(
+#             f"Token for {token.character_name}-{token.character_id} has been refreshed, expires in {token.expires_in} seconds.\n"
+#         )
+#         return
+#     except KeyError as e:
+#         console.print(f"[red]No token found for character ID {character_id}[/red]\n")
+#         raise typer.Exit(code=1) from e
+#     except Exception as e:
+#         console.print(
+#             f"[red]Error refreshing token for character ID {character_id}: {e}[/red]\n"
+#         )
+#         raise typer.Exit(code=1) from e
+
+
+# @app.command()
+# def refresh_all(
+#     ctx: typer.Context,
+# ):
+#     """Refresh all CharacterTokens."""
+#     settings = get_esi_link_settings_from_context(ctx)
+#     console = Console()
+#     authenticator = get_authenticator(settings, console)
+#     token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
+
+#     try:
+#         tokens = asyncio.run(token_manager.list_tokens(min_seconds=9000))
+#         if not tokens:
+#             console.print("No tokens found.\n")
+#             return
+
+#         console.print(f"Refreshed {len(tokens)} token(s):\n")
+#         for token in tokens:
+#             console.print(
+#                 f"- {token.character_name} (ID: {token.character_id}), Expires in: {token.expires_in} seconds"
+#             )
+#     except Exception as e:
+#         console.print(f"[red]Error refreshing tokens: {e}[/red]\n")
+#         raise typer.Exit(code=1) from e
+
+
+# async def get_character_attributes(
+#     character_id: int, token_manager: CharacterTokenManager
+# ) -> dict[str, Any]:
+#     """Get character attributes from ESI using the token.
+
+#     Demonstrates use of the AuthProvider and CharacterTokenManager to get a valid token
+#     and make an authenticated request to ESI.
+#     """
+#     auth_provider = AuthProvider(token_manager)
+#     character_auth = await auth_provider.character_auth(character_id)
+#     async with aiohttp.ClientSession() as session:
+#         headers: dict[str, str] = {
+#             "User-Agent": USER_AGENT,
+#         }
+#         headers.update(character_auth.auth_headers)
+#         url = f"https://esi.evetech.net/characters/{character_id}/attributes"
+#         async with session.get(url, headers=headers) as response:
+#             if response.status != 200:
+#                 raise Exception(
+#                     f"Failed to get character attributes: {response.status} {response.reason}"
+#                 )
+#             data = await response.json()
+#             return data

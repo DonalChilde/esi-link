@@ -4,13 +4,13 @@ import logging
 
 import typer
 
+from esi_link.cli.app_credentials import app as app_credentials_app
 from esi_link.cli.cache import app as cache_app
 from esi_link.cli.callback import default_options
 from esi_link.cli.config_info import app as config_info_app
 from esi_link.cli.esi_schema import app as esi_schema_app
 from esi_link.cli.examples import app as examples_app
 from esi_link.cli.requests import app as requests_app
-from esi_link.esi_auth.cli.main_typer import app as esi_auth_app
 
 logger = logging.getLogger(__name__)
 app = typer.Typer(
@@ -22,9 +22,7 @@ app.add_typer(
     esi_schema_app, name="schema", help="ESI schema information and management."
 )
 app.add_typer(cache_app, name="cache", help="ESI cache management commands.")
-app.add_typer(
-    esi_auth_app, name="auth", help="Commands for managing ESI authentication."
-)
+
 # Add config info commands to the main app as indiviual commands, rather than a subcommand
 app.add_typer(config_info_app)
 app.add_typer(
@@ -32,4 +30,7 @@ app.add_typer(
 )
 app.add_typer(
     requests_app, name="requests", help="Commands for managing ESI Link requests."
+)
+app.add_typer(
+    app_credentials_app, name="creds", help="Commands for managing app credentials."
 )
