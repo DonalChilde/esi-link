@@ -50,44 +50,56 @@ class SchemaDownload:
     download_date: Instant
 
 
-@dataclass(slots=True, kw_only=True)
-class RuntimeRequestInfo:
-    """Represents the runtime information needed for a Request."""
+# @dataclass(slots=True, kw_only=True)
+# class RuntimeRequestInfo:
+#     """Represents the runtime information needed for a Request."""
 
-    path_url: str
-    additional_query_params: dict[str, str] = field(default_factory=dict[str, str])
-    """Additional query parameters that are not defined in the request, but are needed 
-    for the request. Including things like the page number for paged requests."""
-    method: Literal["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
-    is_paged: bool = False
-    is_auth: bool = False
-    headers: dict[str, str] = {}
-    """Includes UserAgent, If-None-Match, If-Modified-Since, X-Compatibility-Date, and auth if required."""
-    timeout: int = 10
-    cache_key: UUID | None = None
-    """Cache key for the request, if applicable. This is used to identify cached responses. Paged requests only have a cache key for the first page."""
-    metrics: "RequestMetrics"
-    parent_id: UUID | None = None
-    """The request_id of the parent request if this request is a sub-request, e.g. a paged request or a retry."""
-
-
-@dataclass(slots=True, kw_only=True)
-class RuntimeGroupInfo:
-    """Represents the runtime information for a group of ESI requests."""
-
-    metrics: "RequestGroupMetrics"
+#     path_url: str
+#     additional_query_params: dict[str, str] = field(default_factory=dict[str, str])
+#     """Additional query parameters that are not defined in the request, but are needed
+#     for the request. Including things like the page number for paged requests."""
+#     method: Literal["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
+#     is_paged: bool = False
+#     is_auth: bool = False
+#     headers: dict[str, str] = field(default_factory=dict[str, str])
+#     """Includes UserAgent, If-None-Match, If-Modified-Since, X-Compatibility-Date, and auth if required."""
+#     timeout: int = 10
+#     cache_key: UUID | None = None
+#     """Cache key for the request, if applicable. This is used to identify cached responses. Paged requests only have a cache key for the first page."""
+#     metrics: "RequestMetrics"
+#     parent_id: UUID | None = None
+#     """The request_id of the parent request if this request is a sub-request, e.g. a paged request or a retry."""
 
 
-@dataclass(slots=True, kw_only=True)
+# @dataclass(slots=True, kw_only=True)
+# class RuntimeGroupInfo:
+#     """Represents the runtime information for a group of ESI requests."""
+
+#     metrics: "RequestGroupMetrics"
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
 class Request:
-    """Represents a single ESI request to be executed."""
+    """Represents a single ESI request to be executed.
+
+    Can be loaded from a file or created programmatically. The request_id is used to
+    identify the request.
+
+    Requests are expected to be contained in a RequestGroup, and the request_id is used
+    to link the Request to its RuntimeRequest, and to the final Response.
+    """
 
     request_id: UUID = field(default_factory=uuid4)
     operation_id: str
     compatibility_date: str | None = None
-    path_parameters: dict[str, str | int | float] = {}
-    query_parameters: dict[str, str | int | float] = {}
+    path_parameters: dict[str, str | int | float] = field(
+        default_factory=dict[str, str | int | float]
+    )
+    query_parameters: dict[str, str | int | float] = field(
+        default_factory=dict[str, str | int | float]
+    )
     authorization_id: int | None = None
+    """The Character ID to use for authentication, if applicable."""
     lang: Lang = "en"
     json_body: Any | None = None
     """The JSON body of the request, if applicable. This is used for POST, PUT, PATCH requests."""
@@ -99,13 +111,39 @@ class Request:
 
 @dataclass(slots=True, kw_only=True)
 class RuntimeRequest:
+    """Represents the runtime information needed for a Request."""
+
     request: Request
-    runtime_info: RuntimeRequestInfo
+    path_url: str
+    additional_query_params: dict[str, str] = field(default_factory=dict[str, str])
+    """Additional query parameters that are not defined in the request, but are needed 
+    for the request. Including things like the page number for paged requests."""
+    method: Literal["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
+    is_paged: bool = False
+    is_auth: bool = False
+    headers: dict[str, str] = field(default_factory=dict[str, str])
+    """Includes UserAgent, If-None-Match, If-Modified-Since, X-Compatibility-Date, and auth if required."""
+    timeout: int = 10
+    cache_key: UUID | None = None
+    """Cache key for the request, if applicable. This is used to identify cached responses. Paged requests only have a cache key for the first page."""
+    metrics: "RequestMetrics" = field(default_factory=RequestMetrics)  # type: ignore
+    parent_id: UUID | None = None
+    """The request_id of the parent request if this request is a sub-request, e.g. a paged request or a retry."""
+    error_messages: list[str] = field(default_factory=list[str])
+    """A list of error messages encountered during the processing of this request, e.g. validation errors, errors from the URL generator, etc."""
+    _exceptions: list[Exception] = field(
+        default_factory=list[Exception], repr=False, init=False
+    )
 
 
-@dataclass(slots=True, kw_only=True)
+@dataclass(slots=True, kw_only=True, frozen=True)
 class RequestGroup:
-    """Represents a batch of ESI requests to be executed."""
+    """Represents a batch of ESI requests to be executed.
+
+    Can be loaded from a file or created programmatically. The group_id is used to
+    identify the group, and can be used for things like saving response data to disk with
+    a filename that includes the group_id.
+    """
 
     created_on: Instant = field(default_factory=_get_current_instant)
     group_id: UUID
@@ -115,6 +153,20 @@ class RequestGroup:
     """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
     save_filename: str | None = None
     """The filename to save the response group data to, if applicable. If not provided, but a save_directory is provided, a default filename will be used."""
+
+
+@dataclass(slots=True, kw_only=True)
+class RuntimeRequestGroup:
+    """Represents the runtime information for a group of ESI requests."""
+
+    request_group: RequestGroup
+    runtime_requests: dict[UUID, RuntimeRequest]
+    metrics: "RequestGroupMetrics" = field(default_factory=RequestGroupMetrics)  # type: ignore
+    error_messages: list[str] = field(default_factory=list[str])
+    """A list of error messages encountered during the processing of this request group, e.g. validation errors, etc."""
+    _exceptions: list[Exception] = field(
+        default_factory=list[Exception], repr=False, init=False
+    )
 
 
 @dataclass(slots=True, kw_only=True)
@@ -341,20 +393,23 @@ class RequestMetrics:
 class Response:
     """Represents the response to an ESI request."""
 
-    request: Request
-    runtime_info: RuntimeRequestInfo
+    request_id: UUID
     http_response: HttpResponse | None = None
-    network_exception_messages: list[str] = field(default_factory=list[str])
+    error_messages: list[str] = field(default_factory=list[str])
+    _exceptions: list[Exception] = field(
+        default_factory=list[Exception], repr=False, init=False
+    )
 
 
 @dataclass(slots=True, kw_only=True)
 class ResponseGroup:
     """Represents the responses to a group of ESI requests."""
 
-    request_group: RequestGroup
-    runtime_info: RuntimeGroupInfo
+    request_group_id: UUID
     responses: dict[UUID, Response]
-    exceptions: list[Exception] = field(default_factory=list[Exception])
+    _exceptions: list[Exception] = field(
+        default_factory=list[Exception], repr=False, init=False
+    )
 
 
 @dataclass(slots=True, kw_only=True)
@@ -668,12 +723,12 @@ class HttpRequestExecutorProtocol(Protocol):
         ...
 
 
-class RuntimeRequestInfoGeneratorProtocol(Protocol):
-    async def __call__(self, request: Request) -> RuntimeRequestInfo: ...
+# class RuntimeRequestInfoGeneratorProtocol(Protocol):
+#     async def __call__(self, request: Request) -> RuntimeRequestInfo: ...
 
 
-class RuntimeGroupInfoGeneratorProtocol(Protocol):
-    def __call__(self, request_group: RequestGroup) -> RuntimeGroupInfo: ...
+# class RuntimeGroupInfoGeneratorProtocol(Protocol):
+#     def __call__(self, request_group: RequestGroup) -> RuntimeGroupInfo: ...
 
 
 class RequestValidatorProtocol(Protocol):
@@ -698,8 +753,8 @@ class RequestGroupValidatorProtocol(Protocol):
 
 class RequestGroupExecutorProtocol(Protocol):
     _request_executor: HttpRequestExecutorProtocol
-    _runtime_request_info: RuntimeRequestInfoGeneratorProtocol
-    _runtime_group_info: RuntimeGroupInfoGeneratorProtocol
+    # _runtime_request_info: RuntimeRequestInfoGeneratorProtocol
+    # _runtime_group_info: RuntimeGroupInfoGeneratorProtocol
     _request_validator: RequestValidatorProtocol
     _request_group_validator: RequestGroupValidatorProtocol
 
