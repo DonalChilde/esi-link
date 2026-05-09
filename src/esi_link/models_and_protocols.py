@@ -2,14 +2,15 @@
 
 import json
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from types import TracebackType
 from typing import Any, Literal, Protocol, Self, cast
 from uuid import UUID, uuid4
 
 import aiohttp
-from pydantic import BaseModel, ConfigDict, Field
+
+# from pydantic import BaseModel, ConfigDict, Field
 from whenever import Instant
 
 from esi_link.helpers.resolve_json_ref import resolve_internal_refs
@@ -48,11 +49,12 @@ class SchemaDownload:
     download_date: Instant
 
 
-class RuntimeRequestInfo(BaseModel):
+@dataclass(slots=True, kw_only=True)
+class RuntimeRequestInfo:
     """Represents the runtime information needed for a Request."""
 
     path_url: str
-    additional_query_params: dict[str, str] = Field(default_factory=dict)
+    additional_query_params: dict[str, str] = field(default_factory=dict[str, str])
     """Additional query parameters that are not defined in the request, but are needed 
     for the request. Including things like the page number for paged requests."""
     method: Literal["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
@@ -67,19 +69,19 @@ class RuntimeRequestInfo(BaseModel):
     parent_id: UUID | None = None
     """The request_id of the parent request if this request is a sub-request, e.g. a paged request or a retry."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-
-class RuntimeGroupInfo(BaseModel):
+@dataclass(slots=True, kw_only=True)
+class RuntimeGroupInfo:
     """Represents the runtime information for a group of ESI requests."""
 
     metrics: "RequestGroupMetrics"
 
 
-class Request(BaseModel):
+@dataclass(slots=True, kw_only=True)
+class Request:
     """Represents a single ESI request to be executed."""
 
-    request_id: UUID = Field(default_factory=uuid4)
+    request_id: UUID = field(default_factory=uuid4)
     operation_id: str
     path_parameters: dict[str, str | int | float] = {}
     query_parameters: dict[str, str | int | float] = {}
@@ -88,12 +90,14 @@ class Request(BaseModel):
     json_body: Any | None = None
 
 
-class RuntimeRequest(BaseModel):
+@dataclass(slots=True, kw_only=True)
+class RuntimeRequest:
     request: Request
     runtime_info: RuntimeRequestInfo
 
 
-class RequestGroup(BaseModel):
+@dataclass(slots=True, kw_only=True)
+class RequestGroup:
     """Represents a batch of ESI requests to be executed.
 
     This model exists mostly for serialization purposes, with the imagined use being
@@ -101,13 +105,13 @@ class RequestGroup(BaseModel):
     downloading a fresh set of pricing data every day.
     """
 
-    created_on: Instant = Field(default_factory=_get_current_instant)
+    created_on: Instant = field(default_factory=_get_current_instant)
     group_id: UUID
     description: str = ""
     requests: dict[UUID, Request]
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class X_ratelimit:
     group: str
     limit: str
@@ -116,12 +120,13 @@ class X_ratelimit:
 
 
 # TODO consider forcing headers to lower case on ingestion.
-class HttpResponse(BaseModel):
+@dataclass(slots=True, kw_only=True)
+class HttpResponse:
     """Represents the data of an ESI response."""
 
     status_code: int
     url: str
-    headers: dict[str, str] = {}
+    headers: dict[str, str] = field(default_factory=dict[str, str])
     body_text: str
     received_at: int = -1
     """The timestamp when the response was received, as a Unix timestamp in nanoseconds."""
@@ -241,7 +246,7 @@ class HttpResponse(BaseModel):
         return X_ratelimit(group=group, limit=limit, remaining=remaining, used=used)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class RequestGroupMetrics:
     """Performance metrics for a RequestGroup."""
 
@@ -328,30 +333,28 @@ class RequestMetrics:
         return -1.0
 
 
-class Response(BaseModel):
+@dataclass(slots=True, kw_only=True)
+class Response:
     """Represents the response to an ESI request."""
 
     request: Request
     runtime_info: RuntimeRequestInfo
     http_response: HttpResponse | None = None
-    network_exception_messages: list[str] = Field(default_factory=list)
-    exceptions: list[Exception] = Field(..., exclude=True)
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    network_exception_messages: list[str] = field(default_factory=list[str])
 
 
-class ResponseGroup(BaseModel):
+@dataclass(slots=True, kw_only=True)
+class ResponseGroup:
     """Represents the responses to a group of ESI requests."""
 
     request_group: RequestGroup
     runtime_info: RuntimeGroupInfo
     responses: dict[UUID, Response]
-    exceptions: list[Exception] = Field(..., exclude=True)
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    exceptions: list[Exception] = field(default_factory=list[Exception])
 
 
-class ResponseData(BaseModel):
+@dataclass(slots=True, kw_only=True)
+class ResponseData:
     """Represents the data of a response, includes the request and response_date.
 
     This model is used both as a serialization format for response data, and as a
@@ -369,11 +372,12 @@ class ResponseData(BaseModel):
     """The actual data of the response, typically the parsed JSON body."""
 
 
-class CachedResponse(BaseModel):
+@dataclass(slots=True, kw_only=True)
+class CachedResponse:
     """Represents a cached response for a Request."""
 
     cache_key: UUID
-    cached_at: Instant = Field(default_factory=_get_current_instant)
+    cached_at: Instant = field(default_factory=_get_current_instant)
     """The instant when the response was cached."""
     http_response: HttpResponse
     expires_at: Instant | None = None
@@ -608,7 +612,8 @@ class EsiSchema:
         return self.dereferenced_schema["servers"][0]["url"]
 
 
-class StoredSchema(BaseModel):
+@dataclass(slots=True, kw_only=True)
+class StoredSchema:
     """Represents a stored ESI schema, including the raw schema and the date it was downloaded."""
 
     esi_schema: EsiSchema
