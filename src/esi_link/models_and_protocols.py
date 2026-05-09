@@ -4,13 +4,12 @@ import json
 from copy import deepcopy
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path
 from types import TracebackType
-from typing import Annotated, Any, ClassVar, Literal, Protocol, Self, cast
+from typing import Any, Literal, Protocol, Self, cast
 from uuid import UUID, uuid4
 
 import aiohttp
-from pydantic import BaseModel, ConfigDict, Field, SkipValidation
+from pydantic import BaseModel, ConfigDict, Field
 from whenever import Instant
 
 from esi_link.helpers.resolve_json_ref import resolve_internal_refs
@@ -49,69 +48,6 @@ class SchemaDownload:
     download_date: Instant
 
 
-# class ResponseHandlerConfig(BaseModel):
-#     """Configuration for a response handler.
-
-#     Handler names are namespaced, with the format <namespace>:<handler_name>. Namespaces
-#     are case insensitive, so "esi-link" and "ESI-LINK" would be considered the same
-#     namespace. The esi-link namespace is reserved for built-in handlers,
-#     e.g., esi-link:BuiltinHandler. Custom handlers should use a different namespace to
-#     avoid conflicts. For example, a handler named "my_handler" could be registered under
-#     the name "my_namespace.my_handler" to avoid conflicts with any built-in handlers or
-#     other custom handlers that may be registered in the future.
-
-#     Runtime values for handlers can be included in the config dictionary, and will be
-#     passed to the handler when it is initialized. e.g. {"my_namespace.my_parameter": "value"}
-
-#     It is the responsibility of the handler implementation to parse the config and
-#     extract any needed values from it. The config dictionary is not interpreted by the
-#     core ESI Link code, and is validated only by the handler implementation.
-
-#     Example:
-#     ```python
-#     ResponseHandlerConfig(
-#         name="my_namespace.my_handler",
-#         config={
-#             "type_id": "EsiRequest.query_parameters.type_id",
-#             "download_date": "EsiResponse.http_response.date",
-#         },
-#     )
-#     ```
-#     """
-
-#     name: str
-#     """Name of the handler."""
-#     config: dict[str, Any] = {}
-#     """Configuration specific to the handler."""
-
-
-# class ResponseGroupHandlerConfig(BaseModel):
-#     """Configuration for a response handler that operates on a group of responses.
-
-#     This is similar to ResponseHandlerConfig, but is intended for handlers that need to
-#     operate on a group of responses together, e.g. to aggregate data across multiple
-#     responses. The handler will receive the entire ResponseGroup as input, and can
-#     access the individual responses and their associated requests and runtime info as
-#     needed.
-
-#     Example:
-#     ```python
-#     ResponseGroupHandlerConfig(
-#         name="my_namespace.my_group_handler",
-#         config={
-#             "type_id": "ResponseGroup.request_group.requests.*.query_parameters.type_id",
-#             "download_date": "ResponseGroup.responses.*.http_response.date",
-#         },
-#     )
-#     ```
-#     """
-
-#     name: str
-#     """Name of the handler."""
-#     config: dict[str, Any] = {}
-#     """Configuration specific to the handler."""
-
-
 class RuntimeRequestInfo(BaseModel):
     """Represents the runtime information needed for a Request."""
 
@@ -127,10 +63,6 @@ class RuntimeRequestInfo(BaseModel):
     timeout: int = 10
     cache_key: UUID | None = None
     """Cache key for the request, if applicable. This is used to identify cached responses. Paged requests only have a cache key for the first page."""
-    # response_handlers: Annotated[
-    #     list["ResponseHandlerProtocol"], Field(..., exclude=True), SkipValidation
-    # ]
-    # """The list of response handler instances to run for this request, in the order they should be run."""
     metrics: "RequestMetrics"
     parent_id: UUID | None = None
     """The request_id of the parent request if this request is a sub-request, e.g. a paged request or a retry."""
@@ -142,8 +74,6 @@ class RuntimeGroupInfo(BaseModel):
     """Represents the runtime information for a group of ESI requests."""
 
     metrics: "RequestGroupMetrics"
-    # response_group_handlers: list[Any] = Field(..., exclude=True)
-    # """The list of response group handler instances to run for this group of requests, in the order they should be run."""
 
 
 class Request(BaseModel):
@@ -156,7 +86,6 @@ class Request(BaseModel):
     auth_character_id: int | None = None
     lang: Lang = "en"
     json_body: Any | None = None
-    # response_handlers: list[ResponseHandlerConfig] = []
 
 
 class RuntimeRequest(BaseModel):
@@ -176,7 +105,6 @@ class RequestGroup(BaseModel):
     group_id: UUID
     description: str = ""
     requests: dict[UUID, Request]
-    # response_group_handlers: list[ResponseGroupHandlerConfig] = []
 
 
 @dataclass(slots=True)
@@ -319,20 +247,6 @@ class RequestGroupMetrics:
 
     group_execution_started: Instant | None = None
     group_execution_completed: Instant | None = None
-    # group_handlers_started: Instant | None = None
-    # group_handlers_completed: Instant | None = None
-
-    # @property
-    # def group_handlers_duration(self) -> float:
-    #     """Calculate the total duration of the group handlers."""
-    #     if (
-    #         self.group_handlers_started is not None
-    #         and self.group_handlers_completed is not None
-    #     ):
-    #         return (
-    #             self.group_handlers_completed - self.group_handlers_started
-    #         ).in_seconds()
-    #     return -1.0
 
     @property
     def group_execution_duration(self) -> float:
@@ -343,7 +257,7 @@ class RequestGroupMetrics:
         ):
             return (
                 self.group_execution_completed - self.group_execution_started
-            ).in_seconds()
+            ).total("seconds")
         return -1.0
 
 
@@ -358,8 +272,6 @@ class RequestMetrics:
     paged_requests_start: float | None = None
     paged_requests_completed: float | None = None
     paged_request_count: int = 0
-    # handlers_started: float | None = None
-    # handlers_completed: float | None = None
     cache_response_status: "CachedResponseStatus | None" = None
     cache_action: "CacheAction | None" = None
     cache_check_started: float | None = None
@@ -382,7 +294,7 @@ class RequestMetrics:
         """Calculate the total duration of the task."""
         if self.task_started is not None and self.task_completed is not None:
             duration = self.task_completed - self.task_started
-            return duration.in_seconds()
+            return duration.total("seconds")
         return -1.0
 
     @property
@@ -415,13 +327,6 @@ class RequestMetrics:
             return self.cache_check_completed - self.cache_check_started
         return -1.0
 
-    # @property
-    # def handlers_duration(self) -> float:
-    #     """Calculate the total duration of the response handlers."""
-    #     if self.handlers_started is not None and self.handlers_completed is not None:
-    #         return self.handlers_completed - self.handlers_started
-    #     return -1.0
-
 
 class Response(BaseModel):
     """Represents the response to an ESI request."""
@@ -430,7 +335,6 @@ class Response(BaseModel):
     runtime_info: RuntimeRequestInfo
     http_response: HttpResponse | None = None
     network_exception_messages: list[str] = Field(default_factory=list)
-    # handler_exception_messages: list[str] = Field(default_factory=list)
     exceptions: list[Exception] = Field(..., exclude=True)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -442,7 +346,6 @@ class ResponseGroup(BaseModel):
     request_group: RequestGroup
     runtime_info: RuntimeGroupInfo
     responses: dict[UUID, Response]
-    # group_handler_exception_messages: list[str] = Field(default_factory=list)
     exceptions: list[Exception] = Field(..., exclude=True)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -727,136 +630,6 @@ class AvailableSchema:
     datetime: str
 
 
-# @dataclass(slots=True)
-# class IndexedOperation:
-#     method: Literal["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
-#     path: str
-#     operation: dict[str, Any] = field(default_factory=dict[str, Any])
-#     """The raw operation object from the OpenAPI schema, dereferenced and ready for use.
-
-#     This object contains all the details of the operation as defined in the OpenAPI schema,
-#     including parameters, request body, responses, and security requirements.
-
-#     <paths>:<path>:<method>:<operation> from the OpenAPI schema.
-
-#     """
-
-#     @property
-#     def operation_id(self) -> str:
-#         """Extract the operation ID from the operation object."""
-#         return self.operation.get("operationId", "")
-
-#     @property
-#     def tags(self) -> list[str]:
-#         """Extract the tags from the operation object, if present."""
-#         return self.operation.get("tags", [])
-
-#     @property
-#     def description(self) -> str:
-#         """Extract the description from the operation object, if present."""
-#         return self.operation.get("description", "")
-
-#     @property
-#     def path_params(self) -> list[dict[str, Any]]:
-#         """Extract the path parameters from the operation object, if present."""
-#         return [
-#             param
-#             for param in self.operation.get("parameters", [])
-#             if param.get("in") == "path"
-#         ]
-
-#     @property
-#     def query_params(self) -> list[dict[str, Any]]:
-#         """Extract the query parameters from the operation object, if present."""
-#         return [
-#             param
-#             for param in self.operation.get("parameters", [])
-#             if param.get("in") == "query"
-#         ]
-
-#     @property
-#     def header_params(self) -> list[dict[str, Any]]:
-#         """Extract the header parameters from the operation object, if present."""
-#         return [
-#             param
-#             for param in self.operation.get("parameters", [])
-#             if param.get("in") == "header"
-#         ]
-
-#     @property
-#     def request_body(self) -> dict[str, Any] | None:
-#         """Extract the request body from the operation object, if present."""
-#         return self.operation.get("requestBody")
-
-#     @property
-#     def auth_required(self) -> bool:
-#         """Determine if the operation requires authentication based on the presence of security requirements."""
-#         return "security" in self.operation and bool(self.operation["security"])
-
-#     @property
-#     def is_paged(self) -> bool:
-#         """Determine if the operation is paged based on the presence of pagination-related parameters."""
-#         for param in self.query_params:
-#             if param.get("name") in {"page"}:
-#                 return True
-#         return False
-
-#     @property
-#     def is_cached(self) -> bool:
-#         """Determine if the operation is cacheable."""
-#         if self.method in {"GET", "get"}:
-#             return True
-#         return False
-
-
-# # TODO can this be a dataclass instead of a full class with methods? It doesn't seem to have any behavior, just data.
-# class IndexedEsiSchema(BaseModel):
-#     """Represents the entire schema for ESI requests and responses, indexed for efficient access."""
-
-#     download_date: Instant
-#     """The date the schema was downloaded."""
-#     esi_schema: dict[str, Any]
-#     """The raw OpenAPI schema as a dictionary."""
-#     operations: dict[str, IndexedOperation] = Field(default_factory=dict)
-#     """A mapping of operation IDs to IndexedOperation instances."""
-#     security_schemes: dict[str, Any] = Field(default_factory=dict)
-#     """A mapping of security scheme names to their definitions."""
-#     info: dict[str, Any] = Field(default_factory=dict)
-#     """The info section of the OpenAPI schema."""
-#     openapi: str
-#     """The OpenAPI version."""
-#     servers: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
-#     """The servers section of the OpenAPI schema."""
-#     tags: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
-#     """The tags section of the OpenAPI schema."""
-
-#     def __str__(self) -> str:
-#         """String representation of the IndexedEsiSchema instance."""
-#         return (
-#             f"IndexedEsiSchema(version={self.version}, "
-#             f"openapi={self.openapi}, operations={len(self.operations)}, "
-#             f"download_date={self.download_date})"
-#         )
-
-#     @property
-#     def compatibility_date(self) -> str:
-#         """Get the compatibility date of the ESI schema from the info section."""
-#         return self.version
-
-#     @property
-#     def version(self) -> str:
-#         """Get the version of the ESI schema based on the compatibility date."""
-#         version = cast(str, self.info["version"])
-#         return version
-
-#     @property
-#     def base_url(self) -> str:
-#         """Get the base URL for the ESI API from the servers section of the schema."""
-#         if self.servers:
-#             return self.servers[0]["url"]
-#         raise ValueError("No servers defined in schema")
-
-
 @dataclass(slots=True)
 class GeneratedUrlInfo:
     """Represents the generated URL information for an ESI request."""
@@ -864,19 +637,6 @@ class GeneratedUrlInfo:
     path_url: str
     cache_url: str
     cache_key: UUID
-
-
-# @dataclass(slots=True)
-# class HandlerPluginLoaderConfig:
-#     file_path: Path
-#     class_name: str
-#     enabled: bool
-
-
-# class HandlerPluginConfigs(BaseModel):
-#     plugins: list[HandlerPluginLoaderConfig] = Field(
-#         default_factory=list[HandlerPluginLoaderConfig]
-#     )
 
 
 # ---------------------------------------------------------------------------------------
@@ -943,157 +703,6 @@ class RequestGroupExecutorProtocol(Protocol):
         the final ResponseGroup.
         """
         ...
-
-
-# class ResponseHandlerProtocol(Protocol):
-#     name: ClassVar[str]
-#     config: ResponseHandlerConfig
-
-#     async def __call__(self, response: Response) -> Response:
-#         """Handle a response.
-
-#         This can be used for things like error handling, response transformation,
-#         persisting responses to disk, etc.
-
-#         An exception during handling should not raise, but should be caught and logged.
-#         The messages from any exceptions should be appended to the response's handler_exception_messages,
-#         and the exceptions themselves should be appended to the response's exceptions list.
-
-#         Args:
-#             response: The response to handle.
-
-#         Returns:
-#             The handled response.
-#         """
-#         ...
-
-#     @classmethod
-#     def from_config(cls, config: ResponseHandlerConfig) -> Self:
-#         """Factory method to create a handler instance from a ResponseHandlerConfig.
-
-#         The config should be validated before creating the handler instance.
-
-
-#         Args:
-#             config: The ResponseHandlerConfig instance containing the configuration for the handler.
-
-#         Raises:
-#             InvalidHandlerError: If the configuration is invalid for this handler.
-#         """
-#         raise NotImplementedError("from_config method must be implemented by subclass")
-
-#     @classmethod
-#     def validate_config(cls, config: ResponseHandlerConfig) -> None:
-#         """Validate a ResponseHandlerConfig for this handler.
-
-#         This method should be called before creating a handler instance from a config,
-#         to ensure that the values in the config are valid for this handler.
-
-#         This is only required to validate the presence of the required config values,
-#         and that they are of the correct type. The actual values might not be valid until
-#         runtime, e.g., if the config includes a reference to a value in the EsiResponse
-#         that is not present until the response is received.
-
-#         Args:
-#             config: The ResponseHandlerConfig instance to validate.
-
-#         Raises:
-#             InvalidHandlerConfigError: If the configuration is invalid for this handler.
-#         """
-#         raise NotImplementedError(
-#             "validate_config method must be implemented by subclass"
-#         )
-
-
-# class ResponseHandlerManagerProtocol(Protocol):
-#     def get_handler(
-#         self, config: ResponseHandlerConfig
-#     ) -> ResponseHandlerProtocol | None:
-#         """Get a handler by config.
-
-#         Args:
-#             config: The HandlerConfig instance containing the configuration.
-
-#         Returns:
-#             An instance of the handler or None if the handler is not found.
-
-#         Raises:
-#             InvalidHandlerConfigError: If the config is invalid for the specified handler.
-#         """
-#         raise NotImplementedError("get_handler method must be implemented by subclass")
-
-#     def register_handler(self, handler_cls: type[ResponseHandlerProtocol]) -> None:
-#         """Register a handler class by its name.
-
-#         Args:
-#             handler_cls: The handler class to register.
-
-#         Raises:
-#             InvalidHandlerConfigError: If the handler class is invalid.
-#         """
-#         raise NotImplementedError(
-#             "register_handler method must be implemented by subclass"
-#         )
-
-#     def registered_handlers(self) -> dict[str, type[ResponseHandlerProtocol]]:
-#         """Get a dictionary of registered handler classes by their names.
-
-#         Returns:
-#             A dictionary mapping handler names to their corresponding handler classes.
-#         """
-#         raise NotImplementedError(
-#             "registered_handlers method must be implemented by subclass"
-#         )
-
-#     def validate_handler_config(self, config: ResponseHandlerConfig) -> None:
-#         """Validate a handler configuration against the registered handler.
-
-#         Args:
-#             config: The ResponseHandlerConfig instance containing the configuration.
-
-#         Raises:
-#             InvalidHandlerConfigError: If the configuration is invalid for the specified handler.
-#             HandlerNotFoundError: If the specified handler is not found.
-#         """
-#         raise NotImplementedError(
-#             "validate_handler_config method must be implemented by subclass"
-#         )
-
-
-# class ResponseGroupHandlerProtocol(Protocol):
-#     name: ClassVar[str]
-#     config: ResponseGroupHandlerConfig
-
-#     async def __call__(self, response_group: ResponseGroup) -> ResponseGroup:
-#         """Handle a response group.
-
-#         An exception during handling should not raise, but should be caught and logged.
-#         The messages from any exceptions should be appended to the response's handler_exception_messages,
-#         and the exceptions themselves should be appended to the response's exceptions list.
-
-#         Args:
-#             response_group: The ResponseGroup to handle.
-
-#         Returns:
-#             The handled ResponseGroup.
-#         """
-#         ...
-
-#     @classmethod
-#     def from_config(cls, config: ResponseGroupHandlerConfig) -> Self: ...
-#     @classmethod
-#     def validate_config(cls, config: ResponseGroupHandlerConfig) -> None: ...
-
-
-# class ResponseGroupHandlerManagerProtocol(Protocol):
-#     def get_handler(
-#         self, config: ResponseGroupHandlerConfig
-#     ) -> ResponseGroupHandlerProtocol: ...
-#     def register_handler(
-#         self, handler_cls: type[ResponseGroupHandlerProtocol]
-#     ) -> None: ...
-#     def registered_handlers(self) -> dict[str, type[ResponseGroupHandlerProtocol]]: ...
-#     def validate_handler_config(self, config: ResponseGroupHandlerConfig) -> None: ...
 
 
 class CacheManagerProtocol:
@@ -1361,29 +970,3 @@ class SchemaManagerProtocol:
 
         """
         ...
-
-
-# class ResponseHandlerPluginLoaderProtocol(Protocol):
-#     def __call__(self, handler_manager: ResponseHandlerManagerProtocol) -> None:
-#         """Apply the plugin to the given ResponseHandlerManagerProtocol instance.
-
-#         This method should register any response handlers provided by the plugin with the
-#         handler manager.
-
-#         Args:
-#             handler_manager: The ResponseHandlerManagerProtocol instance to apply the plugin to.
-#         """
-#         ...
-
-
-# class ResponseGroupHandlerPluginLoaderProtocol(Protocol):
-#     def __call__(self, handler_manager: ResponseGroupHandlerManagerProtocol) -> None:
-#         """Apply the plugin to the given ResponseGroupHandlerManagerProtocol instance.
-
-#         This method should register any response group handlers provided by the plugin with the
-#         handler manager.
-
-#         Args:
-#             handler_manager: The ResponseGroupHandlerManagerProtocol instance to apply the plugin to.
-#         """
-#         ...
