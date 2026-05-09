@@ -203,15 +203,15 @@ async def validate_request_auth(
     """Validate the request authentication against the EsiSchema operation."""
     if not operation:
         raise ValueError(f"Operation ID {request.operation_id} not found in schema")
-    if operation.auth_required and not request.auth_character_id:
+    if operation.auth_required and not request.authorization_id:
         raise ValueError(f"Operation ID {request.operation_id} requires authentication")
-    if request.auth_character_id and not operation.auth_required:
+    if request.authorization_id and not operation.auth_required:
         raise ValueError(
             f"Operation ID {request.operation_id} does not require authentication"
         )
-    if request.auth_character_id:
+    if request.authorization_id:
         available_characters = await auth_provider.available_characters()
-        if request.auth_character_id not in available_characters:
+        if request.authorization_id not in available_characters:
             raise ValueError(
-                f"Authentication information for character ID {request.auth_character_id} is not available"
+                f"Authentication information for character ID {request.authorization_id} is not available"
             )

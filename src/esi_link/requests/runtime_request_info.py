@@ -72,15 +72,15 @@ class RuntimeRequestInfoGenerator(RuntimeRequestInfoGeneratorProtocol):
         return runtime_info
 
     async def _auth_headers(self, request: Request) -> dict[str, str]:
-        if request.auth_character_id is None:
+        if request.authorization_id is None:
             return {}
         try:
             char_auth = await self.auth.character_auth(
-                request.auth_character_id, min_seconds=self.auth_min_seconds
+                request.authorization_id, min_seconds=self.auth_min_seconds
             )
         except KeyError as e:
             raise ValueError(
-                f"Authentication required for character ID {request.auth_character_id}, "
+                f"Authentication required for character ID {request.authorization_id}, "
                 "but no authentication information is available."
             ) from e
         auth_headers = char_auth.auth_headers
