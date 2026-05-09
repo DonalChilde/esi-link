@@ -88,7 +88,7 @@ from esi_link.models_and_protocols import (
     EsiSchema,
     Request,
     RequestValidatorProtocol,
-    ResponseHandlerManagerProtocol,
+    # ResponseHandlerManagerProtocol,
     SchemaOperation,
 )
 from esi_link.validation.errors import RequestValidationError
@@ -102,7 +102,7 @@ class RequestValidator(RequestValidatorProtocol):
     def __init__(
         self,
         schema: EsiSchema,
-        response_handler_manager: ResponseHandlerManagerProtocol,
+        # response_handler_manager: ResponseHandlerManagerProtocol,
         auth_provider: AuthProviderProtocol,
     ) -> None:
         """Initialize the RequestValidator.
@@ -113,7 +113,7 @@ class RequestValidator(RequestValidatorProtocol):
             auth_provider: The authentication provider to validate request authentication against.
         """
         self.schema = schema
-        self.response_handler_manager = response_handler_manager
+        # self.response_handler_manager = response_handler_manager
         self.auth_provider = auth_provider
 
     async def __call__(self, request: Request) -> None:
@@ -129,8 +129,8 @@ class RequestValidator(RequestValidatorProtocol):
             validate_request_query_params(request, operation)
             validate_request_body(request, operation)
             await validate_request_auth(request, operation, self.auth_provider)
-            for handler_config in request.response_handlers:
-                self.response_handler_manager.validate_handler_config(handler_config)
+            # for handler_config in request.response_handlers:
+            #     self.response_handler_manager.validate_handler_config(handler_config)
         except RequestValidationError:
             raise
         except Exception as e:

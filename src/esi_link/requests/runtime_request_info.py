@@ -2,13 +2,14 @@
 
 from esi_link import USER_AGENT
 from esi_link.esi_auth.auth_store import AuthStoreDisk
-from esi_link.handlers.response.manager import ResponseHandlerManager
+
+# from esi_link.handlers.response.manager import ResponseHandlerManager
 from esi_link.models_and_protocols import (
     EsiSchema,
     Request,
     RequestMetrics,
-    ResponseHandlerManagerProtocol,
-    ResponseHandlerProtocol,
+    # ResponseHandlerManagerProtocol,
+    # ResponseHandlerProtocol,
     RuntimeRequestInfo,
     RuntimeRequestInfoGeneratorProtocol,
     UrlGeneratorProtocol,
@@ -23,7 +24,7 @@ class RuntimeRequestInfoGenerator(RuntimeRequestInfoGeneratorProtocol):
         auth_store: AuthStoreDisk,
         auth_min_seconds: int = 300,
         url_generator: UrlGeneratorProtocol | None = None,
-        response_handler_manager: ResponseHandlerManagerProtocol | None = None,
+        # response_handler_manager: ResponseHandlerManagerProtocol | None = None,
     ) -> None:
         """Initialize the RuntimeRequestInfoGenerator."""
         self.schema = schema
@@ -31,9 +32,9 @@ class RuntimeRequestInfoGenerator(RuntimeRequestInfoGeneratorProtocol):
         self.auth_min_seconds = auth_min_seconds
 
         self.url_generator = url_generator or UrlGenerator()
-        self.response_handler_manager = (
-            response_handler_manager or ResponseHandlerManager()
-        )
+        # self.response_handler_manager = (
+        #     response_handler_manager or ResponseHandlerManager()
+        # )
 
     async def __call__(self, request: Request) -> RuntimeRequestInfo:
         """Generate the RuntimeRequestInfo for a given Request."""
@@ -47,14 +48,14 @@ class RuntimeRequestInfoGenerator(RuntimeRequestInfoGeneratorProtocol):
                 f"Operation with ID {request.operation_id} not found in indexed schema for request {request.request_id}."
             )
 
-        handlers: list[ResponseHandlerProtocol] = []
-        for handler_config in request.response_handlers:
-            handler = self.response_handler_manager.get_handler(handler_config)
-            if handler is None:
-                raise ValueError(
-                    f"Response handler with ID {handler_config.name} not found for request {request.request_id}."
-                )
-            handlers.append(handler)
+        # handlers: list[ResponseHandlerProtocol] = []
+        # for handler_config in request.response_handlers:
+        #     handler = self.response_handler_manager.get_handler(handler_config)
+        #     if handler is None:
+        #         raise ValueError(
+        #             f"Response handler with ID {handler_config.name} not found for request {request.request_id}."
+        #         )
+        #     handlers.append(handler)
 
         runtime_info = RuntimeRequestInfo(
             path_url=url_info.path_url,
@@ -65,7 +66,7 @@ class RuntimeRequestInfoGenerator(RuntimeRequestInfoGeneratorProtocol):
             headers=headers,
             timeout=10,
             cache_key=url_info.cache_key if operation and operation.is_cached else None,
-            response_handlers=handlers,
+            # response_handlers=handlers,
             metrics=RequestMetrics(),
         )
         return runtime_info

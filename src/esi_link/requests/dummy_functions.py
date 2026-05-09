@@ -12,9 +12,9 @@ from esi_link.models_and_protocols import (
     RequestGroupValidatorProtocol,
     RequestValidatorProtocol,
     Response,
-    ResponseHandlerConfig,
-    ResponseHandlerManagerProtocol,
-    ResponseHandlerProtocol,
+    # ResponseHandlerConfig,
+    # ResponseHandlerManagerProtocol,
+    # ResponseHandlerProtocol,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,47 +30,47 @@ class DummyRequestGroupValidator(RequestGroupValidatorProtocol):
         pass
 
 
-class DummyResponseHandler(ResponseHandlerProtocol):
-    name = "esi-link:dummy"
+# class DummyResponseHandler(ResponseHandlerProtocol):
+#     name = "esi-link:dummy"
 
-    def __init__(self, config: ResponseHandlerConfig) -> None:
+#     def __init__(self, config: ResponseHandlerConfig) -> None:
 
-        self.config = config
+#         self.config = config
 
-    async def __call__(self, response: Response) -> Response:
-        if response.http_response is None:
-            logger.info(
-                "DummyResponseHandler called with response with no http_response, name: %s, config: %s",
-                self.config,
-            )
-            return response
-        logger.info(
-            "DummyResponseHandler called with config: %s, for url: %s",
-            self.config,
-            response.http_response.url,
-        )
-        return response
+#     async def __call__(self, response: Response) -> Response:
+#         if response.http_response is None:
+#             logger.info(
+#                 "DummyResponseHandler called with response with no http_response, name: %s, config: %s",
+#                 self.config,
+#             )
+#             return response
+#         logger.info(
+#             "DummyResponseHandler called with config: %s, for url: %s",
+#             self.config,
+#             response.http_response.url,
+#         )
+#         return response
 
-    @classmethod
-    def from_config(cls, config: ResponseHandlerConfig) -> Self:
-        return cls(config=config)
+#     @classmethod
+#     def from_config(cls, config: ResponseHandlerConfig) -> Self:
+#         return cls(config=config)
 
-    @classmethod
-    def validate_config(cls, config: ResponseHandlerConfig) -> None:
-        pass
+#     @classmethod
+#     def validate_config(cls, config: ResponseHandlerConfig) -> None:
+#         pass
 
 
-class DummyResponseHandlerManager(ResponseHandlerManagerProtocol):
-    def get_handler(
-        self, config: ResponseHandlerConfig
-    ) -> ResponseHandlerProtocol | None:
-        return DummyResponseHandler(config=config)
+# class DummyResponseHandlerManager(ResponseHandlerManagerProtocol):
+#     def get_handler(
+#         self, config: ResponseHandlerConfig
+#     ) -> ResponseHandlerProtocol | None:
+#         return DummyResponseHandler(config=config)
 
-    def register_handler(self, handler_cls: type[ResponseHandlerProtocol]) -> None:
-        return None
+#     def register_handler(self, handler_cls: type[ResponseHandlerProtocol]) -> None:
+#         return None
 
-    def registered_handlers(self) -> dict[str, type[ResponseHandlerProtocol]]:
-        return {}
+#     def registered_handlers(self) -> dict[str, type[ResponseHandlerProtocol]]:
+#         return {}
 
-    def validate_handler_config(self, config: ResponseHandlerConfig) -> None:
-        pass
+#     def validate_handler_config(self, config: ResponseHandlerConfig) -> None:
+#         pass

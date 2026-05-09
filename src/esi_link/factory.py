@@ -7,16 +7,17 @@ from aiolimiter import AsyncLimiter
 
 from esi_link.cache.diskcache_cache import DiskCache
 from esi_link.cache.json_disk_cache import JsonDiskCache
-from esi_link.handlers.plugin_manager.response_group_plugin_loader import (
-    ResponseGroupHandlerPluginLoader,
-)
-from esi_link.handlers.plugin_manager.response_plugin_loader import (
-    ResponseHandlerPluginLoader,
-)
-from esi_link.handlers.response.manager import ResponseHandlerManager
-from esi_link.handlers.response_group.manager import (
-    ResponseGroupHandlerManager,
-)
+
+# from esi_link.handlers.plugin_manager.response_group_plugin_loader import (
+#     ResponseGroupHandlerPluginLoader,
+# )
+# from esi_link.handlers.plugin_manager.response_plugin_loader import (
+#     ResponseHandlerPluginLoader,
+# )
+# from esi_link.handlers.response.manager import ResponseHandlerManager
+# from esi_link.handlers.response_group.manager import (
+#     ResponseGroupHandlerManager,
+# )
 from esi_link.models_and_protocols import (
     CacheManagerProtocol,
     EsiSchema,
@@ -105,13 +106,13 @@ class EsiLinkObjectFactory:
             schema=self._schema,
             auth=self.auth_provider(),
             auth_min_seconds=self._auth_min_seconds,
-            response_handler_manager=self.response_handler_manager(),
+            # response_handler_manager=self.response_handler_manager(),
         )
 
     def runtime_group_info_gen(self) -> RuntimeRequestGroupInfoGenerator:
         """Create a RuntimeRequestGroupInfoGenerator with the factory's dependencies."""
         return RuntimeRequestGroupInfoGenerator(
-            response_group_handler_manager=self.response_group_handler_manager()
+            # response_group_handler_manager=self.response_group_handler_manager()
         )
 
     def group_executor(self) -> RequestGroupExecutorProtocol:
@@ -128,37 +129,37 @@ class EsiLinkObjectFactory:
         """Create a RequestValidatorProtocol with the factory's dependencies."""
         return RequestValidator(
             schema=self._schema,
-            response_handler_manager=self.response_handler_manager(),
+            # response_handler_manager=self.response_handler_manager(),
             auth_provider=self.auth_provider(),
         )
 
     def request_group_validator(self) -> RequestGroupValidatorProtocol:
         """Create a RequestGroupValidatorProtocol with the factory's dependencies."""
         return RequestGroupValidator(
-            response_group_handler_manager=self.response_group_handler_manager()
+            # response_group_handler_manager=self.response_group_handler_manager()
         )
 
-    def response_group_handler_manager(self) -> ResponseGroupHandlerManager:
-        """Create a ResponseGroupHandlerManager with the factory's dependencies."""
-        if self._response_group_handler_plugins_config is not None:
-            plugin_loader = ResponseGroupHandlerPluginLoader(
-                self._response_group_handler_plugins_config
-            )
-            manager = ResponseGroupHandlerManager()
-            plugin_loader(manager)
-            return manager
-        return ResponseGroupHandlerManager()
+    # def response_group_handler_manager(self) -> ResponseGroupHandlerManager:
+    #     """Create a ResponseGroupHandlerManager with the factory's dependencies."""
+    #     if self._response_group_handler_plugins_config is not None:
+    #         plugin_loader = ResponseGroupHandlerPluginLoader(
+    #             self._response_group_handler_plugins_config
+    #         )
+    #         manager = ResponseGroupHandlerManager()
+    #         plugin_loader(manager)
+    #         return manager
+    #     return ResponseGroupHandlerManager()
 
-    def response_handler_manager(self) -> ResponseHandlerManager:
-        """Create a ResponseHandlerManager with the factory's dependencies."""
-        if self._response_handler_plugins_config is not None:
-            plugin_loader = ResponseHandlerPluginLoader(
-                self._response_handler_plugins_config
-            )
-            manager = ResponseHandlerManager()
-            plugin_loader(manager)
-            return manager
-        return ResponseHandlerManager()
+    # def response_handler_manager(self) -> ResponseHandlerManager:
+    #     """Create a ResponseHandlerManager with the factory's dependencies."""
+    #     if self._response_handler_plugins_config is not None:
+    #         plugin_loader = ResponseHandlerPluginLoader(
+    #             self._response_handler_plugins_config
+    #         )
+    #         manager = ResponseHandlerManager()
+    #         plugin_loader(manager)
+    #         return manager
+    #     return ResponseHandlerManager()
 
     def auth_provider(self) -> AuthProviderProtocol:
         """Get the factory's AuthProviderProtocol."""

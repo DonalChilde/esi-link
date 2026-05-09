@@ -63,17 +63,17 @@ class GroupExecutor(RequestGroupExecutorProtocol):
         handled_responses = await self._execution_strategy(
             runtime_requests, self._request_executor
         )
-        group_metrics.group_handlers_started = Instant.now()
+        # group_metrics.group_handlers_started = Instant.now()
         response_group = ResponseGroup(
             request_group=request_group,
             runtime_info=runtime_group_info,
             responses={r.request.request_id: r for r in handled_responses},
-            group_handler_exception_messages=[],
+            # group_handler_exception_messages=[],
             exceptions=[],
         )
-        for handler in runtime_group_info.response_group_handlers:
-            await handler(response_group)
-        group_metrics.group_handlers_completed = Instant.now()
+        # for handler in runtime_group_info.response_group_handlers:
+        #     await handler(response_group)
+        # group_metrics.group_handlers_completed = Instant.now()
         logger.info(
             f"Completed handling of response group for {len(handled_responses)} requests."
         )
@@ -91,11 +91,11 @@ async def execute_all_requests_then_handle_responses(
         logger.info(f"Completed execution of {len(responses)} requests.")
     for response in responses:
         metrics = response.runtime_info.metrics
-        metrics.handlers_started = perf_counter()
-        for handler in response.runtime_info.response_handlers:
-            await handler(response)
+        # metrics.handlers_started = perf_counter()
+        # for handler in response.runtime_info.response_handlers:
+        #     await handler(response)
 
-        metrics.handlers_completed = perf_counter()
+        # metrics.handlers_completed = perf_counter()
         metrics.task_completed = Instant.now()
     logger.info(f"Completed handling of responses for {len(responses)} requests.")
     return responses
@@ -109,10 +109,10 @@ async def execute_requests_and_handle_responses_together(
 
         async def execute_and_handle(request: RuntimeRequest) -> Response:
             response = await executor(request, session)
-            response.runtime_info.metrics.handlers_started = perf_counter()
-            for handler in response.runtime_info.response_handlers:
-                await handler(response)
-            response.runtime_info.metrics.handlers_completed = perf_counter()
+            # response.runtime_info.metrics.handlers_started = perf_counter()
+            # for handler in response.runtime_info.response_handlers:
+            #     await handler(response)
+            # response.runtime_info.metrics.handlers_completed = perf_counter()
             response.runtime_info.metrics.task_completed = Instant.now()
             return response
 
