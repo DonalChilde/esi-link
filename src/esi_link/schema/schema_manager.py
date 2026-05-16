@@ -9,15 +9,14 @@ from pydantic import RootModel
 from whenever import Instant
 
 from esi_link.helpers.save_text_file import save_text_file
-from esi_link.models_and_protocols import (
-    AvailableSchema,
-    EsiSchema,
-    SchemaManagerProtocol,
-    StoredSchema,
-)
 from esi_link.schema.errors import (
     SchemaManagerError,
     SchemaNotFoundError,
+)
+from esi_link.simplified_models import (
+    AvailableSchema,
+    EsiSchema,
+    StoredSchema,
 )
 
 
@@ -36,7 +35,14 @@ class SchemaFileInfo:
 StoredSchemaRoot = RootModel[StoredSchema]
 
 
-class SchemaManager(SchemaManagerProtocol):
+# FIXME: The schema manager should cache loaded schemas in memory to avoid reading and
+# parsing the same schema file multiple times. This is especially important for the
+# get_latest_schema method, which may be called frequently and needs to be efficient.
+# We can implement a simple in-memory cache that stores loaded schemas keyed by their
+# compatibility date and timestamp. When a schema is requested, we first check the cache
+# before loading it from the file system. We should also consider adding a method to clear
+# the cache if needed, for example when new schemas are added to the store.
+class SchemaManager:
     def __init__(self, schema_directory: Path):
         """File based schema manager.
 
@@ -134,14 +140,25 @@ class SchemaManager(SchemaManagerProtocol):
     #             f"Error indexing schema file {file_path}: {str(e)}"
     #         ) from e
 
-    def get_schema_for_date(
-        self, compatibility_date: str, timestamp: int
+    def get_schema(
+        self,
+        compatibility_date: str | None,
+        at_or_after: int | None,
+        exact: bool = False,
     ) -> StoredSchema:
         """Get the ESI schema corresponding to the given compatibility date and timestamp.
 
+        This method retrieves the ESI schema that matches the specified compatibility
+        date and timestamp criteria. If compatibility_date is None, it returns the latest
+        schema across all compatibility dates. If at_or_after is None, it returns the
+        latest schema for the specified compatibility date. If exact is True, it returns
+        only the schema with the exact timestamp specified in at_or_after; if False, it
+        returns the most recent schema with a timestamp greater than or equal to at_or_after.
+
         Args:
-            compatibility_date (str): The compatibility date of the schema to retrieve.
-            timestamp (int): The timestamp of the schema to retrieve.
+            compatibility_date (str | None): The compatibility date of the schema to retrieve. If None, the latest schema across all compatibility dates will be returned.
+            at_or_after (int | None): The timestamp of the schema to retrieve, or None to get the latest schema for the compatibility date.
+            exact (bool): If True, only return a schema with the exact timestamp specified in `at_or_after`. If False, return the most recent schema with a timestamp greater than `at_or_after`.
 
         Returns:
             StoredSchema: The ESI schema corresponding to the given compatibility date and timestamp.
@@ -150,53 +167,96 @@ class SchemaManager(SchemaManagerProtocol):
             SchemaNotFoundError: If no schema is found for the given compatibility date and timestamp.
             SchemaManagerError: If there is an error loading the schema file.
         """
-        available_schemas = self._schema_files()
-        for schema_info in available_schemas:
-            if (
-                schema_info.compatibility_date == compatibility_date
-                and schema_info.timestamp == timestamp
-            ):
-                stored_schema = self._load_schema_file(schema_info.file_path)
-
-                return stored_schema
-
-        raise SchemaNotFoundError(
-            f"No schema found for compatibility date {compatibility_date} and timestamp {timestamp}"
-        )
-
-    def get_latest_schema(self, compatibility_date: str | None = None) -> StoredSchema:
-        """Get the latest ESI schema available in the schema store.
-
-        If compatibility_date is provided, return the latest schema for that compatibility date.
-        If compatibility_date is None, return the latest schema across all compatibility dates.
-
-        Args:
-            compatibility_date (str | None): The compatibility date to filter schemas by,
-                or None to get the latest schema across all compatibility dates.
-
-        Returns:
-            EsiSchema: The latest ESI schema available in the schema store.
-
-        Raises:
-            SchemaNotFoundError: If no schemas are found in the schema store.
-            SchemaManagerError: If there is an error loading the schema files.
-        """
-        available_schemas = self._schema_files()
-        if not available_schemas:
-            raise SchemaNotFoundError("No schemas found in the schema store")
+        available_schema_files = self._schema_files()
+        if compatibility_date is None:
+            if at_or_after is not None:
+                raise ValueError(
+                    "at_or_after cannot be used when compatibility_date is None"
+                )
+            # if compatibility_date is None, we want to get the latest schema across all compatibility dates, and ignore the at_or_after parameter.
+            # first filter for the latest compatibility date, then get the latest timestamp for that compatibility date, and return that schema.
+            latest_compatibility_date = max(
+                available_schema_files, key=lambda x: x.compatibility_date
+            ).compatibility_date
+            filtered_schemas = [
+                schema_info
+                for schema_info in available_schema_files
+                if schema_info.compatibility_date == latest_compatibility_date
+            ]
+            latest_schema = max(filtered_schemas, key=lambda x: x.timestamp)
+            stored_schema = self._load_schema_file(latest_schema.file_path)
+            return stored_schema
         filtered_schemas = [
             schema_info
-            for schema_info in available_schemas
-            if compatibility_date is None
-            or schema_info.compatibility_date == compatibility_date
+            for schema_info in available_schema_files
+            if schema_info.compatibility_date == compatibility_date
         ]
         if not filtered_schemas:
             raise SchemaNotFoundError(
                 f"No schemas found for compatibility date {compatibility_date}"
             )
         latest_schema = max(filtered_schemas, key=lambda x: x.timestamp)
+        # if at_or_after is None, we want to get the latest schema for the compatibility date
+        if at_or_after is None:
+            stored_schema = self._load_schema_file(latest_schema.file_path)
+            return stored_schema
+        # if at_or_after is not None, we want to get the most recent schema with the exact
+        # compatibility date and at or after the timestamp.
+        if exact:
+            # return only the exact timestamp match for the compatibility date
+            filtered_schemas = [
+                schema_info
+                for schema_info in filtered_schemas
+                if schema_info.timestamp == at_or_after
+            ]
+        else:
+            filtered_schemas = [
+                schema_info
+                for schema_info in filtered_schemas
+                if schema_info.timestamp >= at_or_after
+            ]
+        if not filtered_schemas:
+            raise SchemaNotFoundError(
+                f"No schema found for compatibility date {compatibility_date} and timestamp {at_or_after}"
+            )
+        # Get the most recent schema with the exact compatibility date and at or after the timestamp.
+        latest_schema = max(filtered_schemas, key=lambda x: x.timestamp)
         stored_schema = self._load_schema_file(latest_schema.file_path)
         return stored_schema
+
+    # def get_latest_schema(self, compatibility_date: str | None = None) -> StoredSchema:
+    #     """Get the latest ESI schema available in the schema store.
+
+    #     If compatibility_date is provided, return the latest schema for that compatibility date.
+    #     If compatibility_date is None, return the latest schema across all compatibility dates.
+
+    #     Args:
+    #         compatibility_date (str | None): The compatibility date to filter schemas by,
+    #             or None to get the latest schema across all compatibility dates.
+
+    #     Returns:
+    #         EsiSchema: The latest ESI schema available in the schema store.
+
+    #     Raises:
+    #         SchemaNotFoundError: If no schemas are found in the schema store.
+    #         SchemaManagerError: If there is an error loading the schema files.
+    #     """
+    #     available_schema_files = self._schema_files()
+    #     if not available_schema_files:
+    #         raise SchemaNotFoundError("No schemas found in the schema store")
+    #     filtered_schemas = [
+    #         schema_info
+    #         for schema_info in available_schema_files
+    #         if compatibility_date is None
+    #         or schema_info.compatibility_date == compatibility_date
+    #     ]
+    #     if not filtered_schemas:
+    #         raise SchemaNotFoundError(
+    #             f"No schemas found for compatibility date {compatibility_date}"
+    #         )
+    #     latest_schema = max(filtered_schemas, key=lambda x: x.timestamp)
+    #     stored_schema = self._load_schema_file(latest_schema.file_path)
+    #     return stored_schema
 
     def available_schemas(self) -> list[AvailableSchema]:
         """Return a list of available compatibility dates for schemas in the store.

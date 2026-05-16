@@ -24,6 +24,7 @@ applyTo: "**/*.py"
 - For libraries or external dependencies, mention their usage and purpose in comments.
 - Use consistent naming conventions and follow language-specific best practices.
 - Write concise, efficient, and idiomatic code that is also easily understandable.
+- When adding a long comment string, respect a line length of 88-95 characters, use multiple lines for long comments.
 
 ## Code Style and Formatting
 

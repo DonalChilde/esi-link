@@ -241,8 +241,8 @@ def get_schema(
     """Helper function to get the ESI schema from the schema manager based on the compatibility date and timestamp."""
     if compatibility_date:
         if timestamp:
-            schema = schema_manager.get_schema_for_date(
-                compatibility_date=compatibility_date, timestamp=timestamp
+            schema = schema_manager.get_schema(
+                compatibility_date=compatibility_date, at_or_after=timestamp
             )
         else:
             schema = schema_manager.get_latest_schema(

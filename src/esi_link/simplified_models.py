@@ -18,9 +18,7 @@ logger = logging.getLogger(__name__)
 
 # TODO
 # - flesh out models
-# - add debug models? failure models?
 # flow is: Request -> ValidatedRequest -> RuntimeRequest -> RuntimeResponse -> Response
-# can we skip runtimerequest stage? do it all in validated request?
 def _get_current_instant() -> Instant:
     """Factory function to get current instant for default values.
 
@@ -46,11 +44,13 @@ class Request:
 
     request_id: UUID = field(default_factory=uuid4)
     """The unique identifier for the request. This is used to link the request to various objects during the request lifecycle."""
+    created_on: Instant = field(default_factory=_get_current_instant)
+    """The timestamp of when the request was created. This is used for things like determining the age of the request, or for saving response data to disk with a filename that includes the creation date."""
     operation_id: str
     """The operation ID of the request, corresponding to the operationId in the ESI OpenAPI schema."""
     compatibility_date: str | None = None
     """Optional compatibility date for the request. If not provided, the latest schema will be used."""
-    after: int | None = None
+    at_or_after: int | None = None
     """Used with compatibility date. Optional timestamp to refine compatibility date selection. If provided, the schema with the compatibility date that was downloaded after the provided timestamp will be used."""
     path_parameters: dict[str, str | int | float] = field(
         default_factory=dict[str, str | int | float]
@@ -62,7 +62,7 @@ class Request:
     """The query parameters for the request, if applicable. This is used to fill in the query parameters in the URL template."""
     authorization_id: int | None = None
     """The Character ID to use for authentication, if applicable."""
-    lang: Lang = "en"
+    language: Lang = "en"
     """The language to use for the request, if applicable. This is used to set the Accept-Language header in the request."""
     json_body: Any | None = None
     """The JSON body of the request, if applicable. This is used for POST, PUT, PATCH requests."""
@@ -73,7 +73,7 @@ class Request:
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
-class ValidatedRequest(Request):
+class ValidatedRequest:
     """Represents a validated ESI request, ready to be executed.
 
     The path, query, and json body parameters are duplicated from the original Request,
@@ -92,21 +92,59 @@ class ValidatedRequest(Request):
 
     """
 
-    path_url_template: str
+    # These fields are copied from the original Request, but are now validated and ready
+    # to be used for the actual HTTP request to ESI.
+
+    request_id: UUID = field(default_factory=uuid4)
+    """The unique identifier for the request. This is used to link the request to various objects during the request lifecycle."""
+    created_on: Instant = field(default_factory=_get_current_instant)
+    """The timestamp of when the request was created. This is used for things like determining the age of the request, or for saving response data to disk with a filename that includes the creation date."""
+    operation_id: str = "NOT_SET"
+    """The operation ID of the request, corresponding to the operationId in the ESI OpenAPI schema."""
+    compatibility_date: str | None = None
+    """Optional compatibility date for the request. If not provided, the latest schema will be used."""
+    at_or_after: int | None = None
+    """Used with compatibility date. Optional timestamp to refine compatibility date selection. If provided, the schema with the compatibility date that was downloaded after the provided timestamp will be used."""
+    path_parameters: dict[str, str | int | float] = field(
+        default_factory=dict[str, str | int | float]
+    )
+    """The path parameters for the request, if applicable. This is used to fill in the path parameters in the URL template."""
+    query_parameters: dict[str, str | int | float] = field(
+        default_factory=dict[str, str | int | float]
+    )
+    """The query parameters for the request, if applicable. This is used to fill in the query parameters in the URL template."""
+    authorization_id: int | None = None
+    """The Character ID to use for authentication, if applicable."""
+    language: Lang = "en"
+    """The language to use for the request, if applicable. This is used to set the Accept-Language header in the request."""
+    json_body: Any | None = None
+    """The JSON body of the request, if applicable. This is used for POST, PUT, PATCH requests."""
+    save_directory_template: str | None = None
+    """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
+    save_filename_template: str | None = None
+    """The filename template to save the response data to, if applicable. If not provided, but a save_directory_template is provided, a default filename will be used."""
+
+    # These fields are added to capture required info from the schema for the request,
+    # such as the path URL template, HTTP method, and whether the request is paged or cacheable.
+    path_url_template: str = ""
     """The URL template for the path."""
-    method: Literal["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
+    method: Literal[
+        "GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "NOT_SET"
+    ] = "NOT_SET"
     """The HTTP method for the request."""
     is_paged: bool = False
     """Whether the request is paged or not, based on the presence of pagination-related parameters in the operation schema."""
     is_cached: bool = False
     """Whether the request is cacheable or not, based on the HTTP method of the operation."""
+    is_authentication_required: bool = False
+    """Whether the request requires authentication or not, based on the presence of security requirements in the operation schema."""
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class FailedRequestValidation:
     request: Request
     """The original request that failed validation."""
-    errors: list[str]
+    errors: tuple[str, ...]
     """A list of error messages describing the validation failures."""
 
 
@@ -134,12 +172,24 @@ class RequestGroup:
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
-class ValidatedRequestGroup(RequestGroup):
+class ValidatedRequestGroup:
     """Represents a validated batch of ESI requests, ready to be executed."""
 
-    validated_requests: dict[UUID, ValidatedRequest] = field(
+    # These fields are copied from the original RequestGroup, but are now validated and
+    # ready to be executed. The requests field is now a dictionary of ValidatedRequest,
+    # and an additional field is added to capture any failed request validations, which
+    # is a dictionary of FailedRequestValidation.
+    created_on: Instant
+    group_id: UUID
+    description: str = ""
+    requests: dict[UUID, ValidatedRequest] = field(
         default_factory=dict[UUID, ValidatedRequest]
     )
+    save_directory_template: str | None = None
+    """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
+    save_filename_template: str | None = None
+    """The filename template to save the response group data to, if applicable. If not provided, but a save_directory_template is provided, a default filename will be used."""
+
     failed_request_validations: dict[UUID, FailedRequestValidation] = field(
         default_factory=dict[UUID, FailedRequestValidation]
     )
@@ -149,7 +199,7 @@ class ValidatedRequestGroup(RequestGroup):
 class FailedRequestGroupValidation:
     request_group: RequestGroup
     """The original request group that failed validation."""
-    errors: list[str]
+    errors: tuple[str, ...]
     """A list of error messages describing the validation failures."""
 
 
@@ -218,7 +268,7 @@ class SchemaOperation:
         ]
 
     @property
-    def path_params(self) -> list[dict[str, Any]]:
+    def path_parameters(self) -> list[dict[str, Any]]:
         """Extract the path parameters from the operation object, if present."""
         return [
             deepcopy(param)
@@ -227,7 +277,7 @@ class SchemaOperation:
         ]
 
     @property
-    def query_params(self) -> list[dict[str, Any]]:
+    def query_parameters(self) -> list[dict[str, Any]]:
         """Extract the query parameters from the operation object, if present."""
         return [
             deepcopy(param)
@@ -262,7 +312,7 @@ class SchemaOperation:
         return deepcopy(self.operation_schema.get("requestBody"))
 
     @property
-    def auth_required(self) -> bool:
+    def is_authentication_required(self) -> bool:
         """Determine if the operation requires authentication based on the presence of security requirements."""
         return "security" in self.operation_schema and bool(
             self.operation_schema["security"]
@@ -271,7 +321,7 @@ class SchemaOperation:
     @property
     def is_paged(self) -> bool:
         """Determine if the operation is paged based on the presence of pagination-related parameters."""
-        for param in self.query_params:
+        for param in self.query_parameters:
             if param.get("name") in {"page"}:
                 return True
         return False
@@ -403,6 +453,17 @@ class EsiSchema:
     def base_url(self) -> str:
         """Get the base URL for the ESI API from the servers section of the schema."""
         return self.dereferenced_schema["servers"][0]["url"]
+
+    @property
+    def content_languages(self) -> set[str]:
+        """Get the content languages supported by the ESI API from the schema."""
+        return set(
+            self.dereferenced_schema.get("components", {})
+            .get("headers", {})
+            .get("ContentLanguage", {})
+            .get("schema", {})
+            .get("enum", [])
+        )
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
