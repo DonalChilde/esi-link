@@ -5,6 +5,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any, TypedDict
 
+from pydantic import RootModel
 from whenever import Instant
 
 from esi_link.helpers.save_text_file import save_text_file
@@ -30,6 +31,9 @@ class SchemaFileInfo:
     compatibility_date: str
     timestamp: int
     file_path: Path
+
+
+StoredSchemaRoot = RootModel[StoredSchema]
 
 
 class SchemaManager(SchemaManagerProtocol):
@@ -100,7 +104,7 @@ class SchemaManager(SchemaManagerProtocol):
         """
         try:
             with file_path.open("r") as f:
-                stored_schema = StoredSchema.model_validate_json(f.read())
+                stored_schema = StoredSchemaRoot.model_validate_json(f.read()).root
             return stored_schema
         except Exception as e:
             raise SchemaManagerError(
@@ -254,7 +258,7 @@ class SchemaManager(SchemaManagerProtocol):
         )
         try:
             save_text_file(
-                text=stored_schema.model_dump_json(indent=2),
+                text=StoredSchemaRoot(stored_schema).model_dump_json(indent=2),
                 output_dir=self.schema_directory,
                 file_name=f"{schema.version}-{download_date.timestamp()}-schema.json",
                 overwrite=False,
