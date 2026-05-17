@@ -25,6 +25,7 @@ def validate_request(
     in_process: ValidatedRequest | FailedRequestValidation = ValidatedRequest(
         created_on=request.created_on,
         request_id=request.request_id,
+        actions_after_response=request.actions_after_response,  # TODO move to validation step after we have the schema, so we can validate that the actions are valid for the requested operation_id
     )
     in_process = _validate_request_schema(
         request, in_process, schema_manager=schema_manager
@@ -56,8 +57,8 @@ def validate_request(
         request, in_process, schema=schema, authorized_characters=authorized_characters
     )
     in_process = _validate_language(request, in_process, schema=schema)
-    in_process = _validate_request_directory_template(request, in_process)
-    in_process = _validate_request_filename_template(request, in_process)
+    # in_process = _validate_request_directory_template(request, in_process)
+    # in_process = _validate_request_filename_template(request, in_process)
     in_process = _set_method(request, in_process, schema=schema)
     in_process = _set_url_template(request, in_process, schema=schema)
     in_process = _set_is_paged(request, in_process, schema=schema)
@@ -79,10 +80,11 @@ def validate_request_group(
             created_on=request_group.created_on,
             group_id=request_group.group_id,
             description=request_group.description,
+            actions_after_response=request_group.actions_after_response,  # TODO move to validation step after we have the schema, so we can validate that the actions are valid for the requested operation_ids of the individual requests in the group
         )
     )
-    in_process = _validate_group_directory_template(request_group, in_process)
-    in_process = _validate_group_filename_template(request_group, in_process)
+    # in_process = _validate_group_directory_template(request_group, in_process)
+    # in_process = _validate_group_filename_template(request_group, in_process)
     if isinstance(in_process, FailedRequestGroupValidation):
         # If the group-level validation failed, we don't need to validate the individual requests, because the group is already invalid. We can just return the FailedRequestGroupValidation with the group-level errors.
         return in_process
@@ -103,164 +105,164 @@ def validate_request_group(
     return in_process
 
 
-def _validate_group_directory_template(
-    request_group: RequestGroup,
-    inprocess_request_group: ValidatedRequestGroup | FailedRequestGroupValidation,
-) -> ValidatedRequestGroup | FailedRequestGroupValidation:
-    """Validates the save_directory_template field of the request group, if applicable. If the template is invalid, returns a FailedRequestGroupValidation with the appropriate error message. If the template is valid, returns the inprocess_request_group unchanged."""
-    if request_group.save_directory_template is not None:
-        fail_msgs: list[str] = []
-        # Validate that the template is a valid directory path template.
-        # Because some of the variables that can be used in the template are not known
-        # until execution time, we can't fully validate the template at this point. However,
-        # we can validate that the template is a valid string template and that it only
-        # uses the allowed variables.
+# def _validate_group_directory_template(
+#     request_group: RequestGroup,
+#     inprocess_request_group: ValidatedRequestGroup | FailedRequestGroupValidation,
+# ) -> ValidatedRequestGroup | FailedRequestGroupValidation:
+#     """Validates the save_directory_template field of the request group, if applicable. If the template is invalid, returns a FailedRequestGroupValidation with the appropriate error message. If the template is valid, returns the inprocess_request_group unchanged."""
+#     if request_group.save_directory_template is not None:
+#         fail_msgs: list[str] = []
+#         # Validate that the template is a valid directory path template.
+#         # Because some of the variables that can be used in the template are not known
+#         # until execution time, we can't fully validate the template at this point. However,
+#         # we can validate that the template is a valid string template and that it only
+#         # uses the allowed variables.
 
-        # TODO define this in a central place, probably the module that actually renders the template, and import it here.
-        available_variables = {"group_id", "created_on"}
-        template = Template(request_group.save_directory_template)
-        identifiers = template.get_identifiers()
-        fail_msgs: list[str] = []
-        for identifier in identifiers:
-            if identifier not in available_variables:
-                fail_msgs.append(
-                    f"Invalid save_directory_template: invalid variable {identifier}"
-                )
-        if fail_msgs:
-            if isinstance(inprocess_request_group, FailedRequestGroupValidation):
-                fail_msgs = list(inprocess_request_group.errors) + fail_msgs
-            return FailedRequestGroupValidation(
-                request_group=request_group,
-                errors=tuple(fail_msgs),
-            )
-    # Update validated fields.
-    if isinstance(inprocess_request_group, ValidatedRequestGroup):
-        inprocess_request_group = deepcopy(inprocess_request_group)
-        inprocess_request_group = replace(
-            inprocess_request_group,
-            save_directory_template=request_group.save_directory_template,
-        )
-    return inprocess_request_group
-
-
-def _validate_group_filename_template(
-    request_group: RequestGroup,
-    inprocess_request_group: ValidatedRequestGroup | FailedRequestGroupValidation,
-) -> ValidatedRequestGroup | FailedRequestGroupValidation:
-    """Validates the save_filename_template field of the request group, if applicable. If the template is invalid, returns a FailedRequestGroupValidation with the appropriate error message. If the template is valid, returns the inprocess_request_group unchanged."""
-    if request_group.save_filename_template is not None:
-        fail_msgs: list[str] = []
-        # Validate that the template is a valid filename template.
-        # Because some of the variables that can be used in the template are not known
-        # until execution time, we can't fully validate the template at this point. However,
-        # we can validate that the template is a valid string template and that it only
-        # uses the allowed variables.
-
-        # TODO define this in a central place, probably the module that actually renders the template, and import it here.
-        available_variables = {"group_id", "created_on"}
-        template = Template(request_group.save_filename_template)
-        identifiers = template.get_identifiers()
-        fail_msgs: list[str] = []
-        for identifier in identifiers:
-            if identifier not in available_variables:
-                fail_msgs.append(
-                    f"Invalid save_filename_template: invalid variable {identifier}"
-                )
-        if fail_msgs:
-            if isinstance(inprocess_request_group, FailedRequestGroupValidation):
-                fail_msgs = list(inprocess_request_group.errors) + fail_msgs
-            return FailedRequestGroupValidation(
-                request_group=request_group,
-                errors=tuple(fail_msgs),
-            )
-    # Update validated fields.
-    if isinstance(inprocess_request_group, ValidatedRequestGroup):
-        inprocess_request_group = deepcopy(inprocess_request_group)
-        inprocess_request_group = replace(
-            inprocess_request_group,
-            save_filename_template=request_group.save_filename_template,
-        )
-    return inprocess_request_group
+#         # TODO define this in a central place, probably the module that actually renders the template, and import it here.
+#         available_variables = {"group_id", "created_on"}
+#         template = Template(request_group.save_directory_template)
+#         identifiers = template.get_identifiers()
+#         fail_msgs: list[str] = []
+#         for identifier in identifiers:
+#             if identifier not in available_variables:
+#                 fail_msgs.append(
+#                     f"Invalid save_directory_template: invalid variable {identifier}"
+#                 )
+#         if fail_msgs:
+#             if isinstance(inprocess_request_group, FailedRequestGroupValidation):
+#                 fail_msgs = list(inprocess_request_group.errors) + fail_msgs
+#             return FailedRequestGroupValidation(
+#                 request_group=request_group,
+#                 errors=tuple(fail_msgs),
+#             )
+#     # Update validated fields.
+#     if isinstance(inprocess_request_group, ValidatedRequestGroup):
+#         inprocess_request_group = deepcopy(inprocess_request_group)
+#         inprocess_request_group = replace(
+#             inprocess_request_group,
+#             save_directory_template=request_group.save_directory_template,
+#         )
+#     return inprocess_request_group
 
 
-def _validate_request_directory_template(
-    request: Request,
-    inprocess_request: ValidatedRequest | FailedRequestValidation,
-) -> ValidatedRequest | FailedRequestValidation:
-    """Validates the save_directory_template field of the request, if applicable. If the template is invalid, returns a FailedRequestValidation with the appropriate error message. If the template is valid, returns the inprocess_request unchanged."""
-    if request.save_directory_template is not None:
-        fail_msgs: list[str] = []
-        # Validate that the template is a valid directory path template.
-        # Because some of the variables that can be used in the template are not known
-        # until execution time, we can't fully validate the template at this point. However,
-        # we can validate that the template is a valid string template and that it only
-        # uses the allowed variables.
+# def _validate_group_filename_template(
+#     request_group: RequestGroup,
+#     inprocess_request_group: ValidatedRequestGroup | FailedRequestGroupValidation,
+# ) -> ValidatedRequestGroup | FailedRequestGroupValidation:
+#     """Validates the save_filename_template field of the request group, if applicable. If the template is invalid, returns a FailedRequestGroupValidation with the appropriate error message. If the template is valid, returns the inprocess_request_group unchanged."""
+#     if request_group.save_filename_template is not None:
+#         fail_msgs: list[str] = []
+#         # Validate that the template is a valid filename template.
+#         # Because some of the variables that can be used in the template are not known
+#         # until execution time, we can't fully validate the template at this point. However,
+#         # we can validate that the template is a valid string template and that it only
+#         # uses the allowed variables.
 
-        # TODO define this in a central place, probably the module that actually renders the template, and import it here.
-        available_variables = {"request_id", "created_on"}
-        template = Template(request.save_directory_template)
-        identifiers = template.get_identifiers()
-        fail_msgs: list[str] = []
-        for identifier in identifiers:
-            if identifier not in available_variables:
-                fail_msgs.append(
-                    f"Invalid save_directory_template: invalid variable {identifier}"
-                )
-        if fail_msgs:
-            if isinstance(inprocess_request, FailedRequestValidation):
-                fail_msgs = list(inprocess_request.errors) + fail_msgs
-            return FailedRequestValidation(
-                request=request,
-                errors=tuple(fail_msgs),
-            )
-    # Update validated fields.
-    if isinstance(inprocess_request, ValidatedRequest):
-        inprocess_request = deepcopy(inprocess_request)
-        inprocess_request = replace(
-            inprocess_request,
-            save_directory_template=request.save_directory_template,
-        )
-    return inprocess_request
+#         # TODO define this in a central place, probably the module that actually renders the template, and import it here.
+#         available_variables = {"group_id", "created_on"}
+#         template = Template(request_group.save_filename_template)
+#         identifiers = template.get_identifiers()
+#         fail_msgs: list[str] = []
+#         for identifier in identifiers:
+#             if identifier not in available_variables:
+#                 fail_msgs.append(
+#                     f"Invalid save_filename_template: invalid variable {identifier}"
+#                 )
+#         if fail_msgs:
+#             if isinstance(inprocess_request_group, FailedRequestGroupValidation):
+#                 fail_msgs = list(inprocess_request_group.errors) + fail_msgs
+#             return FailedRequestGroupValidation(
+#                 request_group=request_group,
+#                 errors=tuple(fail_msgs),
+#             )
+#     # Update validated fields.
+#     if isinstance(inprocess_request_group, ValidatedRequestGroup):
+#         inprocess_request_group = deepcopy(inprocess_request_group)
+#         inprocess_request_group = replace(
+#             inprocess_request_group,
+#             save_filename_template=request_group.save_filename_template,
+#         )
+#     return inprocess_request_group
 
 
-def _validate_request_filename_template(
-    request: Request,
-    inprocess_request: ValidatedRequest | FailedRequestValidation,
-) -> ValidatedRequest | FailedRequestValidation:
-    """Validates the save_filename_template field of the request, if applicable. If the template is invalid, returns a FailedRequestValidation with the appropriate error message. If the template is valid, returns the inprocess_request unchanged."""
-    if request.save_filename_template is not None:
-        fail_msgs: list[str] = []
-        # Validate that the template is a valid filename template.
-        # Because some of the variables that can be used in the template are not known
-        # until execution time, we can't fully validate the template at this point. However,
-        # we can validate that the template is a valid string template and that it only
-        # uses the allowed variables.
+# def _validate_request_directory_template(
+#     request: Request,
+#     inprocess_request: ValidatedRequest | FailedRequestValidation,
+# ) -> ValidatedRequest | FailedRequestValidation:
+#     """Validates the save_directory_template field of the request, if applicable. If the template is invalid, returns a FailedRequestValidation with the appropriate error message. If the template is valid, returns the inprocess_request unchanged."""
+#     if request.save_directory_template is not None:
+#         fail_msgs: list[str] = []
+#         # Validate that the template is a valid directory path template.
+#         # Because some of the variables that can be used in the template are not known
+#         # until execution time, we can't fully validate the template at this point. However,
+#         # we can validate that the template is a valid string template and that it only
+#         # uses the allowed variables.
 
-        # TODO define this in a central place, probably the module that actually renders the template, and import it here.
-        available_variables = {"request_id", "created_on"}
-        template = Template(request.save_filename_template)
-        identifiers = template.get_identifiers()
-        fail_msgs: list[str] = []
-        for identifier in identifiers:
-            if identifier not in available_variables:
-                fail_msgs.append(
-                    f"Invalid save_filename_template: invalid variable {identifier}"
-                )
-        if fail_msgs:
-            if isinstance(inprocess_request, FailedRequestValidation):
-                fail_msgs = list(inprocess_request.errors) + fail_msgs
-            return FailedRequestValidation(
-                request=request,
-                errors=tuple(fail_msgs),
-            )
-    # Update validated fields.
-    if isinstance(inprocess_request, ValidatedRequest):
-        inprocess_request = deepcopy(inprocess_request)
-        inprocess_request = replace(
-            inprocess_request,
-            save_filename_template=request.save_filename_template,
-        )
-    return inprocess_request
+#         # TODO define this in a central place, probably the module that actually renders the template, and import it here.
+#         available_variables = {"request_id", "created_on"}
+#         template = Template(request.save_directory_template)
+#         identifiers = template.get_identifiers()
+#         fail_msgs: list[str] = []
+#         for identifier in identifiers:
+#             if identifier not in available_variables:
+#                 fail_msgs.append(
+#                     f"Invalid save_directory_template: invalid variable {identifier}"
+#                 )
+#         if fail_msgs:
+#             if isinstance(inprocess_request, FailedRequestValidation):
+#                 fail_msgs = list(inprocess_request.errors) + fail_msgs
+#             return FailedRequestValidation(
+#                 request=request,
+#                 errors=tuple(fail_msgs),
+#             )
+#     # Update validated fields.
+#     if isinstance(inprocess_request, ValidatedRequest):
+#         inprocess_request = deepcopy(inprocess_request)
+#         inprocess_request = replace(
+#             inprocess_request,
+#             save_directory_template=request.save_directory_template,
+#         )
+#     return inprocess_request
+
+
+# def _validate_request_filename_template(
+#     request: Request,
+#     inprocess_request: ValidatedRequest | FailedRequestValidation,
+# ) -> ValidatedRequest | FailedRequestValidation:
+#     """Validates the save_filename_template field of the request, if applicable. If the template is invalid, returns a FailedRequestValidation with the appropriate error message. If the template is valid, returns the inprocess_request unchanged."""
+#     if request.save_filename_template is not None:
+#         fail_msgs: list[str] = []
+#         # Validate that the template is a valid filename template.
+#         # Because some of the variables that can be used in the template are not known
+#         # until execution time, we can't fully validate the template at this point. However,
+#         # we can validate that the template is a valid string template and that it only
+#         # uses the allowed variables.
+
+#         # TODO define this in a central place, probably the module that actually renders the template, and import it here.
+#         available_variables = {"request_id", "created_on"}
+#         template = Template(request.save_filename_template)
+#         identifiers = template.get_identifiers()
+#         fail_msgs: list[str] = []
+#         for identifier in identifiers:
+#             if identifier not in available_variables:
+#                 fail_msgs.append(
+#                     f"Invalid save_filename_template: invalid variable {identifier}"
+#                 )
+#         if fail_msgs:
+#             if isinstance(inprocess_request, FailedRequestValidation):
+#                 fail_msgs = list(inprocess_request.errors) + fail_msgs
+#             return FailedRequestValidation(
+#                 request=request,
+#                 errors=tuple(fail_msgs),
+#             )
+#     # Update validated fields.
+#     if isinstance(inprocess_request, ValidatedRequest):
+#         inprocess_request = deepcopy(inprocess_request)
+#         inprocess_request = replace(
+#             inprocess_request,
+#             save_filename_template=request.save_filename_template,
+#         )
+#     return inprocess_request
 
 
 def _validate_request_schema(

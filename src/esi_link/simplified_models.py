@@ -44,6 +44,14 @@ class CacheAction(StrEnum):
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
+class AfterResponseAction:
+    """Represents an action to be taken after receiving a response for a request."""
+
+    action_type: str
+    action_parameters: dict[str, Any] = field(default_factory=dict[str, Any])
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
 class Request:
     """Represents a single ESI request to be executed.
 
@@ -78,10 +86,13 @@ class Request:
     """The language to use for the request, if applicable. This is used to set the Accept-Language header in the request."""
     json_body: Any | None = None
     """The JSON body of the request, if applicable. This is used for POST, PUT, PATCH requests."""
-    save_directory_template: str | None = None
-    """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
-    save_filename_template: str | None = None
-    """The filename template to save the response data to, if applicable. If not provided, but a save_directory_template is provided, a default filename will be used."""
+    actions_after_response: list[AfterResponseAction] = field(
+        default_factory=list[AfterResponseAction]
+    )
+    # save_directory_template: str | None = None
+    # """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
+    # save_filename_template: str | None = None
+    # """The filename template to save the response data to, if applicable. If not provided, but a save_directory_template is provided, a default filename will be used."""
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -131,10 +142,13 @@ class ValidatedRequest:
     """The language to use for the request, if applicable. This is used to set the Accept-Language header in the request."""
     json_body: Any | None = None
     """The JSON body of the request, if applicable. This is used for POST, PUT, PATCH requests."""
-    save_directory_template: str | None = None
-    """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
-    save_filename_template: str | None = None
-    """The filename template to save the response data to, if applicable. If not provided, but a save_directory_template is provided, a default filename will be used."""
+    actions_after_response: list[AfterResponseAction] = field(
+        default_factory=list[AfterResponseAction]
+    )
+    # save_directory_template: str | None = None
+    # """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
+    # save_filename_template: str | None = None
+    # """The filename template to save the response data to, if applicable. If not provided, but a save_directory_template is provided, a default filename will be used."""
 
     # These fields are added to capture required info from the schema for the request,
     # such as the path URL template, HTTP method, and whether the request is paged or cacheable.
@@ -173,10 +187,13 @@ class RequestGroup:
     group_id: UUID
     description: str = ""
     requests: dict[UUID, Request]
-    save_directory_template: str | None = None
-    """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
-    save_filename_template: str | None = None
-    """The filename template to save the response group data to, if applicable. If not provided, but a save_directory_template is provided, a default filename will be used."""
+    actions_after_response: list[AfterResponseAction] = field(
+        default_factory=list[AfterResponseAction]
+    )
+    # save_directory_template: str | None = None
+    # """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
+    # save_filename_template: str | None = None
+    # """The filename template to save the response group data to, if applicable. If not provided, but a save_directory_template is provided, a default filename will be used."""
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -193,10 +210,13 @@ class ValidatedRequestGroup:
     requests: dict[UUID, ValidatedRequest] = field(
         default_factory=dict[UUID, ValidatedRequest]
     )
-    save_directory_template: str | None = None
-    """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
-    save_filename_template: str | None = None
-    """The filename template to save the response group data to, if applicable. If not provided, but a save_directory_template is provided, a default filename will be used."""
+    actions_after_response: list[AfterResponseAction] = field(
+        default_factory=list[AfterResponseAction]
+    )
+    # save_directory_template: str | None = None
+    # """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
+    # save_filename_template: str | None = None
+    # """The filename template to save the response group data to, if applicable. If not provided, but a save_directory_template is provided, a default filename will be used."""
 
     failed_request_validations: dict[UUID, FailedRequestValidation] = field(
         default_factory=dict[UUID, FailedRequestValidation]
@@ -340,10 +360,13 @@ class RuntimeRequest:
     """The language to use for the request, if applicable. This is used to set the Accept-Language header in the request."""
     json_body: Any | None = None
     """The JSON body of the request, if applicable. This is used for POST, PUT, PATCH requests."""
-    save_directory_template: str | None = None
-    """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
-    save_filename_template: str | None = None
-    """The filename template to save the response data to, if applicable. If not provided, but a save_directory_template is provided, a default filename will be used."""
+    actions_after_response: list[AfterResponseAction] = field(
+        default_factory=list[AfterResponseAction]
+    )
+    # save_directory_template: str | None = None
+    # """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
+    # save_filename_template: str | None = None
+    # """The filename template to save the response data to, if applicable. If not provided, but a save_directory_template is provided, a default filename will be used."""
     path_url_template: str = ""
     """The URL template for the path."""
     method: Literal[
@@ -385,11 +408,11 @@ class RuntimeRequest:
     """The request_id of the parent request if this request is a sub-request, e.g. a paged 
     request or a retry."""
 
-    # These fields are determined after the request is executed
-    save_directory: Path | None = None
-    """The directory to save the response data to, if applicable. This is the resolved directory after filling in any templates. If not provided, response data will not be saved to disk."""
-    save_filename: str | None = None
-    """The filename to save the response data to, if applicable. This is the resolved filename after filling in any templates. If not provided, but a save_directory is provided, a default filename will be used."""
+    # # These fields are determined after the request is executed
+    # save_directory: Path | None = None
+    # """The directory to save the response data to, if applicable. This is the resolved directory after filling in any templates. If not provided, response data will not be saved to disk."""
+    # save_filename: str | None = None
+    # """The filename to save the response data to, if applicable. This is the resolved filename after filling in any templates. If not provided, but a save_directory is provided, a default filename will be used."""
 
 
 @dataclass(slots=True, kw_only=True)
@@ -402,10 +425,13 @@ class RuntimeRequestGroup:
     requests: dict[UUID, RuntimeRequest] = field(
         default_factory=dict[UUID, RuntimeRequest]
     )
-    save_directory_template: str | None = None
-    """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
-    save_filename_template: str | None = None
-    """The filename template to save the response group data to, if applicable. If not provided, but a save_directory_template is provided, a default filename will be used."""
+    actions_after_response: list[AfterResponseAction] = field(
+        default_factory=list[AfterResponseAction]
+    )
+    # save_directory_template: str | None = None
+    # """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
+    # save_filename_template: str | None = None
+    # """The filename template to save the response group data to, if applicable. If not provided, but a save_directory_template is provided, a default filename will be used."""
 
     failed_request_validations: dict[UUID, FailedRequestValidation] = field(
         default_factory=dict[UUID, FailedRequestValidation]
@@ -448,10 +474,10 @@ class ResponseGroup:
     description: str = ""
     responses: dict[UUID, Response] = field(default_factory=dict[UUID, Response])
     metrics: RequestGroupMetrics = field(default_factory=RequestGroupMetrics)
-    save_directory_template: str | None = None
-    """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
-    save_filename_template: str | None = None
-    """The filename template to save the response group data to, if applicable. If not provided, but a save_directory_template is provided, a default filename will be used."""
+    # save_directory_template: str | None = None
+    # """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
+    # save_filename_template: str | None = None
+    # """The filename template to save the response group data to, if applicable. If not provided, but a save_directory_template is provided, a default filename will be used."""
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
