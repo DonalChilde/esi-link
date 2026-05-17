@@ -2,7 +2,6 @@
 
 from copy import deepcopy
 from dataclasses import replace
-from string import Template
 
 from esi_link.simplified_models import (
     EsiSchema,
