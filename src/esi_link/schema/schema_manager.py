@@ -18,6 +18,7 @@ from esi_link.simplified_models import (
     EsiSchema,
     StoredSchema,
 )
+from esi_link.simplified_protocols import SchemaManagerProtocol
 
 
 class StoredSchemaTD(TypedDict):
@@ -42,7 +43,7 @@ StoredSchemaRoot = RootModel[StoredSchema]
 # compatibility date and timestamp. When a schema is requested, we first check the cache
 # before loading it from the file system. We should also consider adding a method to clear
 # the cache if needed, for example when new schemas are added to the store.
-class SchemaManager:
+class SchemaManager(SchemaManagerProtocol):
     def __init__(self, schema_directory: Path):
         """File based schema manager.
 

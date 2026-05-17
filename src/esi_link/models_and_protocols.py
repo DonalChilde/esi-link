@@ -169,7 +169,7 @@ class RuntimeRequestGroup:
     )
 
 
-@dataclass(slots=True, kw_only=True)
+@dataclass(slots=True, kw_only=True, frozen=True)
 class X_ratelimit:
     group: str
     limit: str

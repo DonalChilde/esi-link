@@ -9,13 +9,11 @@ from uuid import UUID
 from diskcache import Cache  # type: ignore
 from whenever import Instant
 
-from esi_link.cache.stale_cache_check import is_stale
-from esi_link.models_and_protocols import (
+from esi_link.simplified_models import (
     CachedResponse,
-    CachedResponseStatus,
-    CacheManagerProtocol,
     HttpResponse,
 )
+from esi_link.simplified_protocols import CacheManagerProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -38,12 +36,12 @@ class DiskCache(CacheManagerProtocol):
         self.cache = Cache(cache_directory)
         self.local_max_age_seconds = local_max_age_seconds
 
-    def __enter__(self) -> Self:
+    async def __aenter__(self) -> Self:
         """Enter the runtime context related to this object, which will automatically open the disk cache."""
         self.cache.__enter__()
         return self
 
-    def __exit__(
+    async def __aexit__(
         self,
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
@@ -52,16 +50,12 @@ class DiskCache(CacheManagerProtocol):
         """Exit the runtime context related to this object, which will automatically close the disk cache."""
         self.cache.__exit__(exc_type, exc_value, traceback)  # type: ignore
 
-    def get(
-        self, key: UUID, local_max_age: int | None = None
-    ) -> tuple[CachedResponse | None, CachedResponseStatus]:
+    async def get(self, key: UUID) -> CachedResponse | None:
         """Get a value from the disk cache."""
-        if local_max_age is None:
-            local_max_age = self.local_max_age_seconds
         response = self.cache.get(str(key))  # type: ignore
         if response is None:
             logger.info(f"Cache miss for key {key}")
-            return None, CachedResponseStatus.MISS
+            return None
         if not isinstance(response, CachedResponse):
             logger.error(
                 f"Cached value for key {key} is not of type CachedResponse, got {type(response)}"  # type: ignore
@@ -69,13 +63,12 @@ class DiskCache(CacheManagerProtocol):
             raise ValueError(
                 f"Cached value for key {key} is not of type CachedResponse, got {type(response)}"  # type: ignore
             )
-        if is_stale(response, local_max_age_seconds=local_max_age):
-            logger.info(f"Cache stale for key {key}")
-            return response, CachedResponseStatus.STALE
-        logger.info(f"Cache hit for key {key}")
-        return response, CachedResponseStatus.HIT
+        logger.info(
+            f"Cache hit for key {key}, is_expired: {response.is_expired}, cached at {response.cached_at}, expires at {response.expires_at}"
+        )
+        return response
 
-    def set(self, key: UUID, http_response: HttpResponse) -> CachedResponse:
+    async def set(self, key: UUID, http_response: HttpResponse) -> CachedResponse:
         """Set a value in the disk cache."""
         cached_response = CachedResponse(
             cache_key=key,
@@ -89,9 +82,11 @@ class DiskCache(CacheManagerProtocol):
         )
         return cached_response
 
-    def refresh(self, key: UUID, new_http_response: HttpResponse) -> CachedResponse:
+    async def refresh(
+        self, key: UUID, new_http_response: HttpResponse
+    ) -> CachedResponse:
         """Refresh a value in the disk cache."""
-        cached_response, _ = self.get(key)
+        cached_response = await self.get(key)
         if cached_response is None:
             logger.info(f"No cached response found for key {key} to refresh.")
             raise KeyError(f"No cached response found for key {key} to refresh.")
@@ -106,22 +101,22 @@ class DiskCache(CacheManagerProtocol):
         logger.info(
             f"Refreshing cache for key {key} with new HTTP response received at {new_http_response.received_at}"
         )
-        return self.set(key, updated_http_response)
+        return await self.set(key, updated_http_response)
 
-    def clear(self, only_stale: bool = False) -> int:
+    async def clear(self, only_stale: bool = False) -> int:
         """Clear all cached responses from the cache."""
         if only_stale:
             keys_to_delete: list[str] = [
                 key
                 for key, response in self.cache.items()  # type: ignore
-                if is_stale(response, local_max_age_seconds=self.local_max_age_seconds)  # type: ignore
+                if response.is_expired  # type: ignore
             ]
             for key in keys_to_delete:
                 self.cache.delete(key)  # type: ignore
             return len(keys_to_delete)
         return self.cache.clear()
 
-    def cache_info(self) -> dict[str, Any]:
+    async def cache_info(self) -> dict[str, Any]:
         """Get information about the cache, such as size, number of entries, etc."""
         return {
             "path": self.cache_directory,

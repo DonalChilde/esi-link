@@ -13,7 +13,7 @@ import aiohttp
 from aiolimiter import AsyncLimiter
 from whenever import Instant
 
-from esi_link.models_and_protocols import (
+from esi_link.simplified_models import (
     CacheAction,
     CachedResponse,
     CachedResponseStatus,
