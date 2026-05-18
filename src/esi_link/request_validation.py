@@ -2,7 +2,12 @@
 
 from copy import deepcopy
 from dataclasses import replace
+from pathlib import Path
+from uuid import UUID
 
+from pydantic import RootModel
+
+from esi_link.helpers.save_text_file import save_text_file
 from esi_link.simplified_models import (
     EsiSchema,
     FailedRequestGroupValidation,
@@ -14,11 +19,30 @@ from esi_link.simplified_models import (
 )
 from esi_link.simplified_protocols import SchemaManagerProtocol
 
+# FIXME Consolidate root model declarations in a single module to avoid having to redefine them in multiple places.
+FailedRequestValidationRoot = RootModel[FailedRequestValidation]
+
+
+def _write_debug_file(
+    in_process: FailedRequestValidation,
+    debug_path: Path,
+):
+    """Writes the request and the failed validation result to a debug file at the specified path."""
+    # NOTE Not sure this is the way to go. could also output the validation failures after processing.
+    # This could be useful when doing only the validation step. Meh, we'll see how this feels in practice and can always change it later.
+    save_text_file(
+        text=FailedRequestValidationRoot(in_process).model_dump_json(indent=2),
+        output_dir=debug_path,
+        file_name=f"failed_request_validation_{in_process.request.request_id}.json",
+        overwrite=True,
+    )
+
 
 def validate_request(
     request: Request,
     schema_manager: SchemaManagerProtocol,
     authorized_characters: set[int],
+    debug_path: Path | None = None,
 ) -> ValidatedRequest | FailedRequestValidation:
     """Validates an individual request. If the request is valid, returns a ValidatedRequest. If the request is invalid, returns a FailedRequestValidation with the appropriate error messages."""
     in_process: ValidatedRequest | FailedRequestValidation = ValidatedRequest(
@@ -33,6 +57,8 @@ def validate_request(
         # If the schema validation failed, we don't need to do any further validation,
         # because the request is already invalid. We can just return the
         # FailedRequestValidation with the schema validation error.
+        if debug_path is not None:
+            _write_debug_file(in_process, debug_path)
         return in_process
     # Get the schema for use in the rest of the validation steps.
     assert in_process.compatibility_date is not None, (
@@ -48,6 +74,8 @@ def validate_request(
     in_process = _validate_operation_id(request, in_process, schema=schema)
     if isinstance(in_process, FailedRequestValidation):
         # If the operation_id validation failed, we don't need to do any further validation, because the request is already invalid. We can just return the FailedRequestValidation with the operation_id validation error.
+        if debug_path is not None:
+            _write_debug_file(in_process, debug_path)
         return in_process
     in_process = _validate_path_parameters(request, in_process, schema=schema)
     in_process = _validate_query_parameters(request, in_process, schema=schema)
@@ -64,7 +92,34 @@ def validate_request(
     in_process = _set_is_paged(request, in_process, schema=schema)
     in_process = _set_is_cached(request, in_process, schema=schema)
     in_process = _set_is_authentication_required(request, in_process, schema=schema)
+
+    # Last check before returning the validation result.
+    if isinstance(in_process, FailedRequestValidation) and debug_path is not None:
+        _write_debug_file(in_process, debug_path)
     return in_process
+
+
+def validate_requests(
+    requests: dict[UUID, Request],
+    schema_manager: SchemaManagerProtocol,
+    authorized_characters: set[int],
+    debug_path: Path | None = None,
+) -> tuple[dict[UUID, ValidatedRequest], dict[UUID, FailedRequestValidation]]:
+    """Validates a group of requests. Returns a tuple containing a dictionary of the valid requests and a dictionary of the failed request validations."""
+    validated_requests: dict[UUID, ValidatedRequest] = {}
+    failed_request_validations: dict[UUID, FailedRequestValidation] = {}
+    for request_id, request in requests.items():
+        validation_result = validate_request(
+            request=request,
+            schema_manager=schema_manager,
+            authorized_characters=authorized_characters,
+            debug_path=debug_path,
+        )
+        if isinstance(validation_result, ValidatedRequest):
+            validated_requests[request_id] = validation_result
+        else:
+            failed_request_validations[request_id] = validation_result
+    return validated_requests, failed_request_validations
 
 
 def validate_request_group(
@@ -79,7 +134,7 @@ def validate_request_group(
             created_on=request_group.created_on,
             group_id=request_group.group_id,
             description=request_group.description,
-            actions_after_response=request_group.actions_after_response,  # TODO move to validation step after we have the schema, so we can validate that the actions are valid for the requested operation_ids of the individual requests in the group
+            response_actions=request_group.response_actions,  # TODO move to validation step after we have the schema, so we can validate that the actions are valid for the requested operation_ids of the individual requests in the group
         )
     )
     # in_process = _validate_group_directory_template(request_group, in_process)

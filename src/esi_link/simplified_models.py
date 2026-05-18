@@ -44,8 +44,16 @@ class CacheAction(StrEnum):
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
-class AfterResponseAction:
+class RuntimeResponseAction:
     """Represents an action to be taken after receiving a response for a request."""
+
+    action_type: str
+    action_parameters: dict[str, Any] = field(default_factory=dict[str, Any])
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ResponseGroupAction:
+    """Represents an action to be taken after receiving a group of responses."""
 
     action_type: str
     action_parameters: dict[str, Any] = field(default_factory=dict[str, Any])
@@ -86,8 +94,8 @@ class Request:
     """The language to use for the request, if applicable. This is used to set the Accept-Language header in the request."""
     json_body: Any | None = None
     """The JSON body of the request, if applicable. This is used for POST, PUT, PATCH requests."""
-    actions_after_response: list[AfterResponseAction] = field(
-        default_factory=list[AfterResponseAction]
+    actions_after_response: list[RuntimeResponseAction] = field(
+        default_factory=list[RuntimeResponseAction]
     )
     # save_directory_template: str | None = None
     # """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
@@ -142,8 +150,8 @@ class ValidatedRequest:
     """The language to use for the request, if applicable. This is used to set the Accept-Language header in the request."""
     json_body: Any | None = None
     """The JSON body of the request, if applicable. This is used for POST, PUT, PATCH requests."""
-    actions_after_response: list[AfterResponseAction] = field(
-        default_factory=list[AfterResponseAction]
+    actions_after_response: list[RuntimeResponseAction] = field(
+        default_factory=list[RuntimeResponseAction]
     )
     # save_directory_template: str | None = None
     # """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
@@ -187,8 +195,8 @@ class RequestGroup:
     group_id: UUID
     description: str = ""
     requests: dict[UUID, Request]
-    actions_after_response: list[AfterResponseAction] = field(
-        default_factory=list[AfterResponseAction]
+    response_actions: list[ResponseGroupAction] = field(
+        default_factory=list[ResponseGroupAction]
     )
     # save_directory_template: str | None = None
     # """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
@@ -210,8 +218,8 @@ class ValidatedRequestGroup:
     requests: dict[UUID, ValidatedRequest] = field(
         default_factory=dict[UUID, ValidatedRequest]
     )
-    actions_after_response: list[AfterResponseAction] = field(
-        default_factory=list[AfterResponseAction]
+    response_actions: list[ResponseGroupAction] = field(
+        default_factory=list[ResponseGroupAction]
     )
     # save_directory_template: str | None = None
     # """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
@@ -360,8 +368,8 @@ class RuntimeRequest:
     """The language to use for the request, if applicable. This is used to set the Accept-Language header in the request."""
     json_body: Any | None = None
     """The JSON body of the request, if applicable. This is used for POST, PUT, PATCH requests."""
-    actions_after_response: list[AfterResponseAction] = field(
-        default_factory=list[AfterResponseAction]
+    actions_after_response: list[RuntimeResponseAction] = field(
+        default_factory=list[RuntimeResponseAction]
     )
     # save_directory_template: str | None = None
     # """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
@@ -425,8 +433,8 @@ class RuntimeRequestGroup:
     requests: dict[UUID, RuntimeRequest] = field(
         default_factory=dict[UUID, RuntimeRequest]
     )
-    actions_after_response: list[AfterResponseAction] = field(
-        default_factory=list[AfterResponseAction]
+    actions_after_response: list[RuntimeResponseAction] = field(
+        default_factory=list[RuntimeResponseAction]
     )
     # save_directory_template: str | None = None
     # """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""

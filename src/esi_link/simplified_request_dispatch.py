@@ -7,7 +7,8 @@ import aiohttp
 from aiolimiter import AsyncLimiter
 
 from esi_link import USER_AGENT
-from esi_link.request_validation import validate_request
+from esi_link.request_validation import validate_requests
+from esi_link.response_action import do_response_action
 from esi_link.runtime_request import (
     generate_runtime_request,
 )
@@ -15,8 +16,11 @@ from esi_link.simplified_models import (
     FailedRequestValidation,
     FailedRuntimeResponse,
     Request,
+    RequestGroup,
     Response,
+    ResponseGroup,
     RuntimeRequest,
+    RuntimeResponse,
     ValidatedRequest,
 )
 from esi_link.simplified_protocols import CacheManagerProtocol, SchemaManagerProtocol
@@ -38,18 +42,12 @@ async def dispatch_requests(
     """Dispatch a request group and return the combined response."""
     if not requests:
         raise ValueError("Requests must contain at least one request.")
-    failed_request_validations: dict[UUID, FailedRequestValidation] = {}
-    valid_requests: dict[UUID, ValidatedRequest] = {}
-    for request_id, request in requests.items():
-        validated_request = validate_request(
-            request=request,
-            schema_manager=schema_manager,
-            authorized_characters=set(authentication_headers.keys()),
-        )
-        if isinstance(validated_request, FailedRequestValidation):
-            failed_request_validations[request_id] = validated_request
-        else:
-            valid_requests[request_id] = validated_request
+
+    valid_requests, failed_request_validations = validate_requests(
+        requests=requests,
+        schema_manager=schema_manager,
+        authorized_characters=set(authentication_headers.keys()),
+    )
 
     runtime_requests: dict[UUID, RuntimeRequest] = {}
     for request_id, validated_request in valid_requests.items():
@@ -62,13 +60,23 @@ async def dispatch_requests(
 
     async with aiohttp.ClientSession() as session:
         rate_limiter = AsyncLimiter(requests_per, time_period)
-        tasks = [
-            execute_request_with_cache(
+
+        async def execute_with_actions(
+            request: RuntimeRequest,
+        ) -> RuntimeResponse | FailedRuntimeResponse:
+            response = await execute_request_with_cache(
                 request=request,
                 session=session,
                 cache_manager=cache_manager,
                 rate_limiter=rate_limiter,
             )
+            for action in request.actions_after_response:
+                # NOTE action might modify the response, so we need to update the response variable with the result of the action.
+                response = await do_response_action(action=action, response=response)
+            return response
+
+        tasks = [
+            execute_with_actions(request=request)
             for request in runtime_requests.values()
         ]
         runtime_responses = await asyncio.gather(*tasks)
@@ -86,3 +94,27 @@ async def dispatch_requests(
             )
             responses[runtime_response.runtime_request.request_id] = response
     return responses, failed_request_validations, failed_runtime_responses
+
+
+async def dispatch_request_group(
+    request_group: RequestGroup,
+    schema_manager: SchemaManagerProtocol,
+    cache_manager: CacheManagerProtocol,
+    authentication_headers: dict[int, dict[str, str]],
+    requests_per: float = 100.0,
+    time_period: float = 60.0,
+) -> tuple[
+    ResponseGroup,
+    dict[UUID, FailedRequestValidation],
+    dict[UUID, FailedRuntimeResponse],
+]:
+    responses, failed_validations, failed_responses = await dispatch_requests(
+        requests=request_group.requests,
+        schema_manager=schema_manager,
+        cache_manager=cache_manager,
+        authentication_headers=authentication_headers,
+        requests_per=requests_per,
+        time_period=time_period,
+    )
+    response_group = ResponseGroup(group_id=request_group.group_id, responses=responses)
+    return response_group, failed_validations, failed_responses
