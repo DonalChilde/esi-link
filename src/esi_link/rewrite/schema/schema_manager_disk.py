@@ -33,7 +33,7 @@ class SchemaFileInfo:
     file_path: Path
 
 
-class SchemaManager(SchemaManagerProtocol):
+class SchemaManagerDisk(SchemaManagerProtocol):
     def __init__(self, schema_directory: Path):
         """File based schema manager.
 
