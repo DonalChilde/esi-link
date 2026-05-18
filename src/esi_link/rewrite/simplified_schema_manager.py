@@ -5,20 +5,20 @@ from datetime import date
 from pathlib import Path
 from typing import Any, TypedDict
 
-from pydantic import RootModel
 from whenever import Instant
 
-from esi_link.helpers.save_text_file import save_text_file
+from esi_link.rewrite.helpers.save_text_file import save_text_file
+from esi_link.rewrite.models.schema import (
+    AvailableSchema,
+    EsiSchema,
+    StoredSchema,
+    StoredSchemaRoot,
+)
+from esi_link.rewrite.protocols.schema_manager import SchemaManagerProtocol
 from esi_link.schema.errors import (
     SchemaManagerError,
     SchemaNotFoundError,
 )
-from esi_link.simplified_models import (
-    AvailableSchema,
-    EsiSchema,
-    StoredSchema,
-)
-from esi_link.simplified_protocols import SchemaManagerProtocol
 
 
 class StoredSchemaTD(TypedDict):
@@ -31,9 +31,6 @@ class SchemaFileInfo:
     compatibility_date: str
     timestamp: int
     file_path: Path
-
-
-StoredSchemaRoot = RootModel[StoredSchema]
 
 
 class SchemaManager(SchemaManagerProtocol):

@@ -9,11 +9,11 @@ from uuid import UUID
 from diskcache import Cache  # type: ignore
 from whenever import Instant
 
-from esi_link.simplified_models import (
+from esi_link.rewrite.models.cache import (
     CachedResponse,
-    HttpResponse,
 )
-from esi_link.simplified_protocols import CacheManagerProtocol
+from esi_link.rewrite.models.http_response import HttpResponse
+from esi_link.rewrite.protocols.cache_manager import CacheManagerProtocol
 
 logger = logging.getLogger(__name__)
 

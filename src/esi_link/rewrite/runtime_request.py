@@ -7,14 +7,13 @@ from string import Template
 from uuid import UUID, uuid5
 
 from esi_link import ESI_LINK_NAMESPACE
-from esi_link.helpers.canonicalize_url import combine_and_canonicalize_url
-from esi_link.simplified_models import (
+from esi_link.rewrite.helpers.canonicalize_url import combine_and_canonicalize_url
+from esi_link.rewrite.models.runtime import (
     RequestGroupMetrics,
     RuntimeRequest,
     RuntimeRequestGroup,
-    ValidatedRequest,
-    ValidatedRequestGroup,
 )
+from esi_link.rewrite.models.validated import ValidatedRequest, ValidatedRequestGroup
 
 logger = logging.getLogger(__name__)
 
@@ -58,8 +57,8 @@ def generate_runtime_request_group(
         group_id=validated_request_group.group_id,
         created_on=validated_request_group.created_on,
         description=validated_request_group.description,
-        save_directory_template=validated_request_group.save_directory_template,
-        save_filename_template=validated_request_group.save_filename_template,
+        # save_directory_template=validated_request_group.save_directory_template,
+        # save_filename_template=validated_request_group.save_filename_template,
         requests=runtime_requests,
         metrics=RequestGroupMetrics(),
     )

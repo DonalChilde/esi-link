@@ -9,16 +9,16 @@ from pydantic import RootModel
 from whenever import Instant
 
 from esi_link.helpers.save_text_file import save_text_file
-from esi_link.schema.errors import (
-    SchemaManagerError,
-    SchemaNotFoundError,
-)
-from esi_link.simplified_models import (
+from esi_link.rewrite.models.schema import (
     AvailableSchema,
     EsiSchema,
     StoredSchema,
 )
-from esi_link.simplified_protocols import SchemaManagerProtocol
+from esi_link.rewrite.protocols.schema_manager import SchemaManagerProtocol
+from esi_link.schema.errors import (
+    SchemaManagerError,
+    SchemaNotFoundError,
+)
 
 
 class StoredSchemaTD(TypedDict):

@@ -13,15 +13,17 @@ import aiohttp
 from aiolimiter import AsyncLimiter
 from whenever import Instant
 
-from esi_link.simplified_models import (
+from esi_link.rewrite.models.cache import (
     CacheAction,
     CachedResponse,
     CachedResponseStatus,
+)
+from esi_link.rewrite.models.http_response import HttpResponse
+from esi_link.rewrite.models.runtime import RuntimeRequest
+from esi_link.rewrite.models.surface import Response
+from esi_link.rewrite.simplified_models import (
     CacheManagerProtocol,
     HttpRequestExecutorProtocol,
-    HttpResponse,
-    Response,
-    RuntimeRequest,
 )
 
 logger = logging.getLogger(__name__)

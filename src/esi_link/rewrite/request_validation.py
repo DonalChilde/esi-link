@@ -5,22 +5,19 @@ from dataclasses import replace
 from pathlib import Path
 from uuid import UUID
 
-from pydantic import RootModel
-
-from esi_link.helpers.save_text_file import save_text_file
-from esi_link.simplified_models import (
+from esi_link.rewrite.helpers.save_text_file import save_text_file
+from esi_link.rewrite.models.schema import (
     EsiSchema,
+)
+from esi_link.rewrite.models.surface import Request, RequestGroup
+from esi_link.rewrite.models.validated import (
     FailedRequestGroupValidation,
     FailedRequestValidation,
-    Request,
-    RequestGroup,
+    FailedRequestValidationRoot,
     ValidatedRequest,
     ValidatedRequestGroup,
 )
-from esi_link.simplified_protocols import SchemaManagerProtocol
-
-# FIXME Consolidate root model declarations in a single module to avoid having to redefine them in multiple places.
-FailedRequestValidationRoot = RootModel[FailedRequestValidation]
+from esi_link.rewrite.protocols.schema_manager import SchemaManagerProtocol
 
 
 def _write_debug_file(

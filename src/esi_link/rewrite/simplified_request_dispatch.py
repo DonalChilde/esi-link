@@ -7,24 +7,28 @@ import aiohttp
 from aiolimiter import AsyncLimiter
 
 from esi_link import USER_AGENT
-from esi_link.request_validation import validate_requests
-from esi_link.response_action import do_response_action
-from esi_link.runtime_request import (
-    generate_runtime_request,
-)
-from esi_link.simplified_models import (
-    FailedRequestValidation,
+from esi_link.rewrite.models.runtime import (
     FailedRuntimeResponse,
+    RuntimeRequest,
+    RuntimeResponse,
+)
+from esi_link.rewrite.models.surface import (
     Request,
     RequestGroup,
     Response,
     ResponseGroup,
-    RuntimeRequest,
-    RuntimeResponse,
-    ValidatedRequest,
 )
-from esi_link.simplified_protocols import CacheManagerProtocol, SchemaManagerProtocol
-from esi_link.simplified_request_executor import execute_request_with_cache
+from esi_link.rewrite.models.validated import FailedRequestValidation
+from esi_link.rewrite.protocols.cache_manager import (
+    CacheManagerProtocol,
+)
+from esi_link.rewrite.protocols.schema_manager import SchemaManagerProtocol
+from esi_link.rewrite.request_validation import validate_requests
+from esi_link.rewrite.response_action import do_response_action
+from esi_link.rewrite.runtime_request import (
+    generate_runtime_request,
+)
+from esi_link.rewrite.simplified_request_executor import execute_request_with_cache
 
 
 async def dispatch_requests(
@@ -39,7 +43,7 @@ async def dispatch_requests(
     dict[UUID, FailedRequestValidation],
     dict[UUID, FailedRuntimeResponse],
 ]:
-    """Dispatch a request group and return the combined response."""
+    """Dispatch requests and return the responses."""
     if not requests:
         raise ValueError("Requests must contain at least one request.")
 
