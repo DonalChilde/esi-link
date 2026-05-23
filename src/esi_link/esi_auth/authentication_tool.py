@@ -82,11 +82,11 @@ class AuthenticationTool:
 
     def generate_request_params(self) -> AuthenticationRequestParams:
         """Generate the request parameters for the authentication request."""
-        code_challenge, code_verifier = generate_code_challenge_and_verifier()
+        pkce_codes = generate_code_challenge_and_verifier()
         state = generate_secure_random_string(16)
         return AuthenticationRequestParams(
             redirect_url=generate_url(
-                code_challenge=code_challenge,
+                code_challenge=pkce_codes.code_challenge,
                 client_id=self.client_id,
                 callback_url=self.callback_url,
                 authorization_endpoint=self.authorization_endpoint,
@@ -94,8 +94,8 @@ class AuthenticationTool:
                 state=state,
             ),
             state=state,
-            code_verifier=code_verifier,
-            code_challenge=code_challenge,
+            code_verifier=pkce_codes.code_verifier,
+            code_challenge=pkce_codes.code_challenge,
         )
 
     async def request_authentication_code(
