@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Self
+from typing import Any, Self, cast
 
 import httpx2
 from jwt import PyJWKClient
@@ -12,6 +12,8 @@ from whenever import Instant
 
 from esi_link.rewrite import USER_AGENT
 from esi_link.rewrite.settings import OAUTH_METADATA_URL
+
+AUDIENCE = "EVE Online"
 
 
 @dataclass(slots=True, frozen=True)
@@ -24,9 +26,16 @@ class OAuthMetadataTimestamped:
     """The timestamp of when the metadata was fetched, in seconds since the epoch."""
 
     @property
-    def issuer(self) -> str:
-        """The issuer of the OAuth metadata."""
-        return self.metadata["issuer"]
+    def issuers(self) -> list[str]:
+        """The issuers of the OAuth metadata."""
+        value = self.metadata["issuer"]
+        if isinstance(value, str):
+            return [value]
+        elif isinstance(value, list):
+            value = cast(list[str], value)
+            return value
+        else:
+            raise ValueError("Invalid issuer value in OAuth metadata.")
 
     @property
     def authorization_endpoint(self) -> str:
@@ -68,8 +77,6 @@ class OAuthMetadataDiskCache:
         cache_file: Path | None = None,
         cache_ttl: int = 3600,
         metadata_url: str = OAUTH_METADATA_URL,
-        _timestamped_metadata: OAuthMetadataTimestamped | None = None,
-        _jwks_client: PyJWKClient | None = None,
     ):
         """Manage the disk cache for OAuth metadata.
 
@@ -83,6 +90,7 @@ class OAuthMetadataDiskCache:
         self._metadata_url = metadata_url
         self._cached_metadata: OAuthMetadataTimestamped | None = None
         self._jwks_client: PyJWKClient | None = None
+        self._timestamped_metadata: OAuthMetadataTimestamped | None = None
 
     def _load_metadata_from_cache(self) -> OAuthMetadataTimestamped:
         """Load the cached metadata from disk."""
@@ -129,6 +137,7 @@ class OAuthMetadataDiskCache:
             return False
 
     def __enter__(self) -> Self:
+        """Load the metadata, either from cache or from the URL if the cache is invalid."""
         if self._cache_file is not None and self._cache_file.exists():
             self._cached_metadata = self._load_metadata_from_cache()
             if not self._is_cache_valid():
@@ -146,6 +155,7 @@ class OAuthMetadataDiskCache:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
+        """Clean up any resources if necessary. In this case, there are no resources to clean up."""
         pass
 
     @property

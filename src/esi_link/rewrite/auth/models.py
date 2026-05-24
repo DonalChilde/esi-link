@@ -1,0 +1,107 @@
+"""Models for esi-link authentication."""
+
+from dataclasses import dataclass, field
+
+from pydantic import RootModel
+from whenever import Instant
+
+
+@dataclass(slots=True, frozen=True)
+class OauthToken:
+    token_data: dict[str, str | int]
+
+    @property
+    def access_token(self) -> str:
+        value = self.token_data["access_token"]
+        assert isinstance(value, str)
+        return value
+
+    @property
+    def refresh_token(self) -> str:
+        value = self.token_data["refresh_token"]
+        assert isinstance(value, str)
+        return value
+
+    @property
+    def expires_in(self) -> int:
+        value = self.token_data["expires_in"]
+        assert isinstance(value, int)
+        return value
+
+    @property
+    def token_type(self) -> str:
+        value = self.token_data["token_type"]
+        assert isinstance(value, str)
+        return value
+
+
+@dataclass(slots=True, frozen=True)
+class ValidatedToken:
+    token_data: dict[str, str | int | list[str]]
+
+    @property
+    def character_id(self) -> int:
+        sub = self.token_data["sub"]
+        assert isinstance(sub, str)
+        prefix = "CHARACTER:EVE:"
+        assert sub.startswith(prefix)
+        character_id_str = sub[len(prefix) :]
+        return int(character_id_str)
+
+    @property
+    def character_name(self) -> str:
+        value = self.token_data["name"]
+        assert isinstance(value, str)
+        return value
+
+    @property
+    def issued_at(self) -> int:
+        value = self.token_data["iat"]
+        assert isinstance(value, int)
+        return value
+
+    @property
+    def expires_at(self) -> int:
+        value = self.token_data["exp"]
+        assert isinstance(value, int)
+        return value
+
+
+@dataclass(slots=True, frozen=True)
+class EsiAppCredentials:
+    """EVE application credentials.
+
+    Field names match the JSON keys returned by the ESI app registration page.
+    https://developers.eveonline.com/applications
+    """
+
+    name: str
+    description: str
+    clientId: str
+    clientSecret: str
+    callbackUrl: str
+    scopes: list[str] = field(default_factory=list[str])
+
+
+EsiAppCredentialsRoot = RootModel[EsiAppCredentials]
+
+
+@dataclass(slots=True, frozen=True)
+class CharacterToken:
+    character_id: int
+    character_name: str
+    created: int
+    """Creation time as a UNIX timestamp."""
+    expires: int
+    """Expiration time as a UNIX timestamp."""
+    oauth_token: OauthToken
+
+    @property
+    def expires_in(self) -> int:
+        """Return the number of seconds until the token expires."""
+        return self.expires - Instant.now().timestamp()
+
+    @property
+    def auth_headers(self) -> dict[str, str]:
+        """Return the auth headers to use for authenticated requests to ESI."""
+        return {"Authorization": f"Bearer {self.oauth_token.access_token}"}
