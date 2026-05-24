@@ -9,12 +9,12 @@ from pydantic import RootModel
 from whenever import Instant
 
 from esi_link.helpers.save_text_file import save_text_file
-from esi_link.rewrite.models.schema import (
+from esi_link.rewrite.protocols.schema_manager import SchemaManagerProtocol
+from esi_link.rewrite.schema.models import (
     AvailableSchema,
     EsiSchema,
     StoredSchema,
 )
-from esi_link.rewrite.protocols.schema_manager import SchemaManagerProtocol
 from esi_link.schema.errors import (
     SchemaManagerError,
     SchemaNotFoundError,

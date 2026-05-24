@@ -4,13 +4,15 @@ from uuid import UUID, uuid4
 
 from whenever import Instant
 
-from esi_link.rewrite.models.http_response import HttpResponse
-from esi_link.rewrite.models.runtime import (
+from esi_link.rewrite.execution.models import HttpResponse
+from esi_link.rewrite.runtime.models import (
     RequestGroupMetrics,
     RuntimeRequest,
     RuntimeResponseAction,
 )
 from esi_link.type_defs import Lang
+
+# TODO split this to request and response models, and move to separate files. This file is getting a bit large, and the request and response models are somewhat distinct.
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

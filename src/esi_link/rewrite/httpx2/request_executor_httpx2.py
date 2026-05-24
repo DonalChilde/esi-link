@@ -13,18 +13,18 @@ import httpx2
 from aiolimiter import AsyncLimiter
 from whenever import Instant
 
-from esi_link.rewrite.models.cache import (
+from esi_link.rewrite.cache.models import (
     CacheAction,
     CachedResponse,
     CachedResponseStatus,
 )
-from esi_link.rewrite.models.http_response import HttpResponse
-from esi_link.rewrite.models.runtime import (
+from esi_link.rewrite.execution.models import HttpResponse
+from esi_link.rewrite.protocols.cache_manager import CacheManagerProtocol
+from esi_link.rewrite.runtime.models import (
     FailedRuntimeResponse,
     RuntimeRequest,
     RuntimeResponse,
 )
-from esi_link.rewrite.protocols.cache_manager import CacheManagerProtocol
 
 logger = logging.getLogger(__name__)
 

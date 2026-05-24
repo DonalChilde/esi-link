@@ -8,12 +8,15 @@ from uuid import UUID, uuid5
 
 from esi_link import ESI_LINK_NAMESPACE
 from esi_link.rewrite.helpers.canonicalize_url import combine_and_canonicalize_url
-from esi_link.rewrite.models.runtime import (
+from esi_link.rewrite.runtime.models import (
     RequestGroupMetrics,
     RuntimeRequest,
     RuntimeRequestGroup,
 )
-from esi_link.rewrite.models.validated import ValidatedRequest, ValidatedRequestGroup
+from esi_link.rewrite.validation.models import (
+    ValidatedRequest,
+    ValidatedRequestGroup,
+)
 
 logger = logging.getLogger(__name__)
 

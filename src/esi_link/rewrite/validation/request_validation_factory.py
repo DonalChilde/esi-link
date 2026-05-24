@@ -6,18 +6,18 @@ from pathlib import Path
 from uuid import UUID
 
 from esi_link.rewrite.helpers.save_text_file import save_text_file
-from esi_link.rewrite.models.schema import (
+from esi_link.rewrite.protocols.schema_manager import SchemaManagerProtocol
+from esi_link.rewrite.request.models import Request, RequestGroup
+from esi_link.rewrite.schema.models import (
     EsiSchema,
 )
-from esi_link.rewrite.models.surface import Request, RequestGroup
-from esi_link.rewrite.models.validated import (
+from esi_link.rewrite.validation.models import (
     FailedRequestGroupValidation,
     FailedRequestValidation,
     FailedRequestValidationRoot,
     ValidatedRequest,
     ValidatedRequestGroup,
 )
-from esi_link.rewrite.protocols.schema_manager import SchemaManagerProtocol
 
 
 def _write_debug_file(

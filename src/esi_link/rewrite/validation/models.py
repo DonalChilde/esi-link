@@ -5,8 +5,8 @@ from uuid import UUID, uuid4
 from pydantic import RootModel
 from whenever import Instant
 
-from esi_link.rewrite.models.runtime import RuntimeResponseAction
-from esi_link.rewrite.models.surface import Request, RequestGroup, ResponseGroupAction
+from esi_link.rewrite.request.models import Request, RequestGroup, ResponseGroupAction
+from esi_link.rewrite.runtime.models import RuntimeResponseAction
 from esi_link.type_defs import Lang
 
 

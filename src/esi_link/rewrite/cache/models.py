@@ -4,7 +4,7 @@ from uuid import UUID
 
 from whenever import Instant
 
-from esi_link.rewrite.models.http_response import HttpResponse
+from esi_link.rewrite.execution.models import HttpResponse
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

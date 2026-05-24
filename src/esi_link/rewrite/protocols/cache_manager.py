@@ -2,8 +2,8 @@ from types import TracebackType
 from typing import Any, Self
 from uuid import UUID
 
-from esi_link.rewrite.models.cache import CachedResponse
-from esi_link.rewrite.models.http_response import HttpResponse
+from esi_link.rewrite.cache.models import CachedResponse
+from esi_link.rewrite.execution.models import HttpResponse
 
 
 class CacheManagerProtocol:

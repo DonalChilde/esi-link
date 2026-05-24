@@ -6,9 +6,9 @@ from uuid import UUID, uuid4
 from pydantic import RootModel
 from whenever import Instant
 
-from esi_link.rewrite.models.cache import CacheAction, CachedResponseStatus
-from esi_link.rewrite.models.http_response import HttpResponse
-from esi_link.rewrite.models.validated import FailedRequestValidation
+from esi_link.rewrite.cache.models import CacheAction, CachedResponseStatus
+from esi_link.rewrite.execution.models import HttpResponse
+from esi_link.rewrite.validation.models import FailedRequestValidation
 from esi_link.type_defs import Lang
 
 

@@ -1,15 +1,15 @@
 from uuid import UUID
 
-from esi_link.rewrite.models.runtime import (
+from esi_link.rewrite.request.models import (
+    ResponseGroup,
+    ResponseGroupAction,
+)
+from esi_link.rewrite.runtime.models import (
     FailedRuntimeResponse,
     RuntimeResponse,
     RuntimeResponseAction,
 )
-from esi_link.rewrite.models.surface import (
-    ResponseGroup,
-    ResponseGroupAction,
-)
-from esi_link.rewrite.models.validated import FailedRequestValidation
+from esi_link.rewrite.validation.models import FailedRequestValidation
 
 
 async def do_response_action(

@@ -9,26 +9,26 @@ from aiolimiter import AsyncLimiter
 from esi_link import USER_AGENT
 from esi_link.rewrite.actions.response_action import do_response_action
 from esi_link.rewrite.httpx2.request_executor_httpx2 import execute_request_with_cache
-from esi_link.rewrite.models.runtime import (
-    FailedRuntimeResponse,
-    RuntimeRequest,
-    RuntimeResponse,
+from esi_link.rewrite.protocols.cache_manager import (
+    CacheManagerProtocol,
 )
-from esi_link.rewrite.models.surface import (
+from esi_link.rewrite.protocols.schema_manager import SchemaManagerProtocol
+from esi_link.rewrite.request.models import (
     Request,
     RequestGroup,
     Response,
     ResponseGroup,
 )
-from esi_link.rewrite.models.validated import FailedRequestValidation
-from esi_link.rewrite.protocols.cache_manager import (
-    CacheManagerProtocol,
+from esi_link.rewrite.runtime.models import (
+    FailedRuntimeResponse,
+    RuntimeRequest,
+    RuntimeResponse,
 )
-from esi_link.rewrite.protocols.schema_manager import SchemaManagerProtocol
-from esi_link.rewrite.request_validation_factory import validate_requests
-from esi_link.rewrite.runtime_request_factory import (
+from esi_link.rewrite.runtime.runtime_request_factory import (
     generate_runtime_request,
 )
+from esi_link.rewrite.validation.models import FailedRequestValidation
+from esi_link.rewrite.validation.request_validation_factory import validate_requests
 
 
 async def dispatch_requests(

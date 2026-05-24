@@ -1,7 +1,7 @@
 # TODO match this with current implementation
 from whenever import Instant
 
-from esi_link.rewrite.models.schema import AvailableSchema, EsiSchema, StoredSchema
+from esi_link.rewrite.schema.models import AvailableSchema, EsiSchema, StoredSchema
 
 
 class SchemaManagerProtocol:

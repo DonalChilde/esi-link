@@ -13,14 +13,14 @@ import aiohttp
 from aiolimiter import AsyncLimiter
 from whenever import Instant
 
-from esi_link.rewrite.models.cache import (
+from esi_link.rewrite.cache.models import (
     CacheAction,
     CachedResponse,
     CachedResponseStatus,
 )
-from esi_link.rewrite.models.http_response import HttpResponse
-from esi_link.rewrite.models.runtime import RuntimeRequest
-from esi_link.rewrite.models.surface import Response
+from esi_link.rewrite.execution.models import HttpResponse
+from esi_link.rewrite.request.models import Response
+from esi_link.rewrite.runtime.models import RuntimeRequest
 from esi_link.rewrite.simplified_models import (
     CacheManagerProtocol,
     HttpRequestExecutorProtocol,

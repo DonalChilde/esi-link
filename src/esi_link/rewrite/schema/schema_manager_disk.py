@@ -8,13 +8,13 @@ from typing import Any, TypedDict
 from whenever import Instant
 
 from esi_link.rewrite.helpers.save_text_file import save_text_file
-from esi_link.rewrite.models.schema import (
+from esi_link.rewrite.protocols.schema_manager import SchemaManagerProtocol
+from esi_link.rewrite.schema.models import (
     AvailableSchema,
     EsiSchema,
     StoredSchema,
     StoredSchemaRoot,
 )
-from esi_link.rewrite.protocols.schema_manager import SchemaManagerProtocol
 from esi_link.schema.errors import (
     SchemaManagerError,
     SchemaNotFoundError,
@@ -33,6 +33,9 @@ class SchemaFileInfo:
     file_path: Path
 
 
+# TODO rewrite as context manager to help ensure data integrity.
+# TODO Consider initially loading a manifest file that has the available schemas, and then loading the schema on demand.
+# TODO change the data structure to TimestampedSchema, and use int for the timestamp instead of str.
 class SchemaManagerDisk(SchemaManagerProtocol):
     def __init__(self, schema_directory: Path):
         """File based schema manager.
