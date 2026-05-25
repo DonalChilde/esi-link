@@ -14,7 +14,6 @@ from esi_link.rewrite.auth.helpers.request_authentication_code import (
 from esi_link.rewrite.cli.helpers import get_esi_link_settings_from_context
 from esi_link.rewrite.helpers.http_client import config_http_client
 from esi_link.rewrite.helpers.settings_factories import (
-    metadata_cache_factory,
     token_store_factory,
     token_tool_factory,
 )
@@ -22,8 +21,8 @@ from esi_link.rewrite.helpers.settings_factories import (
 app = typer.Typer(no_args_is_help=True)
 
 
-@app.command()
-def add(
+@app.command(name="add")
+def add_token(
     ctx: typer.Context,
     character_id: Annotated[
         int,
