@@ -2,9 +2,6 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Literal, Self, cast
 
-from pydantic import RootModel
-from whenever import Instant
-
 from esi_link.rewrite.helpers.resolve_json_ref import resolve_internal_refs
 
 
@@ -245,29 +242,3 @@ class EsiSchema:
             .get("schema", {})
             .get("enum", [])
         )
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class StoredSchema:
-    """Represents a stored ESI schema, including the raw schema and the date it was downloaded."""
-
-    esi_schema: EsiSchema
-    download_date: Instant
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class AvailableSchema:
-    """Represents an available ESI schema in the SchemaManager.
-
-    Available schemas are returned as a list of AvailableSchema, where each instance contains:
-        - compatibility_date (str): The compatibility date of the schema.
-        - timestamp (int): The timestamp of the schema download.
-        - datetime (str): The download date and time of the schema as an ISO 8601 string.
-    """
-
-    compatibility_date: str
-    timestamp: int
-    datetime: str
-
-
-StoredSchemaRoot = RootModel[StoredSchema]
