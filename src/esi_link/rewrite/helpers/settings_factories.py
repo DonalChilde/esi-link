@@ -16,7 +16,9 @@ def metadata_cache_factory(settings: EsiLinkSettings) -> OAuthMetadataDiskCache:
 def token_tool_factory(settings: EsiLinkSettings) -> TokenTool:
     """Factory function to create a TokenTool instance."""
     metadata_cache = metadata_cache_factory(settings)
-    return TokenTool(metadata_cache.metadata)
+    with metadata_cache:
+        metadata = metadata_cache.metadata
+    return TokenTool(metadata)
 
 
 def token_store_factory(settings: EsiLinkSettings) -> TokenStore:
