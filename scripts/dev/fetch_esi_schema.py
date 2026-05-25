@@ -9,7 +9,7 @@
 # exclude-newer = "7 days"
 # ///
 
-# pyright: basic
+# pyright: standard
 
 import argparse
 import json
@@ -83,6 +83,7 @@ def resolve_schema(schema: dict[str, Any]) -> dict[str, Any]:
 
     Args:
         schema (dict[str, Any]): The original JSON schema with potential $ref references.
+
     Returns:
         dict[str, Any]: The schema with all internal references resolved.
     """
@@ -94,8 +95,10 @@ def verify_compatibility_date(date_str: str | None) -> str:
 
     Args:
         date_str (str|None): The compatibility date string to verify.
+
     Returns:
         str: The verified compatibility date string, or the current date in UTC if None was provided.
+
     Raises:
         ValueError: If the provided date string is not in the correct format.
     """
@@ -103,10 +106,10 @@ def verify_compatibility_date(date_str: str | None) -> str:
         try:
             datetime.strptime(date_str, "%Y-%m-%d")
             return date_str
-        except ValueError:
+        except ValueError as e:
             raise ValueError(
                 f"Invalid compatibility date format: {date_str}. Expected format: YYYY-MM-DD"
-            )
+            ) from e
     else:
         return datetime.now(UTC).strftime("%Y-%m-%d")
 

@@ -146,7 +146,7 @@ class TokenStore:
         self._store_data.character_tokens[character_id] = new_character_token
         return new_character_token
 
-    def get_character_token(
+    def refresh_character_token(
         self,
         character_id: int,
         min_seconds: Annotated[int, Ge(0), Le(1200)] = 300,
@@ -165,12 +165,12 @@ class TokenStore:
         new_character_token = self._refresh_character(character_id, session)
         return new_character_token
 
-    async def async_get_character_tokens(
+    async def async_refresh_character_tokens(
         self,
         session: AsyncClient,
         min_seconds: Annotated[int, Ge(0), Le(1200)] = 300,
     ) -> dict[int, CharacterToken]:
-        """Asynchronously get the tokens for all characters, refreshing any that are about to expire."""
+        """Asynchronously refresh the tokens for all characters, updating any that are about to expire."""
         if self._store_data is None:
             raise TokenStoreError("TokenStore data is not initialized.")
         character_tokens = self._store_data.character_tokens
@@ -213,3 +213,10 @@ class TokenStore:
         if self._store_data is None:
             raise TokenStoreError("TokenStore data is not initialized.")
         return self._store_data.credentials
+
+    @property
+    def character_tokens(self) -> dict[int, CharacterToken]:
+        """Return the character tokens in the store."""
+        if self._store_data is None:
+            raise TokenStoreError("TokenStore data is not initialized.")
+        return self._store_data.character_tokens

@@ -43,7 +43,7 @@ def add(
     settings = get_esi_link_settings_from_context(ctx)
     token_tool = token_tool_factory(settings)
     token_store = token_store_factory(settings)
-    oauth_metadata = metadata_cache_factory(settings).metadata
+    # oauth_metadata = metadata_cache_factory(settings).metadata
     with token_store:
         if character_id in token_store.available_character_ids:
             console.print(
@@ -54,7 +54,7 @@ def add(
         request_params = generate_request_params(
             client_id=credentials.clientId,
             callback_url=credentials.callbackUrl,
-            authorization_endpoint=oauth_metadata.authorization_endpoint,
+            authorization_endpoint=token_tool._oauth_metadata.authorization_endpoint,
             scopes=credentials.scopes,
         )
         if browser_auto_open:
