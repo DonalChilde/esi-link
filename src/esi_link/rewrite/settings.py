@@ -108,11 +108,17 @@ class EsiLinkSettingsPydantic(BaseSettings):
     settings class. This separation allows us to use Pydantic's powerful settings management
     features while keeping the main settings class simple and focused on the application's
     needs.
+
+    Example env file (.esi-link.env):
+    ```
+    # Load settings from environment variables or .esi-link.env file
+    PFMSOFT_ESI_LINK_APPLICATION_DIRECTORY=./dev-data/app-dir
+    ```
     """
 
     model_config = SettingsConfigDict(
         env_prefix=_app_env_prefix,
-        env_file=".esi-link.env",
+        env_file=".esi-link-env",
         env_file_encoding="utf-8",
         extra="forbid",
     )
