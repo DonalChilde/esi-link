@@ -80,14 +80,14 @@ class TokenTool:
         self,
         refresh_token: str,
         client_id: str,
-        client_session: AsyncClient,
+        session: AsyncClient,
     ) -> OauthToken:
         """Asynchronously refresh an existing token using the refresh token."""
         token_response = await oauth_helpers.async_refresh_token(
             refresh_token=refresh_token,
             client_id=client_id,
             token_endpoint=self._oauth_metadata.token_endpoint,
-            session=client_session,
+            session=session,
         )
         return OauthToken(token_data=token_response)
 

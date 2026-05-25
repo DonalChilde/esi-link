@@ -10,12 +10,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-from jwt.jwks_client import PyJWKClient
 from pydantic import Field, RootModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from whenever import Instant
 
-from esi_link.rewrite import DEFAULT_APP_DIR, USER_AGENT, __app_name__, __version__
+from esi_link.rewrite import DEFAULT_APP_DIR
 
 _app_env_prefix = "PFMSOFT_ESI_LINK_"
 
@@ -62,7 +60,6 @@ class JsonStoreCacheConfiguration(CacheConfiguration):
     """Configuration for a JSON file-based cache used by ESI Link."""
 
     cache_type: Literal["jsonstore"] = "jsonstore"
-    directory: Path
     configuration: dict[str, str] = field(default_factory=dict[str, str])
 
 
@@ -71,7 +68,6 @@ class DiskCacheConfiguration(CacheConfiguration):
     """Configuration for a disk-based cache using the diskcache library."""
 
     cache_type: Literal["diskcache"] = "diskcache"
-    directory: Path
     configuration: dict[str, str] = field(default_factory=dict[str, str])
 
 
@@ -85,15 +81,16 @@ class EsiLinkSettings:
 
     application_directory: Path
     log_directory: Path
+    cache_directory: Path
     esi_schema_url: str
     oauth_metadata_url: str
-    schema_store_path: Path | None
-    token_store_path: Path | None
-    auth_metadata_cache_path: Path | None
+    schema_store_path: Path
+    token_store_path: Path
+    auth_metadata_cache_path: Path
     auth_metadata_cache_ttl: int
     rate_limit_connection_period: int
     rate_limit_connection_max_rate: int
-    cache_configuration: CacheConfiguration | None
+    cache_configuration: CacheConfiguration
 
 
 class EsiLinkSettingsPydantic(BaseSettings):
@@ -124,10 +121,7 @@ class EsiLinkSettingsPydantic(BaseSettings):
         default=DEFAULT_APP_DIR,
         description="The directory where the ESI Link application stores its data, logs, and cache.",
     )
-    log_directory: Path = Field(
-        default=DEFAULT_APP_DIR / "logs",
-        description="The directory where ESI Link stores its log files.",
-    )
+
     esi_schema_url: str = Field(
         default=ESI_SCHEMA_URL,
         description="The URL to fetch the ESI OpenAPI schema from.",
@@ -136,27 +130,7 @@ class EsiLinkSettingsPydantic(BaseSettings):
         default=OAUTH_METADATA_URL,
         description="The URL to fetch OAuth metadata from the ESI auth server.",
     )
-    schema_store_path: Path | None = Field(
-        default=None,
-        description=(
-            "The path to the cache used for storing the ESI OpenAPI schemas. "
-            "If None, a default in-memory cache is used."
-        ),
-    )
-    token_store_path: Path | None = Field(
-        default=None,
-        description=(
-            "The path to the cache used for storing token information. "
-            "If None, a default in-memory cache is used."
-        ),
-    )
-    auth_metadata_cache_path: Path | None = Field(
-        default=None,
-        description=(
-            "The path to the cache used for storing OAuth metadata. If None, "
-            "a default in-memory cache is used."
-        ),
-    )
+
     auth_metadata_cache_ttl: int = Field(
         default=3600,
         description=(
@@ -187,8 +161,8 @@ class EsiLinkSettingsPydantic(BaseSettings):
         ),
     )
 
-    cache_configuration: str | None = Field(
-        default=None,
+    cache_configuration: str = Field(
+        default="{}",
         description=(
             "Additional configuration options for the cache, provided as a JSON string. "
             "The specific options depend on the cache type. For example, for 'diskcache', "
@@ -223,20 +197,12 @@ def get_settings(
                 cache_type="memory", configuration={}
             )
         case "diskcache":
-            if pydantic_settings.cache_configuration is None:
-                raise ValueError(
-                    "Cache configuration must be provided for diskcache cache type."
-                )
             config_obj = json.loads(pydantic_settings.cache_configuration)
             config_obj["cache_type"] = "diskcache"
             cache_configuration = DiskCacheConfigurationRoot.model_validate(
                 config_obj
             ).root
         case "jsonstore":
-            if pydantic_settings.cache_configuration is None:
-                raise ValueError(
-                    "Cache configuration must be provided for jsonstore cache type."
-                )
             config_obj = json.loads(pydantic_settings.cache_configuration)
             config_obj["cache_type"] = "jsonstore"
             cache_configuration = JsonStoreCacheConfigurationRoot.model_validate(
@@ -247,14 +213,16 @@ def get_settings(
 
     return EsiLinkSettings(
         application_directory=pydantic_settings.application_directory,
-        log_directory=pydantic_settings.log_directory,
+        log_directory=pydantic_settings.application_directory / "logs",
+        cache_directory=pydantic_settings.application_directory / "cache",
         esi_schema_url=pydantic_settings.esi_schema_url,
         oauth_metadata_url=pydantic_settings.oauth_metadata_url,
-        schema_store_path=pydantic_settings.schema_store_path,
-        auth_metadata_cache_path=pydantic_settings.auth_metadata_cache_path,
+        schema_store_path=pydantic_settings.application_directory / "schema_store.json",
+        auth_metadata_cache_path=pydantic_settings.application_directory
+        / "auth_metadata_cache.json",
         auth_metadata_cache_ttl=pydantic_settings.auth_metadata_cache_ttl,
         rate_limit_connection_period=pydantic_settings.rate_limit_connection_period,
         rate_limit_connection_max_rate=pydantic_settings.rate_limit_connection_max_rate,
-        token_store_path=pydantic_settings.token_store_path,
+        token_store_path=pydantic_settings.application_directory / "token_store.json",
         cache_configuration=cache_configuration,
     )

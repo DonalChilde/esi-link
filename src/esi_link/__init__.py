@@ -28,6 +28,6 @@ USER_AGENT = f"{__app_name__}/{__version__} (+{__url__})"
 ESI_LINK_NAMESPACE = uuid5(NAMESPACE_URL, "esi-link")
 
 
-from esi_link.api import EsiLink, EsiLinkTools
+# from esi_link.api import EsiLink, EsiLinkTools
 
-__all__ = ["EsiLink", "EsiLinkTools"]
+# __all__ = ["EsiLink", "EsiLinkTools"]

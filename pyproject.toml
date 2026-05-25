@@ -31,7 +31,7 @@ license-files = ["LICENSE"]
 # script entry-points
 # COMMAND_NAME = "PATH.TO.ENTRY.MODULE:ENTRY_FUNCTION"
 
-esi-link = "esi_link.cli.main_typer:app"
+esi-link = "esi_link.rewrite.cli.main_typer:app"
 
 [project.urls]
 Documentation = "https://github.com/DonalChilde/esi-link#readme"

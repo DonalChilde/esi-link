@@ -6,12 +6,18 @@ necessary headers, such as the User-Agent.
 
 from httpx2 import AsyncClient, Client
 
+from esi_link.rewrite import USER_AGENT
 
-def config_http_client(user_agent: str) -> Client:
+
+def config_http_client(user_agent: str | None = None) -> Client:
     """Configures the HTTP client with the provided user agent."""
+    if user_agent is None:
+        user_agent = USER_AGENT
     return Client(headers={"User-Agent": user_agent})
 
 
-async def config_async_http_client(user_agent: str) -> AsyncClient:
+async def config_async_http_client(user_agent: str | None = None) -> AsyncClient:
     """Configures the asynchronous HTTP client with the provided user agent."""
+    if user_agent is None:
+        user_agent = USER_AGENT
     return AsyncClient(headers={"User-Agent": user_agent})

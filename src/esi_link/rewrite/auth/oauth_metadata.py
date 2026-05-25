@@ -165,11 +165,11 @@ class OAuthMetadataDiskCache:
             raise ValueError("OAuth metadata is not loaded.")
         return self._cached_metadata
 
-    @property
-    def jwks_client(self) -> PyJWKClient:
-        """Get a PyJWKClient for the JWKS URI provided in the metadata."""
-        if self._jwks_client is None:
-            self._jwks_client = PyJWKClient(
-                self.metadata.jwks_uri, headers={"User-Agent": USER_AGENT}
-            )
-        return self._jwks_client
+    # @property
+    # def jwks_client(self) -> PyJWKClient:
+    #     """Get a PyJWKClient for the JWKS URI provided in the metadata."""
+    #     if self._jwks_client is None:
+    #         self._jwks_client = PyJWKClient(
+    #             self.metadata.jwks_uri, headers={"User-Agent": USER_AGENT}
+    #         )
+    #     return self._jwks_client

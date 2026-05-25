@@ -12,24 +12,28 @@ class OauthToken:
 
     @property
     def access_token(self) -> str:
+        """Return the access token string."""
         value = self.token_data["access_token"]
         assert isinstance(value, str)
         return value
 
     @property
     def refresh_token(self) -> str:
+        """Return the refresh token string."""
         value = self.token_data["refresh_token"]
         assert isinstance(value, str)
         return value
 
     @property
     def expires_in(self) -> int:
+        """Return the number of seconds until the token expires."""
         value = self.token_data["expires_in"]
         assert isinstance(value, int)
         return value
 
     @property
     def token_type(self) -> str:
+        """Return the token type."""
         value = self.token_data["token_type"]
         assert isinstance(value, str)
         return value
@@ -41,6 +45,7 @@ class ValidatedToken:
 
     @property
     def character_id(self) -> int:
+        """Return the character ID."""
         sub = self.token_data["sub"]
         assert isinstance(sub, str)
         prefix = "CHARACTER:EVE:"
@@ -50,18 +55,21 @@ class ValidatedToken:
 
     @property
     def character_name(self) -> str:
+        """Return the character name."""
         value = self.token_data["name"]
         assert isinstance(value, str)
         return value
 
     @property
     def issued_at(self) -> int:
+        """Return the token issuance time as a UNIX timestamp."""
         value = self.token_data["iat"]
         assert isinstance(value, int)
         return value
 
     @property
     def expires_at(self) -> int:
+        """Return the token expiration time as a UNIX timestamp."""
         value = self.token_data["exp"]
         assert isinstance(value, int)
         return value
