@@ -1,3 +1,5 @@
+"""Module for representing the ESI OpenAPI schema and its operations in a structured way."""
+
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Literal, Self, cast
@@ -13,7 +15,7 @@ class SchemaOperation:
     operation ID, and the full operation schema. This allows for easy access to the
     details of each operation when generating documentation or validating requests.
 
-    equivalent to the combination of the path, method, and operation object from the OpenAPI schema.
+    A flattened version of the path, method, and operation object from the OpenAPI schema.
     "paths":<path>:<method>:<operation_schema> from the OpenAPI schema.
     """
 

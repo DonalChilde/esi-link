@@ -84,7 +84,7 @@ class EsiLinkSettings:
     cache_directory: Path
     esi_schema_url: str
     oauth_metadata_url: str
-    schema_store_path: Path
+    schema_cache_directory: Path
     token_store_path: Path
     auth_metadata_cache_path: Path
     auth_metadata_cache_ttl: int
@@ -223,7 +223,7 @@ def get_settings(
         cache_directory=pydantic_settings.application_directory / "cache",
         esi_schema_url=pydantic_settings.esi_schema_url,
         oauth_metadata_url=pydantic_settings.oauth_metadata_url,
-        schema_store_path=pydantic_settings.application_directory / "schema_store.json",
+        schema_cache_directory=pydantic_settings.application_directory / "schema_cache",
         auth_metadata_cache_path=pydantic_settings.application_directory
         / "auth_metadata_cache.json",
         auth_metadata_cache_ttl=pydantic_settings.auth_metadata_cache_ttl,
