@@ -3,6 +3,7 @@
 from esi_link.rewrite.auth.oauth_metadata import OAuthMetadataDiskCache
 from esi_link.rewrite.auth.token_store import TokenStore
 from esi_link.rewrite.auth.token_tool import TokenTool
+from esi_link.rewrite.schema.schema_cache import SchemaCache
 from esi_link.rewrite.settings import EsiLinkSettings
 
 
@@ -25,3 +26,8 @@ def token_store_factory(settings: EsiLinkSettings) -> TokenStore:
     """Factory function to create a TokenStore instance."""
     token_tool = token_tool_factory(settings)
     return TokenStore(store_path=settings.token_store_path, token_tool=token_tool)
+
+
+def schema_cache_factory(settings: EsiLinkSettings) -> SchemaCache:
+    """Factory function to create a SchemaCache instance."""
+    return SchemaCache(cache_directory=settings.schema_cache_directory)

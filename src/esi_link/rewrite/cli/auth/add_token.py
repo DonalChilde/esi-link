@@ -80,12 +80,13 @@ def add_token(
             raise typer.Exit(1)
         console.print("Received authentication code, exchanging for token...")
         session = config_http_client()
-        oauth_token = token_tool.request_new_token(
-            client_id=credentials.clientId,
-            authorization_code=authorization_code,
-            code_verifier=request_params.code_verifier,
-            session=session,
-        )
+        with session:
+            oauth_token = token_tool.request_new_token(
+                client_id=credentials.clientId,
+                authorization_code=authorization_code,
+                code_verifier=request_params.code_verifier,
+                session=session,
+            )
         character_token = token_tool.create_character_token(oauth_token)
         if character_token.character_id != character_id:
             console.print(

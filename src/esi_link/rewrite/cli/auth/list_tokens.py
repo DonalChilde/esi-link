@@ -37,12 +37,14 @@ def _markdown_format_character_tokens(
     """Format the character tokens as a markdown table."""
     if not character_tokens:
         return "No tokens found."
-    table = "| Character ID | Character Name | Expires In |\n"
-    table += "|--------------|----------------|------------|\n"
+    lines = [
+        "| Character ID | Character Name | Expires In |",
+        "|--------------|----------------|------------|",
+    ]
     for character_id, token in character_tokens.items():
         if token.expires_in < 0:
             expires_in = "Expired"
         else:
             expires_in = f"{token.expires_in} seconds"
-        table += f"| {character_id} | {token.character_name} | {expires_in} |\n"
-    return table
+        lines.append(f"| {character_id} | {token.character_name} | {expires_in} |")
+    return "\n".join(lines)

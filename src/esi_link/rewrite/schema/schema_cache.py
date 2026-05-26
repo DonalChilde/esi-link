@@ -8,9 +8,7 @@ from pydantic import RootModel
 from whenever import Instant
 
 from esi_link.rewrite.schema.models import EsiSchema
-from esi_link.rewrite.schema.schema_tool import (
-    SchemaTool,
-)
+from esi_link.rewrite.schema.schema_tool import CompatibilityDates, SchemaTool
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -25,6 +23,10 @@ class CachedSchemaPath:
         """Check if the cached schema file is expired based on the provided TTL."""
         return Instant.now().timestamp() - self.timestamp > ttl
 
+    def expires_in(self, ttl: int) -> int:
+        """Return the number of seconds until the cached schema file expires, or a negative number if it is already expired."""
+        return ttl - (Instant.now().timestamp() - self.timestamp)
+
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class CachedSchema:
@@ -37,6 +39,10 @@ class CachedSchema:
     def is_expired(self, ttl: int) -> bool:
         """Check if the cached schema has expired based on the provided TTL."""
         return Instant.now().timestamp() - self.timestamp > ttl
+
+    def expires_in(self, ttl: int) -> int:
+        """Return the number of seconds until the cached schema expires, or a negative number if it is already expired."""
+        return ttl - (Instant.now().timestamp() - self.timestamp)
 
 
 CachedSchemaRoot = RootModel[CachedSchema]
@@ -95,7 +101,7 @@ class SchemaCache:
             )
         return cached_schemas
 
-    def _fetch_and_cache_schema(
+    def fetch_and_cache_schema(
         self, session: Client, compatibility_date: str
     ) -> CachedSchema:
         """Fetch the schema for the given compatibility date, cache it, and return the CachedSchema instance."""
@@ -115,7 +121,7 @@ class SchemaCache:
             f.write(CachedSchemaRoot(root=cached_schema).model_dump_json(indent=2))
         return cached_schema
 
-    def valid_compatibility_dates(self, session: Client) -> tuple[str, ...]:
+    def valid_compatibility_dates(self, session: Client) -> CompatibilityDates:
         """Return the valid compatibility dates, using the cache if possible."""
         compatibility_dates = self._schema_tool.fetch_compatibility_dates(session)
         return compatibility_dates
@@ -162,7 +168,7 @@ class SchemaCache:
                     self._cached_schemas[compatibility_date] = cached_schema
                     return cached_schema
         # If not in cache and not in cache directory, fetch it, cache it, and return it
-        cached_schema = self._fetch_and_cache_schema(session, compatibility_date)
+        cached_schema = self.fetch_and_cache_schema(session, compatibility_date)
         return cached_schema
 
     def list_cached_schemas(self) -> dict[str, CachedSchemaPath]:
@@ -192,3 +198,8 @@ class SchemaCache:
                 print(
                     f"Error deleting cached schema file {cached_schema_path.file_path}: {e}"
                 )
+
+    @property
+    def schema_ttl(self) -> int:
+        """Return the TTL for cached schemas in seconds."""
+        return self._schema_ttl

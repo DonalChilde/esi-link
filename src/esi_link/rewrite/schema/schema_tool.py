@@ -1,8 +1,11 @@
+"""Tools for fetching and processing ESI OpenAPI schemas, including caching compatibility dates and resolving internal references."""
+
 from dataclasses import dataclass
 from datetime import date
-from typing import Any, Self, cast
+from typing import Any, TypedDict
 
 from httpx2 import Client
+from pydantic import RootModel
 from whenever import Instant
 
 from esi_link.rewrite.helpers.eve_dates import latest_schema_date
@@ -10,6 +13,15 @@ from esi_link.rewrite.helpers.resolve_json_ref import resolve_internal_refs
 from esi_link.rewrite.settings import ESI_SCHEMA_URL
 
 COMPATIBILITY_DATES_URL = "https://esi.evetech.net/meta/compatibility-dates"
+
+
+class CompatibilityDates(TypedDict):
+    """Represents the structure of the compatibility dates response from the ESI endpoint."""
+
+    compatibility_dates: list[str]
+
+
+CompatibilityDatesRoot = RootModel[CompatibilityDates]
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -34,7 +46,7 @@ class ResolvedTimestampedSchema:
 class CachedCompatibilityDates:
     """Represents cached compatibility dates, including the list of dates and the timestamp of when they were fetched."""
 
-    compatibility_dates: tuple[str, ...]
+    compatibility_dates: CompatibilityDates
     fetch_timestamp: int
     """Seconds since the Unix epoch when the compatibility dates were fetched."""
 
@@ -42,20 +54,9 @@ class CachedCompatibilityDates:
         """Check if the cached compatibility dates have expired based on the provided TTL."""
         return Instant.now().timestamp() - self.fetch_timestamp > ttl
 
-    @classmethod
-    def from_dates(cls, dates: list[str], timestamp: int) -> Self:
-        """Create a CachedCompatibilityDates instance from a list of date strings and a timestamp."""
-        if not isinstance(dates, list):  # type: ignore
-            raise ValueError("Invalid response format for compatibility dates")
-        dates = cast(list[str], dates)  # type: ignore
-        for date_string in dates:
-            try:
-                date.fromisoformat(date_string)
-            except ValueError as e:
-                raise ValueError(
-                    f"Invalid date format in compatibility dates: {date_string}"
-                ) from e
-        return cls(compatibility_dates=tuple(dates), fetch_timestamp=timestamp)
+    def expires_in(self, ttl: int) -> int:
+        """Return the number of seconds until the cached compatibility dates expire, or a negative number if they are already expired."""
+        return ttl - (Instant.now().timestamp() - self.fetch_timestamp)
 
 
 class SchemaTool:
@@ -77,13 +78,13 @@ class SchemaTool:
             if date_string > latest_date:
                 return False
             possible_dates = self.fetch_compatibility_dates(session)
-            if date_string not in possible_dates:
+            if date_string not in possible_dates["compatibility_dates"]:
                 return False
             return True
         except ValueError:
             return False
 
-    def fetch_compatibility_dates(self, session: Client) -> tuple[str, ...]:
+    def fetch_compatibility_dates(self, session: Client) -> CompatibilityDates:
         """Fetch the compatibility dates from the ESI endpoint."""
         if self._cached_compatibility_dates is not None:
             ttl = self._compatibility_date_ttl
@@ -93,8 +94,9 @@ class SchemaTool:
         response.raise_for_status()
         dates = response.json()
         timestamp = Instant.now().timestamp()
-        self._cached_compatibility_dates = CachedCompatibilityDates.from_dates(
-            dates, timestamp
+        compatibility_dates = CompatibilityDatesRoot.model_validate(dates).root
+        self._cached_compatibility_dates = CachedCompatibilityDates(
+            compatibility_dates=compatibility_dates, fetch_timestamp=timestamp
         )
         return self._cached_compatibility_dates.compatibility_dates
 
