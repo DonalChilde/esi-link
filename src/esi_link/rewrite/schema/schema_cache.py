@@ -1,17 +1,15 @@
+"""Module for caching ESI schemas on disk and in memory, with support for expiration based on a TTL."""
+
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Self
 
 from httpx2 import Client
 from pydantic import RootModel
 from whenever import Instant
 
-from esi_link.cli import esi_schema
 from esi_link.rewrite.schema.models import EsiSchema
 from esi_link.rewrite.schema.schema_tool import (
-    ResolvedTimestampedSchema,
     SchemaTool,
-    TimestampedSchema,
 )
 
 
@@ -45,8 +43,13 @@ CachedSchemaRoot = RootModel[CachedSchema]
 
 
 class SchemaCache:
-    def __init__(self, cache_directory: Path, schema_ttl: int = 3600):
-        """Initialize the SchemaCache."""
+    def __init__(self, cache_directory: Path, schema_ttl: int = 2_592_000):
+        """Initialize the SchemaCache.
+
+        ttl of 2,592,000 seconds is 30 days, which is a reasonable default for caching
+        ESI schemas, as they are not updated frequently, and this allows for some leeway
+        in case of temporary issues with fetching the schema.
+        """
         self._cache_directory = cache_directory
         self._schema_tool = SchemaTool()
         self._schema_ttl = schema_ttl
@@ -112,11 +115,33 @@ class SchemaCache:
             f.write(CachedSchemaRoot(root=cached_schema).model_dump_json(indent=2))
         return cached_schema
 
+    def valid_compatibility_dates(self, session: Client) -> tuple[str, ...]:
+        """Return the valid compatibility dates, using the cache if possible."""
+        compatibility_dates = self._schema_tool.fetch_compatibility_dates(session)
+        return compatibility_dates
+
+    def get_latest_schema(self, session: Client) -> CachedSchema:
+        """Get the latest schema, using the cache if possible."""
+        compatibility_dates = self._schema_tool.fetch_compatibility_dates(session)
+        if not compatibility_dates:
+            raise ValueError("No compatibility dates available")
+        latest_compatibility_date = max(compatibility_dates)
+        cached_schema = self.get_schema(latest_compatibility_date, session)
+        if cached_schema is None:
+            raise ValueError(
+                f"Failed to fetch schema for compatibility date {latest_compatibility_date}"
+            )
+        return cached_schema
+
     def get_schema(
         self, compatibility_date: str, session: Client
     ) -> CachedSchema | None:
         """Get a cached schema for the given compatibility date, if it exists and is not expired."""
-        # First check if the schema is in the cache and not expired
+        # First check that the compatibility date is valid
+        compatibility_dates = self._schema_tool.fetch_compatibility_dates(session)
+        if compatibility_date not in compatibility_dates:
+            raise ValueError(f"Invalid compatibility date: {compatibility_date}")
+        # Then check if the schema is in the memory cache and not expired
         cached_schema = self._cached_schemas.get(compatibility_date)
         if cached_schema is not None:
             ttl = self._schema_ttl
