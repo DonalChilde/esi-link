@@ -96,10 +96,10 @@ class DiskCache(CacheManagerProtocol):
             url=new_http_response.url,
             headers=new_http_response.headers,
             body_text=data,
-            received_at=new_http_response.received_at,
+            received_timestamp=new_http_response.received_timestamp,
         )
         logger.info(
-            f"Refreshing cache for key {key} with new HTTP response received at {new_http_response.received_at}"
+            f"Refreshing cache for key {key} with new HTTP response received at {new_http_response.received_timestamp}"
         )
         return await self.set(key, updated_http_response)
 

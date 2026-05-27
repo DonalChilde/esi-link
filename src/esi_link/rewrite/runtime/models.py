@@ -238,7 +238,7 @@ class RuntimeResponse:
 class FailedRuntimeResponse:
     runtime_request: RuntimeRequest
     http_response: HttpResponse | None
-    failure_reason: str
+    exception_msg: str = ""
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

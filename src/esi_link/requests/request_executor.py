@@ -106,7 +106,7 @@ async def execute_http_request(
                 url=str(resp.real_url),
                 headers=dict(resp.headers),
                 body_text=content,
-                received_at=Instant.now().timestamp_nanos(),
+                received_timestamp=Instant.now().timestamp_nanos(),
             )
             return Response(
                 request=request.request,

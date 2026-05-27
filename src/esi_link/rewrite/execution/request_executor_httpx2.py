@@ -19,6 +19,7 @@ from esi_link.rewrite.cache.models import (
     CachedResponseStatus,
 )
 from esi_link.rewrite.execution.models import HttpResponse
+from esi_link.rewrite.helpers.timedelta_microseconds import in_microseconds
 from esi_link.rewrite.protocols.cache_manager import CacheManagerProtocol
 from esi_link.rewrite.runtime.models import (
     FailedRuntimeResponse,
@@ -73,7 +74,7 @@ async def execute_request_with_cache(
         response = await execute_http_request(request, session, rate_limiter)
         if isinstance(response, FailedRuntimeResponse):
             logger.error(
-                f"HTTP request failed, cache not updated for {request.path_url} with cache key {cache_key}: {response.failure_reason}"
+                f"HTTP request failed, cache not updated for {request.path_url} with cache key {cache_key}: {response.exception_msg}"
             )
             return response
         request.metrics.cache_action_started = Instant.now().timestamp_nanos()
@@ -94,7 +95,7 @@ async def execute_request_with_cache(
         response = await execute_http_request(request, session, rate_limiter)
         if isinstance(response, FailedRuntimeResponse):
             logger.error(
-                f"HTTP request failed when validating stale cache for {request.path_url} with cache key {cache_key}: {response.failure_reason}. Returning stale cached response with status code {cached_response.http_response.status_code}"
+                f"HTTP request failed when validating stale cache for {request.path_url} with cache key {cache_key}: {response.exception_msg}. Returning stale cached response with status code {cached_response.http_response.status_code}"
             )
             return response
         if response.http_response.status_code == 304:
@@ -146,6 +147,11 @@ async def execute_http_request(
 ) -> RuntimeResponse | FailedRuntimeResponse:
     """Execute the HTTP request with rate limiting."""
     request.metrics.primary_request_started = Instant.now().timestamp_nanos()
+    # We initialize the response data here so that if an exception is raised during the
+    # HTTP request, we can still return a FailedRuntimeResponse with whatever response
+    # data we were able to obtain.
+    response_data = None
+    response_text = ""
     async with rate_limiter:
         query_params = request.query_parameters | request.additional_query_parameters
         http_request = httpx2.Request(
@@ -155,28 +161,77 @@ async def execute_http_request(
             params=query_params,
             json=request.json_body,
         )
-        http_response = await session.send(http_request)
+        network_response = await session.send(http_request)
         logger.info(
-            f"Made HTTP request to {http_response.url} with method {request.method} and received status code {http_response.status_code}"
+            f"Made HTTP request to {network_response.url} with method {request.method} and received status code {network_response.status_code}"
         )
-        content = ""
-        response_data = None
+        response_text = network_response.text
+
         try:
+            headers = tuple(network_response.headers.items())
             response_data = HttpResponse(
-                status_code=http_response.status_code,
-                url=str(http_response.url),
-                headers=dict(http_response.headers),
-                body_text=http_response.text,
-                received_at=Instant.now().timestamp_nanos(),
+                status_code=network_response.status_code,
+                reason_phrase=network_response.reason_phrase,
+                url=str(network_response.url),
+                elapsed=in_microseconds(network_response.elapsed),
+                bytes_downloaded=len(network_response.content),
+                headers=headers,
+                text=response_text,
+                received_timestamp=Instant.now().timestamp_nanos(),
             )
             request.metrics.primary_request_completed = Instant.now().timestamp_nanos()
-            http_response.raise_for_status()
-        except httpx2.HTTPStatusError as e:
-            logger.error(f"HTTP request failed: {e} with response content: {content}")
+            code = response_data.status_code
+            match code:
+                case 200:
+                    # Successful response, we can proceed as normal
+                    logger.info(
+                        f"Received %s - %s for request %s.",
+                        response_data.status_code,
+                        response_data.reason_phrase,
+                        request.path_url,
+                    )
+                case 304:
+                    # Not Modified response, this is expected when validating stale cache responses, so we can proceed without logging an error
+                    logger.info(
+                        f"Received %s - %s for request %s.",
+                        response_data.status_code,
+                        response_data.reason_phrase,
+                        request.path_url,
+                    )
+                case code if 400 <= code < 600:
+                    # Client error response, log an error but still return the response data to the caller
+                    logger.error(
+                        f"Received %s - %s for request %s.",
+                        response_data.status_code,
+                        response_data.reason_phrase,
+                        request.path_url,
+                    )
+                    response = FailedRuntimeResponse(
+                        http_response=response_data,
+                        runtime_request=request,
+                    )
+                    return response
+
+                case _:
+                    # Unexpected status code, log an error but still return the response data to the caller to allow
+                    # for more robust handling of unexpected responses.
+                    logger.error(
+                        f"Received unexpected status code {code} for request {request.path_url}"
+                    )
+                    response = FailedRuntimeResponse(
+                        http_response=response_data,
+                        runtime_request=request,
+                    )
+                    return response
+
+        except Exception as e:
+            logger.error(
+                f"HTTP request failed: {e} with response content: {response_text}"
+            )
             response = FailedRuntimeResponse(
                 http_response=response_data,
                 runtime_request=request,
-                failure_reason=str(e),
+                exception_msg=str(e),
             )
             return response
         response = RuntimeResponse(
@@ -184,6 +239,8 @@ async def execute_http_request(
             runtime_request=request,
         )
         request.metrics.primary_request_completed = Instant.now().timestamp_nanos()
+        # TODO split the pagination logic out of this function and into a separate function to keep this function focused on just executing a single HTTP request, and then call that function here to handle pagination if needed. This will make the code cleaner and easier to maintain.
+        # TODO checking for pages should also be moved to a separate function to keep the code cleaner and more maintainable, and then we can call that function here to check for additional pages and fetch them if needed.
         additional_requests = await _check_for_additional_page_requests(response)
         if not additional_requests:
             return response
@@ -199,12 +256,12 @@ async def execute_http_request(
         for paged_response in additional_responses:
             if isinstance(paged_response, FailedRuntimeResponse):
                 logger.error(
-                    f"Failed to fetch additional page for request {request.path_url}: {paged_response.failure_reason}"
+                    f"Failed to fetch additional page for request {request.path_url}: {paged_response.exception_msg}"
                 )
                 return FailedRuntimeResponse(
                     http_response=response.http_response,
                     runtime_request=request,
-                    failure_reason=f"Failed to fetch additional page: {paged_response.failure_reason}",
+                    exception_msg=f"Failed to fetch additional page: {paged_response.exception_msg}",
                 )
         # At this point, we have successfully fetched all additional pages, so we
         # can combine the responses into a single response to return to the caller
@@ -219,7 +276,7 @@ async def execute_http_request(
             return FailedRuntimeResponse(
                 http_response=response.http_response,
                 runtime_request=request,
-                failure_reason=f"Invalid paged responses: {str(e)}",
+                exception_msg=f"Invalid paged responses: {str(e)}",
             )
 
         return combined_response
@@ -258,9 +315,9 @@ def _combine_paged_responses(
     """Combine the responses from multiple pages of data into a single response."""
     paged_strings = _collect_paged_response_strings(paged_responses)
     combined_string = _combine_paged_response_strings(
-        first_page.http_response.body_text, paged_strings
+        first_page.http_response.text, paged_strings
     )
-    updated_http_response = replace(first_page.http_response, body_text=combined_string)
+    updated_http_response = replace(first_page.http_response, text=combined_string)
     return replace(first_page, http_response=updated_http_response)
 
 
@@ -307,11 +364,11 @@ def _collect_paged_response_strings(
         page_num = paged_response.runtime_request.additional_query_parameters.get(
             "page", "unknown"
         )
-        if not paged_response.http_response.body_text:
+        if not paged_response.http_response.text:
             raise ValueError(
                 f"Cannot collect response string from a paged response with no body text: page {page_num}"
             )
-        response_strings.append(paged_response.http_response.body_text)
+        response_strings.append(paged_response.http_response.text)
     return response_strings
 
 
