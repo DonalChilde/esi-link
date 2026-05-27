@@ -3,16 +3,20 @@
 import asyncio
 from uuid import UUID
 
-import httpx2
 from aiolimiter import AsyncLimiter
 
 from esi_link import USER_AGENT
 from esi_link.rewrite.actions.response_action import do_response_action
-from esi_link.rewrite.httpx2.request_executor_httpx2 import execute_request_with_cache
+from esi_link.rewrite.execution.request_executor_httpx2 import (
+    execute_request_with_cache,
+)
+from esi_link.rewrite.helpers.http_client import (
+    config_async_http_client,
+    config_http_client,
+)
 from esi_link.rewrite.protocols.cache_manager import (
     CacheManagerProtocol,
 )
-from esi_link.rewrite.protocols.schema_manager import SchemaManagerProtocol
 from esi_link.rewrite.request.models import (
     Request,
     RequestGroup,
@@ -27,13 +31,17 @@ from esi_link.rewrite.runtime.models import (
 from esi_link.rewrite.runtime.runtime_request_factory import (
     generate_runtime_request,
 )
+from esi_link.rewrite.schema.schema_cache import SchemaCache
 from esi_link.rewrite.validation.models import FailedRequestValidation
 from esi_link.rewrite.validation.request_validation_factory import validate_requests
+
+# TODO refactor to use token store
+# TODO refactor web cache name.
 
 
 async def dispatch_requests(
     requests: dict[UUID, Request],
-    schema_manager: SchemaManagerProtocol,
+    schema_cache: SchemaCache,
     cache_manager: CacheManagerProtocol,
     authentication_headers: dict[int, dict[str, str]],
     requests_per: float = 100.0,
@@ -46,12 +54,14 @@ async def dispatch_requests(
     """Dispatch requests and return the responses."""
     if not requests:
         raise ValueError("Requests must contain at least one request.")
-
-    valid_requests, failed_request_validations = validate_requests(
-        requests=requests,
-        schema_manager=schema_manager,
-        authorized_characters=set(authentication_headers.keys()),
-    )
+    session = config_http_client()
+    with session:
+        valid_requests, failed_request_validations = validate_requests(
+            requests=requests,
+            schema_cache=schema_cache,
+            session=session,
+            authorized_characters=set(authentication_headers.keys()),
+        )
 
     runtime_requests: dict[UUID, RuntimeRequest] = {}
     for request_id, validated_request in valid_requests.items():
@@ -61,16 +71,16 @@ async def dispatch_requests(
             user_agent=USER_AGENT,
         )
         runtime_requests[request_id] = runtime_request
-
-    async with httpx2.AsyncClient() as session:
-        rate_limiter = AsyncLimiter(requests_per, time_period)
+    async_session = await config_async_http_client()
+    rate_limiter = AsyncLimiter(requests_per, time_period)
+    async with async_session:
 
         async def execute_with_actions(
             request: RuntimeRequest,
         ) -> RuntimeResponse | FailedRuntimeResponse:
             response = await execute_request_with_cache(
                 request=request,
-                session=session,
+                session=async_session,
                 cache_manager=cache_manager,
                 rate_limiter=rate_limiter,
             )
@@ -102,7 +112,7 @@ async def dispatch_requests(
 
 async def dispatch_request_group(
     request_group: RequestGroup,
-    schema_manager: SchemaManagerProtocol,
+    schema_cache: SchemaCache,
     cache_manager: CacheManagerProtocol,
     authentication_headers: dict[int, dict[str, str]],
     requests_per: float = 100.0,
@@ -114,7 +124,7 @@ async def dispatch_request_group(
 ]:
     responses, failed_validations, failed_responses = await dispatch_requests(
         requests=request_group.requests,
-        schema_manager=schema_manager,
+        schema_cache=schema_cache,
         cache_manager=cache_manager,
         authentication_headers=authentication_headers,
         requests_per=requests_per,
