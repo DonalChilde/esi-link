@@ -5,12 +5,14 @@ from dataclasses import replace
 from pathlib import Path
 from uuid import UUID
 
+from httpx2 import Client
+
 from esi_link.rewrite.helpers.save_text_file import save_text_file
-from esi_link.rewrite.protocols.schema_manager import SchemaManagerProtocol
 from esi_link.rewrite.request.models import Request, RequestGroup
 from esi_link.rewrite.schema.models import (
     EsiSchema,
 )
+from esi_link.rewrite.schema.schema_cache import SchemaCache
 from esi_link.rewrite.validation.models import (
     FailedRequestGroupValidation,
     FailedRequestValidation,
@@ -37,18 +39,23 @@ def _write_debug_file(
 
 def validate_request(
     request: Request,
-    schema_manager: SchemaManagerProtocol,
+    schema_cache: SchemaCache,
     authorized_characters: set[int],
+    session: Client,
     debug_path: Path | None = None,
 ) -> ValidatedRequest | FailedRequestValidation:
-    """Validates an individual request. If the request is valid, returns a ValidatedRequest. If the request is invalid, returns a FailedRequestValidation with the appropriate error messages."""
+    """Validates an individual request.
+
+    If the request is valid, returns a ValidatedRequest. If the request is invalid,
+    returns a FailedRequestValidation with the appropriate error messages.
+    """
     in_process: ValidatedRequest | FailedRequestValidation = ValidatedRequest(
         created_on=request.created_on,
         request_id=request.request_id,
         actions_after_response=request.actions_after_response,  # TODO move to validation step after we have the schema, so we can validate that the actions are valid for the requested operation_id
     )
     in_process = _validate_request_schema(
-        request, in_process, schema_manager=schema_manager
+        request, in_process, schema_cache=schema_cache, session=session
     )
     if isinstance(in_process, FailedRequestValidation):
         # If the schema validation failed, we don't need to do any further validation,
@@ -62,11 +69,11 @@ def validate_request(
         "compatibility_date should have been set in the schema validation step"
     )
     # Since the schema validation step passed, we know that the requested schema is
-    # available in the schema manager, so this should not raise a SchemaNotFoundError.
+    # available in the schema cache, so this should not raise a SchemaCacheError.
     # If it does, it's an unexpected error and we can just let it propagate.
-    schema = schema_manager.get_schema(
+    schema = schema_cache.get_schema(
         compatibility_date=in_process.compatibility_date,
-        at_or_after=in_process.at_or_after,
+        session=session,
     ).esi_schema
     in_process = _validate_operation_id(request, in_process, schema=schema)
     if isinstance(in_process, FailedRequestValidation):
@@ -81,8 +88,6 @@ def validate_request(
         request, in_process, schema=schema, authorized_characters=authorized_characters
     )
     in_process = _validate_language(request, in_process, schema=schema)
-    # in_process = _validate_request_directory_template(request, in_process)
-    # in_process = _validate_request_filename_template(request, in_process)
     in_process = _set_method(request, in_process, schema=schema)
     in_process = _set_url_template(request, in_process, schema=schema)
     in_process = _set_is_paged(request, in_process, schema=schema)
@@ -98,18 +103,24 @@ def validate_request(
 
 def validate_requests(
     requests: dict[UUID, Request],
-    schema_manager: SchemaManagerProtocol,
+    schema_cache: SchemaCache,
     authorized_characters: set[int],
+    session: Client,
     debug_path: Path | None = None,
 ) -> tuple[dict[UUID, ValidatedRequest], dict[UUID, FailedRequestValidation]]:
-    """Validates a group of requests. Returns a tuple containing a dictionary of the valid requests and a dictionary of the failed request validations."""
+    """Validates a group of requests.
+
+    Returns a tuple containing a dictionary of the valid requests and a dictionary of
+    the failed request validations.
+    """
     validated_requests: dict[UUID, ValidatedRequest] = {}
     failed_request_validations: dict[UUID, FailedRequestValidation] = {}
     for request_id, request in requests.items():
         validation_result = validate_request(
             request=request,
-            schema_manager=schema_manager,
+            schema_cache=schema_cache,
             authorized_characters=authorized_characters,
+            session=session,
             debug_path=debug_path,
         )
         if isinstance(validation_result, ValidatedRequest):
@@ -121,11 +132,16 @@ def validate_requests(
 
 def validate_request_group(
     request_group: RequestGroup,
-    schema_manager: SchemaManagerProtocol,
+    schema_cache: SchemaCache,
     *,
+    session: Client,
     authorized_characters: set[int],
 ) -> ValidatedRequestGroup | FailedRequestGroupValidation:
-    """Validates a request group and all of its individual requests. If the request group is valid, returns a ValidatedRequestGroup. If the request group is invalid, returns a FailedRequestGroupValidation with the appropriate error messages."""
+    """Validates a request group and all of its individual requests.
+
+    If the request group is valid, returns a ValidatedRequestGroup. If the request group
+    is invalid, returns a FailedRequestGroupValidation with the appropriate error messages.
+    """
     in_process: ValidatedRequestGroup | FailedRequestGroupValidation = (
         ValidatedRequestGroup(
             created_on=request_group.created_on,
@@ -142,8 +158,9 @@ def validate_request_group(
     for request_id, request in request_group.requests.items():
         validated_request_or_failure = validate_request(
             request=request,
-            schema_manager=schema_manager,
+            schema_cache=schema_cache,
             authorized_characters=authorized_characters,
+            session=session,
         )
         if isinstance(validated_request_or_failure, ValidatedRequest):
             in_process.requests[request_id] = validated_request_or_failure
@@ -156,171 +173,12 @@ def validate_request_group(
     return in_process
 
 
-# def _validate_group_directory_template(
-#     request_group: RequestGroup,
-#     inprocess_request_group: ValidatedRequestGroup | FailedRequestGroupValidation,
-# ) -> ValidatedRequestGroup | FailedRequestGroupValidation:
-#     """Validates the save_directory_template field of the request group, if applicable. If the template is invalid, returns a FailedRequestGroupValidation with the appropriate error message. If the template is valid, returns the inprocess_request_group unchanged."""
-#     if request_group.save_directory_template is not None:
-#         fail_msgs: list[str] = []
-#         # Validate that the template is a valid directory path template.
-#         # Because some of the variables that can be used in the template are not known
-#         # until execution time, we can't fully validate the template at this point. However,
-#         # we can validate that the template is a valid string template and that it only
-#         # uses the allowed variables.
-
-#         # TODO define this in a central place, probably the module that actually renders the template, and import it here.
-#         available_variables = {"group_id", "created_on"}
-#         template = Template(request_group.save_directory_template)
-#         identifiers = template.get_identifiers()
-#         fail_msgs: list[str] = []
-#         for identifier in identifiers:
-#             if identifier not in available_variables:
-#                 fail_msgs.append(
-#                     f"Invalid save_directory_template: invalid variable {identifier}"
-#                 )
-#         if fail_msgs:
-#             if isinstance(inprocess_request_group, FailedRequestGroupValidation):
-#                 fail_msgs = list(inprocess_request_group.errors) + fail_msgs
-#             return FailedRequestGroupValidation(
-#                 request_group=request_group,
-#                 errors=tuple(fail_msgs),
-#             )
-#     # Update validated fields.
-#     if isinstance(inprocess_request_group, ValidatedRequestGroup):
-#         inprocess_request_group = deepcopy(inprocess_request_group)
-#         inprocess_request_group = replace(
-#             inprocess_request_group,
-#             save_directory_template=request_group.save_directory_template,
-#         )
-#     return inprocess_request_group
-
-
-# def _validate_group_filename_template(
-#     request_group: RequestGroup,
-#     inprocess_request_group: ValidatedRequestGroup | FailedRequestGroupValidation,
-# ) -> ValidatedRequestGroup | FailedRequestGroupValidation:
-#     """Validates the save_filename_template field of the request group, if applicable. If the template is invalid, returns a FailedRequestGroupValidation with the appropriate error message. If the template is valid, returns the inprocess_request_group unchanged."""
-#     if request_group.save_filename_template is not None:
-#         fail_msgs: list[str] = []
-#         # Validate that the template is a valid filename template.
-#         # Because some of the variables that can be used in the template are not known
-#         # until execution time, we can't fully validate the template at this point. However,
-#         # we can validate that the template is a valid string template and that it only
-#         # uses the allowed variables.
-
-#         # TODO define this in a central place, probably the module that actually renders the template, and import it here.
-#         available_variables = {"group_id", "created_on"}
-#         template = Template(request_group.save_filename_template)
-#         identifiers = template.get_identifiers()
-#         fail_msgs: list[str] = []
-#         for identifier in identifiers:
-#             if identifier not in available_variables:
-#                 fail_msgs.append(
-#                     f"Invalid save_filename_template: invalid variable {identifier}"
-#                 )
-#         if fail_msgs:
-#             if isinstance(inprocess_request_group, FailedRequestGroupValidation):
-#                 fail_msgs = list(inprocess_request_group.errors) + fail_msgs
-#             return FailedRequestGroupValidation(
-#                 request_group=request_group,
-#                 errors=tuple(fail_msgs),
-#             )
-#     # Update validated fields.
-#     if isinstance(inprocess_request_group, ValidatedRequestGroup):
-#         inprocess_request_group = deepcopy(inprocess_request_group)
-#         inprocess_request_group = replace(
-#             inprocess_request_group,
-#             save_filename_template=request_group.save_filename_template,
-#         )
-#     return inprocess_request_group
-
-
-# def _validate_request_directory_template(
-#     request: Request,
-#     inprocess_request: ValidatedRequest | FailedRequestValidation,
-# ) -> ValidatedRequest | FailedRequestValidation:
-#     """Validates the save_directory_template field of the request, if applicable. If the template is invalid, returns a FailedRequestValidation with the appropriate error message. If the template is valid, returns the inprocess_request unchanged."""
-#     if request.save_directory_template is not None:
-#         fail_msgs: list[str] = []
-#         # Validate that the template is a valid directory path template.
-#         # Because some of the variables that can be used in the template are not known
-#         # until execution time, we can't fully validate the template at this point. However,
-#         # we can validate that the template is a valid string template and that it only
-#         # uses the allowed variables.
-
-#         # TODO define this in a central place, probably the module that actually renders the template, and import it here.
-#         available_variables = {"request_id", "created_on"}
-#         template = Template(request.save_directory_template)
-#         identifiers = template.get_identifiers()
-#         fail_msgs: list[str] = []
-#         for identifier in identifiers:
-#             if identifier not in available_variables:
-#                 fail_msgs.append(
-#                     f"Invalid save_directory_template: invalid variable {identifier}"
-#                 )
-#         if fail_msgs:
-#             if isinstance(inprocess_request, FailedRequestValidation):
-#                 fail_msgs = list(inprocess_request.errors) + fail_msgs
-#             return FailedRequestValidation(
-#                 request=request,
-#                 errors=tuple(fail_msgs),
-#             )
-#     # Update validated fields.
-#     if isinstance(inprocess_request, ValidatedRequest):
-#         inprocess_request = deepcopy(inprocess_request)
-#         inprocess_request = replace(
-#             inprocess_request,
-#             save_directory_template=request.save_directory_template,
-#         )
-#     return inprocess_request
-
-
-# def _validate_request_filename_template(
-#     request: Request,
-#     inprocess_request: ValidatedRequest | FailedRequestValidation,
-# ) -> ValidatedRequest | FailedRequestValidation:
-#     """Validates the save_filename_template field of the request, if applicable. If the template is invalid, returns a FailedRequestValidation with the appropriate error message. If the template is valid, returns the inprocess_request unchanged."""
-#     if request.save_filename_template is not None:
-#         fail_msgs: list[str] = []
-#         # Validate that the template is a valid filename template.
-#         # Because some of the variables that can be used in the template are not known
-#         # until execution time, we can't fully validate the template at this point. However,
-#         # we can validate that the template is a valid string template and that it only
-#         # uses the allowed variables.
-
-#         # TODO define this in a central place, probably the module that actually renders the template, and import it here.
-#         available_variables = {"request_id", "created_on"}
-#         template = Template(request.save_filename_template)
-#         identifiers = template.get_identifiers()
-#         fail_msgs: list[str] = []
-#         for identifier in identifiers:
-#             if identifier not in available_variables:
-#                 fail_msgs.append(
-#                     f"Invalid save_filename_template: invalid variable {identifier}"
-#                 )
-#         if fail_msgs:
-#             if isinstance(inprocess_request, FailedRequestValidation):
-#                 fail_msgs = list(inprocess_request.errors) + fail_msgs
-#             return FailedRequestValidation(
-#                 request=request,
-#                 errors=tuple(fail_msgs),
-#             )
-#     # Update validated fields.
-#     if isinstance(inprocess_request, ValidatedRequest):
-#         inprocess_request = deepcopy(inprocess_request)
-#         inprocess_request = replace(
-#             inprocess_request,
-#             save_filename_template=request.save_filename_template,
-#         )
-#     return inprocess_request
-
-
 def _validate_request_schema(
     request: Request,
     inprocess_request: ValidatedRequest | FailedRequestValidation,
     *,
-    schema_manager: SchemaManagerProtocol,
+    session: Client,
+    schema_cache: SchemaCache,
 ) -> ValidatedRequest | FailedRequestValidation:
     """Validates that the requested schema is available in the schema manager.
 
@@ -329,33 +187,15 @@ def _validate_request_schema(
     validation. If the requested schema is not available, returns a FailedRequestValidation
     with the appropriate error message.
     """
-    available_schemas = schema_manager.available_schemas()
-    if request.compatibility_date is None and request.at_or_after is None:
-        # If no compatibility date or timestamp is provided, we can assume the latest
-        # schema will be used, so we can just check that a schema is available.
-        if not available_schemas:
-            fail_msg = "No schemas are available in the schema manager."
-            if isinstance(inprocess_request, FailedRequestValidation):
-                fail_msgs = list(inprocess_request.errors) + [fail_msg]
-            else:
-                fail_msgs = [fail_msg]
-            return FailedRequestValidation(
-                request=request,
-                errors=tuple(fail_msgs),
-            )
-        return inprocess_request
+    # rewrite using schema cache instead of schema manager.
+    # if compatibility date is provided, check that it is a valid compatibility date, and that its schema is available.
+    # if no compatibility date is provided, we can assume the latest schema will be used, check that it is available.
 
+    valid_compatibility_dates = schema_cache.valid_compatibility_dates(session=session)
     if request.compatibility_date is not None:
-        # If a compatibility date is provided, we need to check that there is a schema
-        # with that compatibility date, and if a timestamp is also provided, that there
-        # is a schema with that compatibility date and a timestamp at or after the provided timestamp.
-        filtered_schemas = [
-            schema_info
-            for schema_info in available_schemas
-            if schema_info.compatibility_date == request.compatibility_date
-        ]
-        if not filtered_schemas:
-            fail_msg = f"Requested schema with compatibility date {request.compatibility_date} is not available."
+        # See if the requested compatibility date is in the list of valid compatibility dates.
+        if request.compatibility_date not in valid_compatibility_dates:
+            fail_msg = f"Requested compatibility date {request.compatibility_date} is not valid. Valid compatibility dates are: {', '.join(valid_compatibility_dates)}."
             if isinstance(inprocess_request, FailedRequestValidation):
                 fail_msgs = list(inprocess_request.errors) + [fail_msg]
             else:
@@ -364,14 +204,16 @@ def _validate_request_schema(
                 request=request,
                 errors=tuple(fail_msgs),
             )
-        if request.at_or_after is not None:
-            filtered_schemas = [
-                schema_info
-                for schema_info in filtered_schemas
-                if schema_info.timestamp >= request.at_or_after
-            ]
-            if not filtered_schemas:
-                fail_msg = f"Requested schema with compatibility date {request.compatibility_date} and timestamp after {request.at_or_after} is not available."
+        else:
+            # If the requested compatibility date is valid, we can check that the schema
+            # for that compatibility date is available in the schema cache.
+            try:
+                _requested_schema = schema_cache.get_schema(
+                    session=session,
+                    compatibility_date=request.compatibility_date,
+                )
+            except Exception as e:
+                fail_msg = f"Error while trying to get the requested schema from the schema cache: {str(e)}"
                 if isinstance(inprocess_request, FailedRequestValidation):
                     fail_msgs = list(inprocess_request.errors) + [fail_msg]
                 else:
@@ -380,9 +222,12 @@ def _validate_request_schema(
                     request=request,
                     errors=tuple(fail_msgs),
                 )
-    if request.compatibility_date is None and request.at_or_after is not None:
-        # invalid combination of parameters - after is provided without a compatibility date, so we don't know which schema to check for the timestamp against. We can fail this validation because it's an invalid request.
-        fail_msg = f"Invalid request: 'after' parameter provided without a compatibility date, so we don't know which schema to check for the timestamp against."
+    # No compatibility date was provided, so we can assume the latest schema will be used.
+    # Check that the latest schema is available in the schema cache.
+    try:
+        _latest_schema = schema_cache.get_latest_schema(session=session)
+    except Exception as e:
+        fail_msg = f"Error while trying to get the latest schema from the schema cache: {str(e)}"
         if isinstance(inprocess_request, FailedRequestValidation):
             fail_msgs = list(inprocess_request.errors) + [fail_msg]
         else:
@@ -391,13 +236,13 @@ def _validate_request_schema(
             request=request,
             errors=tuple(fail_msgs),
         )
+    # compatibility date is valid and the requested schema is available.
     # Update validated fields.
     if isinstance(inprocess_request, ValidatedRequest):
         inprocess_request = deepcopy(inprocess_request)
         inprocess_request = replace(
             inprocess_request,
             compatibility_date=request.compatibility_date,
-            after=request.at_or_after,
         )
     return inprocess_request
 
