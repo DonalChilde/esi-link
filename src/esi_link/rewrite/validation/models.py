@@ -1,3 +1,5 @@
+"""Validation Models for ESI requests and request groups."""
+
 from dataclasses import dataclass, field
 from typing import Any, Literal
 from uuid import UUID, uuid4
