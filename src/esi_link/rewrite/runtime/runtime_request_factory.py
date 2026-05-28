@@ -106,6 +106,8 @@ def _set_cache_url(
         # and just return the inprocess_request.
         return deepcopy(inprocess_request)
     path_url = inprocess_request.path_url
+    # NOTE: the `page` query parameter is removed during validation since pagination is
+    # handled separately in the runtime logic, so we don't need to worry about it here.
     query_parameters = inprocess_request.query_parameters or {}
     cache_url = combine_and_canonicalize_url(path_url, query_parameters)
     # Update the inprocess_request with the generated cache_url
@@ -137,7 +139,7 @@ def _set_headers(
     """Sets the headers field of the RuntimeRequest based on the authentication requirements of the request and the provided authorization headers."""
     headers: dict[str, str] = {}
     if inprocess_request.is_authentication_required:
-        if not inprocess_request.authorization_id:
+        if inprocess_request.authorization_id is None:
             raise ValueError(
                 "Request requires authentication but no authorization_id is provided in the request."
             )
@@ -161,10 +163,14 @@ def _set_headers(
 def _set_additional_query_parameters(
     inprocess_request: RuntimeRequest,
 ) -> RuntimeRequest:
-    query_params = deepcopy(inprocess_request.query_parameters) or {}
+    additional_query_params = (
+        deepcopy(inprocess_request.additional_query_parameters) or {}
+    )
     if inprocess_request.is_paged:
-        query_params["page"] = 1
+        additional_query_params["page"] = 1
     # Update the inprocess_request with the generated query parameters
     inprocess_request = deepcopy(inprocess_request)
-    inprocess_request = replace(inprocess_request, query_parameters=query_params)
+    inprocess_request = replace(
+        inprocess_request, additional_query_parameters=additional_query_params
+    )
     return inprocess_request

@@ -22,7 +22,9 @@ from esi_link.rewrite.execution.models import HttpResponse
 from esi_link.rewrite.helpers.timedelta_microseconds import in_microseconds
 from esi_link.rewrite.protocols.cache_manager import CacheManagerProtocol
 from esi_link.rewrite.runtime.models import (
+    CachedResponseMetrics,
     FailedRuntimeResponse,
+    PagedResponseMetrics,
     RuntimeRequest,
     RuntimeResponse,
 )
@@ -47,103 +49,101 @@ def _update_stale_cache_headers(
     return replace(request, headers=updated_headers)
 
 
-async def execute_request_with_cache(
-    request: RuntimeRequest,
-    session: httpx2.AsyncClient,
-    rate_limiter: AsyncLimiter,
-    cache_manager: CacheManagerProtocol,
-) -> RuntimeResponse | FailedRuntimeResponse:
-    """Execute the HTTP request with caching and rate limiting."""
-    cache_key = request.cache_key
-    request.metrics.cache_check_started = Instant.now().timestamp_nanos()
-    if cache_key is None:
-        # No cache key means this request is not cacheable, so we execute it directly without checking the cache
-        logger.info(
-            f"No cache key for request {request.path_url}, executing without cache"
-        )
-        request.metrics.cache_check_completed = Instant.now().timestamp_nanos()
-        return await execute_http_request(request, session, rate_limiter)
-    cached_response = await cache_manager.get(cache_key)
-    request.metrics.cache_check_completed = Instant.now().timestamp_nanos()
-    if cached_response is None:
-        # Cache miss - no cached response found for this cache key
-        request.metrics.cache_response_status = CachedResponseStatus.MISS
-        logger.info(
-            f"Cache miss (not found) for request {request.path_url} with cache key {cache_key}"
-        )
-        response = await execute_http_request(request, session, rate_limiter)
-        if isinstance(response, FailedRuntimeResponse):
-            logger.error(
-                f"HTTP request failed, cache not updated for {request.path_url} with cache key {cache_key}: {response.exception_msg}"
-            )
-            return response
-        request.metrics.cache_action_started = Instant.now().timestamp_nanos()
-        request.metrics.cache_action = CacheAction.ADDED_TO_CACHE
-        await cache_manager.set(cache_key, response.http_response)
-        request.metrics.cache_action_completed = Instant.now().timestamp_nanos()
-        logger.info(
-            f"Cached response for request {response.http_response.url} with cache key {cache_key}, expires at {response.http_response.expires_at}"
-        )
-        return response
-    if cached_response.is_expired:
-        # Cache miss - cached response is expired
-        logger.info(
-            f"Cache miss (stale) for request {cached_response.http_response.url} with cache key {cache_key}"
-        )
-        request = _update_stale_cache_headers(request, cached_response)
-        request.metrics.cache_response_status = CachedResponseStatus.STALE
-        response = await execute_http_request(request, session, rate_limiter)
-        if isinstance(response, FailedRuntimeResponse):
-            logger.error(
-                f"HTTP request failed when validating stale cache for {request.path_url} with cache key {cache_key}: {response.exception_msg}. Returning stale cached response with status code {cached_response.http_response.status_code}"
-            )
-            return response
-        if response.http_response.status_code == 304:
-            # Cached response is still valid, refresh the cache with the new response data and return the cached response
-            request.metrics.cache_action_started = Instant.now().timestamp_nanos()
-            request.metrics.cache_action = CacheAction.CACHE_304_REFRESH
-            cached_response = await cache_manager.refresh(
-                cache_key, response.http_response
-            )
-            request.metrics.cache_action_completed = Instant.now().timestamp_nanos()
-            logger.info(
-                f"Refreshed cache for request {response.http_response.url} with new response, expires at {cached_response.expires_at}"
-            )
-            return RuntimeResponse(
-                http_response=cached_response.http_response,
-                runtime_request=request,
-            )
-        elif response.http_response.status_code == 200:
-            # We got a new valid response, so we update the cache with the new response and return it
-            request.metrics.cache_action_started = Instant.now().timestamp_nanos()
-            request.metrics.cache_action = CacheAction.ADDED_TO_CACHE
-            cached_response = await cache_manager.set(cache_key, response.http_response)
-            request.metrics.cache_action_completed = Instant.now().timestamp_nanos()
-            logger.info(
-                f"Updated cache for request {response.http_response.url} with new response, expires at {cached_response.expires_at}"
-            )
-            return response
-        else:
-            logger.warning(
-                f"Received unexpected status code {response.http_response.status_code} for request {response.http_response.url} when validating stale cache, returning cached response with status code {cached_response.http_response.status_code}"
-            )
-            return response
-    else:
-        # Cache hit - cached response is valid
-        logger.info(
-            f"Cache hit for request {cached_response.http_response.url} with cache key {cache_key}"
-        )
-        request.metrics.cache_response_status = CachedResponseStatus.HIT
-        return RuntimeResponse(
-            http_response=cached_response.http_response,
-            runtime_request=request,
-        )
+# async def execute_request_with_cache(
+#     request: RuntimeRequest,
+#     session: httpx2.AsyncClient,
+#     rate_limiter: AsyncLimiter,
+#     cache_manager: CacheManagerProtocol,
+# ) -> RuntimeResponse | FailedRuntimeResponse:
+#     """Execute the HTTP request with caching and rate limiting."""
+#     cache_key = request.cache_key
+#     request.metrics.cache_check_started = Instant.now().timestamp_nanos()
+#     if cache_key is None:
+#         # No cache key means this request is not cacheable, so we execute it directly without checking the cache
+#         logger.info(
+#             f"No cache key for request {request.path_url}, executing without cache"
+#         )
+#         request.metrics.cache_check_completed = Instant.now().timestamp_nanos()
+#         return await execute_http_request(request, session, rate_limiter)
+#     cached_response = await cache_manager.get(cache_key)
+#     request.metrics.cache_check_completed = Instant.now().timestamp_nanos()
+#     if cached_response is None:
+#         # Cache miss - no cached response found for this cache key
+#         request.metrics.cache_status = CachedResponseStatus.MISS
+#         logger.info(
+#             f"Cache miss (not found) for request {request.path_url} with cache key {cache_key}"
+#         )
+#         response = await execute_http_request(request, session, rate_limiter)
+#         if isinstance(response, FailedRuntimeResponse):
+#             logger.error(
+#                 f"HTTP request failed, cache not updated for {request.path_url} with cache key {cache_key}: {response.failure_msg}"
+#             )
+#             return response
+#         request.metrics.cache_action_started = Instant.now().timestamp_nanos()
+#         request.metrics.cache_action = CacheAction.ADDED_TO_CACHE
+#         await cache_manager.set(cache_key, response.http_response)
+#         request.metrics.cache_action_completed = Instant.now().timestamp_nanos()
+#         logger.info(
+#             f"Cached response for request {response.http_response.url} with cache key {cache_key}, expires at {response.http_response.expires_at}"
+#         )
+#         return response
+#     if cached_response.is_expired:
+#         # Cache miss - cached response is expired
+#         logger.info(
+#             f"Cache miss (stale) for request {cached_response.http_response.url} with cache key {cache_key}"
+#         )
+#         request = _update_stale_cache_headers(request, cached_response)
+#         request.metrics.cache_status = CachedResponseStatus.STALE
+#         response = await execute_http_request(request, session, rate_limiter)
+#         if isinstance(response, FailedRuntimeResponse):
+#             logger.error(
+#                 f"HTTP request failed when validating stale cache for {request.path_url} with cache key {cache_key}: {response.failure_msg}. Returning stale cached response with status code {cached_response.http_response.status_code}"
+#             )
+#             return response
+#         if response.http_response.status_code == 304:
+#             # Cached response is still valid, refresh the cache with the new response data and return the cached response
+#             request.metrics.cache_action_started = Instant.now().timestamp_nanos()
+#             request.metrics.cache_action = CacheAction.CACHE_304_REFRESH
+#             cached_response = await cache_manager.refresh(
+#                 cache_key, response.http_response
+#             )
+#             request.metrics.cache_action_completed = Instant.now().timestamp_nanos()
+#             logger.info(
+#                 f"Refreshed cache for request {response.http_response.url} with new response, expires at {cached_response.expires_at}"
+#             )
+#             return RuntimeResponse(
+#                 http_response=cached_response.http_response,
+#                 runtime_request=request,
+#             )
+#         elif response.http_response.status_code == 200:
+#             # We got a new valid response, so we update the cache with the new response and return it
+#             request.metrics.cache_action_started = Instant.now().timestamp_nanos()
+#             request.metrics.cache_action = CacheAction.ADDED_TO_CACHE
+#             cached_response = await cache_manager.set(cache_key, response.http_response)
+#             request.metrics.cache_action_completed = Instant.now().timestamp_nanos()
+#             logger.info(
+#                 f"Updated cache for request {response.http_response.url} with new response, expires at {cached_response.expires_at}"
+#             )
+#             return response
+#         else:
+#             logger.warning(
+#                 f"Received unexpected status code {response.http_response.status_code} for request {response.http_response.url} when validating stale cache, returning cached response with status code {cached_response.http_response.status_code}"
+#             )
+#             return response
+#     else:
+#         # Cache hit - cached response is valid
+#         logger.info(
+#             f"Cache hit for request {cached_response.http_response.url} with cache key {cache_key}"
+#         )
+#         request.metrics.cache_status = CachedResponseStatus.HIT
+#         return RuntimeResponse(
+#             http_response=cached_response.http_response,
+#             runtime_request=request,
+#         )
 
 
-async def execute_http_request(
-    request: RuntimeRequest,
-    session: httpx2.AsyncClient,
-    rate_limiter: AsyncLimiter,
+async def _make_http_request(
+    request: RuntimeRequest, session: httpx2.AsyncClient, rate_limiter: AsyncLimiter
 ) -> RuntimeResponse | FailedRuntimeResponse:
     """Execute the HTTP request with rate limiting."""
     request.metrics.primary_request_started = Instant.now().timestamp_nanos()
@@ -161,13 +161,13 @@ async def execute_http_request(
             params=query_params,
             json=request.json_body,
         )
-        network_response = await session.send(http_request)
-        logger.info(
-            f"Made HTTP request to {network_response.url} with method {request.method} and received status code {network_response.status_code}"
-        )
-        response_text = network_response.text
 
         try:
+            network_response = await session.send(http_request)
+            logger.info(
+                f"Made HTTP request to {network_response.url} with method {request.method} and received status code {network_response.status_code}"
+            )
+            response_text = network_response.text
             headers = tuple(network_response.headers.items())
             response_data = HttpResponse(
                 status_code=network_response.status_code,
@@ -180,49 +180,6 @@ async def execute_http_request(
                 received_timestamp=Instant.now().timestamp_nanos(),
             )
             request.metrics.primary_request_completed = Instant.now().timestamp_nanos()
-            code = response_data.status_code
-            match code:
-                case 200:
-                    # Successful response, we can proceed as normal
-                    logger.info(
-                        f"Received %s - %s for request %s.",
-                        response_data.status_code,
-                        response_data.reason_phrase,
-                        request.path_url,
-                    )
-                case 304:
-                    # Not Modified response, this is expected when validating stale cache responses, so we can proceed without logging an error
-                    logger.info(
-                        f"Received %s - %s for request %s.",
-                        response_data.status_code,
-                        response_data.reason_phrase,
-                        request.path_url,
-                    )
-                case code if 400 <= code < 600:
-                    # Client error response, log an error but still return the response data to the caller
-                    logger.error(
-                        f"Received %s - %s for request %s.",
-                        response_data.status_code,
-                        response_data.reason_phrase,
-                        request.path_url,
-                    )
-                    response = FailedRuntimeResponse(
-                        http_response=response_data,
-                        runtime_request=request,
-                    )
-                    return response
-
-                case _:
-                    # Unexpected status code, log an error but still return the response data to the caller to allow
-                    # for more robust handling of unexpected responses.
-                    logger.error(
-                        f"Received unexpected status code {code} for request {request.path_url}"
-                    )
-                    response = FailedRuntimeResponse(
-                        http_response=response_data,
-                        runtime_request=request,
-                    )
-                    return response
 
         except Exception as e:
             logger.error(
@@ -231,55 +188,412 @@ async def execute_http_request(
             response = FailedRuntimeResponse(
                 http_response=response_data,
                 runtime_request=request,
-                exception_msg=str(e),
+                failure_msg=str(e),
             )
             return response
         response = RuntimeResponse(
             http_response=response_data,
             runtime_request=request,
         )
-        request.metrics.primary_request_completed = Instant.now().timestamp_nanos()
-        # TODO split the pagination logic out of this function and into a separate function to keep this function focused on just executing a single HTTP request, and then call that function here to handle pagination if needed. This will make the code cleaner and easier to maintain.
-        # TODO checking for pages should also be moved to a separate function to keep the code cleaner and more maintainable, and then we can call that function here to check for additional pages and fetch them if needed.
-        additional_requests = await _check_for_additional_page_requests(response)
-        if not additional_requests:
+        return response
+
+
+def _fail_on_client_server_errors(
+    response: RuntimeResponse | FailedRuntimeResponse,
+) -> RuntimeResponse | FailedRuntimeResponse:
+    """Evaluate the HTTP status code of the response.
+
+    This is a first pass detection of a failed HTTP response based on the status code.
+    The calling functions are responsible for further narrowing of successful responses.
+
+    We consider any 2xx or 3xx status code to be a successful response, and any 4xx or
+    5xx status code to be a failed response. This is because some ESI endpoints return
+    3xx status codes for valid responses, and we want to allow those to be treated as
+    successful responses. However, we still want to log an error for any 4xx or 5xx
+    status codes, and return a FailedRuntimeResponse to the caller so that they can
+    handle it appropriately.
+
+    """
+    if isinstance(response, FailedRuntimeResponse):
+        return response
+    code = response.http_response.status_code
+    match code:
+        case code if 200 <= code < 300:
+            # Successful response, we can proceed as normal
             return response
-        request.metrics.paged_requests_start = Instant.now().timestamp_nanos()
-        request.metrics.additional_pages_count = len(additional_requests)
-        additional_responses = await asyncio.gather(
-            *[
-                execute_http_request(req, session, rate_limiter)
-                for req in additional_requests
-            ]
-        )
-        request.metrics.paged_requests_completed = Instant.now().timestamp_nanos()
-        for paged_response in additional_responses:
-            if isinstance(paged_response, FailedRuntimeResponse):
-                logger.error(
-                    f"Failed to fetch additional page for request {request.path_url}: {paged_response.exception_msg}"
-                )
-                return FailedRuntimeResponse(
-                    http_response=response.http_response,
-                    runtime_request=request,
-                    exception_msg=f"Failed to fetch additional page: {paged_response.exception_msg}",
-                )
-        # At this point, we have successfully fetched all additional pages, so we
-        # can combine the responses into a single response to return to the caller
-        additional_responses = cast(list[RuntimeResponse], additional_responses)
-        try:
-            _check_for_valid_paged_responses(response, additional_responses)
-            combined_response = _combine_paged_responses(response, additional_responses)
-        except Exception as e:
+        case code if 300 <= code < 400:
+            # Successful response, we can proceed as normal.
+            return response
+        case code if 400 <= code < 600:
+            # Client error response, log an error but still return the response data to the caller
             logger.error(
-                f"Invalid paged responses for request {request.path_url}: {str(e)}"
+                "Received %s - %s for request %s.",
+                response.http_response.status_code,
+                response.http_response.reason_phrase,
+                response.http_response.url,
+            )
+            return FailedRuntimeResponse(
+                http_response=response.http_response,
+                runtime_request=response.runtime_request,
+            )
+        case _:
+            logger.error(
+                "Received unexpected status code %s for request %s",
+                response.http_response.status_code,
+                response.http_response.url,
+            )
+            return FailedRuntimeResponse(
+                http_response=response.http_response,
+                runtime_request=response.runtime_request,
+                failure_msg=f"Received unexpected status code {code}",
+            )
+
+
+async def _check_for_additional_pages_and_fetch(
+    response: RuntimeResponse, session: httpx2.AsyncClient, rate_limiter: AsyncLimiter
+) -> RuntimeResponse | FailedRuntimeResponse:
+    """Check if the response indicates that there are additional pages of data to fetch, and if so, fetch them and combine them into a single response."""
+    additional_requests = await _check_for_additional_page_requests(response)
+    if not additional_requests:
+        return response
+    request = response.runtime_request
+    paged_metrics = PagedResponseMetrics(
+        additional_pages_count=len(additional_requests)
+    )
+    request.metrics.paged_responses_metrics = paged_metrics
+    paged_metrics.paged_requests_start = Instant.now().timestamp_nanos()
+
+    additional_responses = await asyncio.gather(
+        *[_make_http_request(req, session, rate_limiter) for req in additional_requests]
+    )
+    paged_metrics.paged_requests_completed = Instant.now().timestamp_nanos()
+    for paged_response in additional_responses:
+        if isinstance(paged_response, FailedRuntimeResponse):
+            logger.error(
+                f"Failed to fetch additional page for request {request.path_url}: {paged_response.failure_msg}"
             )
             return FailedRuntimeResponse(
                 http_response=response.http_response,
                 runtime_request=request,
-                exception_msg=f"Invalid paged responses: {str(e)}",
+                failure_msg=f"Failed to fetch additional page: {paged_response.failure_msg}",
             )
+    # At this point, we have successfully fetched all additional pages, so we
+    # can combine the responses into a single response to return to the caller
+    additional_responses = cast(list[RuntimeResponse], additional_responses)
+    try:
+        _check_for_valid_paged_responses(response, additional_responses)
+        combined_response = _combine_paged_responses(response, additional_responses)
+    except Exception as e:
+        logger.error(
+            "Invalid paged responses for request url %s: %s",
+            request.path_url,
+            e,
+        )
+        return FailedRuntimeResponse(
+            http_response=response.http_response,
+            runtime_request=request,
+            failure_msg=f"Invalid paged responses: {str(e)}",
+        )
 
-        return combined_response
+    return combined_response
+
+
+async def execute_http_request(
+    request: RuntimeRequest,
+    session: httpx2.AsyncClient,
+    rate_limiter: AsyncLimiter,
+    cache_manager: CacheManagerProtocol | None,
+) -> RuntimeResponse | FailedRuntimeResponse:
+    """Execute the HTTP request with rate limiting and optional caching.
+
+    Args:
+        request: The RuntimeRequest to execute.
+        session: The httpx2.AsyncClient to use for making the HTTP request.
+        rate_limiter: The AsyncLimiter to use for rate limiting the HTTP request.
+        cache_manager: The CacheManagerProtocol to use for caching the HTTP response.
+            If None, caching will be disabled and the request will be executed directly
+            without checking the cache.
+
+    Returns:
+        A RuntimeResponse if the request was successful, or a FailedRuntimeResponse if the
+        request failed.
+    """
+    if cache_manager is None:
+        response = await _fetch_response(request, session, rate_limiter)
+        return response
+    if request.cache_key is not None:
+        response = await _fetch_response_with_cache(
+            request, session, rate_limiter, cache_manager
+        )
+    else:
+        response = await _fetch_response(request, session, rate_limiter)
+    return response
+
+
+async def _fetch_response(
+    request: RuntimeRequest, session: httpx2.AsyncClient, rate_limiter: AsyncLimiter
+) -> RuntimeResponse | FailedRuntimeResponse:
+    """Execute the HTTP request with rate limiting, including handling of paged responses."""
+    response = await _make_http_request(request, session, rate_limiter)
+    response = _fail_on_client_server_errors(response)
+    if isinstance(response, FailedRuntimeResponse):
+        return response
+    if response.http_response.status_code == 200 and request.is_paged:
+        # only 200 responses should be considered valid for pagination.
+        response = await _check_for_additional_pages_and_fetch(
+            response, session, rate_limiter
+        )
+    return response
+
+
+async def _fetch_response_with_cache(
+    request: RuntimeRequest,
+    session: httpx2.AsyncClient,
+    rate_limiter: AsyncLimiter,
+    cache_manager: CacheManagerProtocol,
+) -> RuntimeResponse | FailedRuntimeResponse:
+    cache_key = request.cache_key
+    if cache_key is None:
+        raise ValueError(
+            f"Cache key is None for request {request.path_url}, cannot execute with cache"
+        )
+    metrics = CachedResponseMetrics()
+    request.metrics.cached_response_metrics = metrics
+
+    # Check the cache for a cached response for this request
+    metrics.cache_check_started = Instant.now().timestamp_nanos()
+    cached_response = await cache_manager.get(cache_key)
+    metrics.cache_check_completed = Instant.now().timestamp_nanos()
+
+    if cached_response is None:
+        # Cache miss - no cached response found for this cache key
+        request.metrics.cache_status = CachedResponseStatus.MISS
+        logger.info(
+            "Cache miss (not found) for request %s with cache key %s",
+            request.path_url,
+            cache_key,
+        )
+        response = await _fetch_response(request, session, rate_limiter)
+        if isinstance(response, FailedRuntimeResponse):
+            logger.error(
+                f"HTTP request failed, cache not updated for {request.path_url} with cache key {cache_key}: {response.failure_msg}"
+            )
+            return response
+        metrics.cache_action_started = Instant.now().timestamp_nanos()
+        request.metrics.cache_action = CacheAction.ADDED_TO_CACHE
+        await cache_manager.set(cache_key, response.http_response)
+        metrics.cache_action_completed = Instant.now().timestamp_nanos()
+        logger.info(
+            f"Cached response for request {response.http_response.url} with cache key {cache_key}, expires at {response.http_response.expires_at}"
+        )
+        return response
+
+    if cached_response.is_expired:
+        # Cache miss - cached response is expired
+        logger.info(
+            f"Cache miss (stale) for request {cached_response.http_response.url} with "
+            f"cache key {cache_key}"
+        )
+        request = _update_stale_cache_headers(request, cached_response)
+        request.metrics.cache_status = CachedResponseStatus.STALE
+        response = await _fetch_response(request, session, rate_limiter)
+        if isinstance(response, FailedRuntimeResponse):
+            logger.error(
+                f"HTTP request failed when validating stale cache for {request.path_url} "
+                f"with cache key {cache_key}: {response.failure_msg}."
+            )
+            return response
+        if response.http_response.status_code == 304:
+            # Cached response is still valid, refresh the cache with the new response data and return the cached response
+            metrics.cache_action_started = Instant.now().timestamp_nanos()
+            request.metrics.cache_action = CacheAction.CACHE_304_REFRESH
+            cached_response = await cache_manager.refresh(
+                cache_key, response.http_response
+            )
+            metrics.cache_action_completed = Instant.now().timestamp_nanos()
+            logger.info(
+                "Refreshed cache for request %s with new response, expires at %s",
+                response.http_response.url,
+                cached_response.expires_at,
+            )
+            return RuntimeResponse(
+                http_response=cached_response.http_response,
+                runtime_request=request,
+            )
+        elif response.http_response.status_code == 200:
+            # We got a new valid response, so we update the cache with the new response and return it
+            metrics.cache_action_started = Instant.now().timestamp_nanos()
+            request.metrics.cache_action = CacheAction.ADDED_TO_CACHE
+            cached_response = await cache_manager.set(cache_key, response.http_response)
+            metrics.cache_action_completed = Instant.now().timestamp_nanos()
+            logger.info(
+                f"Updated cache for request {response.http_response.url} with new response, expires at {cached_response.expires_at}"
+            )
+            return response
+        else:
+            logger.warning(
+                "Received unexpected status code %s for request %s when validating stale cache.",
+                response.http_response.status_code,
+                response.http_response.url,
+            )
+            return FailedRuntimeResponse(
+                runtime_request=request,
+                http_response=response.http_response,
+                failure_msg=f"Received unexpected status code {response.http_response.status_code} for request "
+                f"{response.http_response.url} when validating stale cache.",
+            )
+    else:
+        # Cache hit - cached response is valid
+        logger.info(
+            f"Cache hit for request {cached_response.http_response.url} with cache key {cache_key}"
+        )
+        request.metrics.cache_status = CachedResponseStatus.HIT
+        return RuntimeResponse(
+            http_response=cached_response.http_response,
+            runtime_request=request,
+        )
+
+
+# async def execute_http_request(
+#     request: RuntimeRequest,
+#     session: httpx2.AsyncClient,
+#     rate_limiter: AsyncLimiter,
+# ) -> RuntimeResponse | FailedRuntimeResponse:
+#     """Execute the HTTP request with rate limiting."""
+#     request.metrics.primary_request_started = Instant.now().timestamp_nanos()
+#     # We initialize the response data here so that if an exception is raised during the
+#     # HTTP request, we can still return a FailedRuntimeResponse with whatever response
+#     # data we were able to obtain.
+#     response_data = None
+#     response_text = ""
+#     async with rate_limiter:
+#         query_params = request.query_parameters | request.additional_query_parameters
+#         http_request = httpx2.Request(
+#             method=request.method,
+#             url=request.path_url,
+#             headers=request.headers,
+#             params=query_params,
+#             json=request.json_body,
+#         )
+#         network_response = await session.send(http_request)
+#         logger.info(
+#             f"Made HTTP request to {network_response.url} with method {request.method} and received status code {network_response.status_code}"
+#         )
+#         response_text = network_response.text
+
+#         try:
+#             headers = tuple(network_response.headers.items())
+#             response_data = HttpResponse(
+#                 status_code=network_response.status_code,
+#                 reason_phrase=network_response.reason_phrase,
+#                 url=str(network_response.url),
+#                 elapsed=in_microseconds(network_response.elapsed),
+#                 bytes_downloaded=len(network_response.content),
+#                 headers=headers,
+#                 text=response_text,
+#                 received_timestamp=Instant.now().timestamp_nanos(),
+#             )
+#             request.metrics.primary_request_completed = Instant.now().timestamp_nanos()
+#             code = response_data.status_code
+#             match code:
+#                 case 200:
+#                     # Successful response, we can proceed as normal
+#                     logger.info(
+#                         f"Received %s - %s for request %s.",
+#                         response_data.status_code,
+#                         response_data.reason_phrase,
+#                         request.path_url,
+#                     )
+#                 case 304:
+#                     # Not Modified response, this is expected when validating stale cache responses, so we can proceed without logging an error
+#                     logger.info(
+#                         f"Received %s - %s for request %s.",
+#                         response_data.status_code,
+#                         response_data.reason_phrase,
+#                         request.path_url,
+#                     )
+#                 case code if 400 <= code < 600:
+#                     # Client error response, log an error but still return the response data to the caller
+#                     logger.error(
+#                         f"Received %s - %s for request %s.",
+#                         response_data.status_code,
+#                         response_data.reason_phrase,
+#                         request.path_url,
+#                     )
+#                     response = FailedRuntimeResponse(
+#                         http_response=response_data,
+#                         runtime_request=request,
+#                     )
+#                     return response
+
+#                 case _:
+#                     # Unexpected status code, log an error but still return the response data to the caller to allow
+#                     # for more robust handling of unexpected responses.
+#                     logger.error(
+#                         f"Received unexpected status code {code} for request {request.path_url}"
+#                     )
+#                     response = FailedRuntimeResponse(
+#                         http_response=response_data,
+#                         runtime_request=request,
+#                     )
+#                     return response
+
+#         except Exception as e:
+#             logger.error(
+#                 f"HTTP request failed: {e} with response content: {response_text}"
+#             )
+#             response = FailedRuntimeResponse(
+#                 http_response=response_data,
+#                 runtime_request=request,
+#                 failure_msg=str(e),
+#             )
+#             return response
+#         response = RuntimeResponse(
+#             http_response=response_data,
+#             runtime_request=request,
+#         )
+#         request.metrics.primary_request_completed = Instant.now().timestamp_nanos()
+#         # TODO split the pagination logic out of this function and into a separate function to keep this function focused on just executing a single HTTP request, and then call that function here to handle pagination if needed. This will make the code cleaner and easier to maintain.
+#         # TODO checking for pages should also be moved to a separate function to keep the code cleaner and more maintainable, and then we can call that function here to check for additional pages and fetch them if needed.
+#         additional_requests = await _check_for_additional_page_requests(response)
+#         if not additional_requests:
+#             return response
+#         request.metrics.paged_requests_start = Instant.now().timestamp_nanos()
+#         request.metrics.additional_pages_count = len(additional_requests)
+#         additional_responses = await asyncio.gather(
+#             *[
+#                 execute_http_request(req, session, rate_limiter)
+#                 for req in additional_requests
+#             ]
+#         )
+#         request.metrics.paged_requests_completed = Instant.now().timestamp_nanos()
+#         for paged_response in additional_responses:
+#             if isinstance(paged_response, FailedRuntimeResponse):
+#                 logger.error(
+#                     f"Failed to fetch additional page for request {request.path_url}: {paged_response.failure_msg}"
+#                 )
+#                 return FailedRuntimeResponse(
+#                     http_response=response.http_response,
+#                     runtime_request=request,
+#                     failure_msg=f"Failed to fetch additional page: {paged_response.failure_msg}",
+#                 )
+#         # At this point, we have successfully fetched all additional pages, so we
+#         # can combine the responses into a single response to return to the caller
+#         additional_responses = cast(list[RuntimeResponse], additional_responses)
+#         try:
+#             _check_for_valid_paged_responses(response, additional_responses)
+#             combined_response = _combine_paged_responses(response, additional_responses)
+#         except Exception as e:
+#             logger.error(
+#                 f"Invalid paged responses for request {request.path_url}: {str(e)}"
+#             )
+#             return FailedRuntimeResponse(
+#                 http_response=response.http_response,
+#                 runtime_request=request,
+#                 failure_msg=f"Invalid paged responses: {str(e)}",
+#             )
+
+#         return combined_response
 
 
 async def _check_for_additional_page_requests(
@@ -287,15 +601,12 @@ async def _check_for_additional_page_requests(
 ) -> list[RuntimeRequest]:
     """Check if the response indicates that there are additional pages of data to fetch."""
     if not response.runtime_request.is_paged:
-        return []
-
-    current_page = response.runtime_request.additional_query_parameters.get("page", -1)
-    # If the current page is not 1, then we know this is not the first page of results,
-    # so we can skip checking for additional pages and just return the response as is.
-    if current_page != 1:
-        return []
+        raise ValueError(
+            f"Cannot check for additional pages for a request that is not marked as paged: {response.runtime_request.path_url}"
+        )
     total_pages = response.http_response.pages
     if total_pages <= 1:
+        # This is a paged request, but there is only one page of data.
         return []
     additional_requests: list[RuntimeRequest] = []
     for page in range(2, total_pages + 1):

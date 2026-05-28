@@ -40,7 +40,29 @@ class RequestGroupMetrics:
         return -1.0
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
+class PagedResponseMetrics:
+    """Performance metrics for a paged response."""
+
+    paged_requests_start: int | None = None
+    paged_requests_completed: int | None = None
+    additional_pages_count: int = 0
+
+
+@dataclass(slots=True, kw_only=True)
+class CachedResponseMetrics:
+    """Performance metrics for a cached response."""
+
+    cache_check_started: int | None = None
+    cache_check_completed: int | None = None
+    cache_action_started: int | None = None
+    cache_action_completed: int | None = None
+
+
+# TODO eval naming for runtime request/response
+
+
+@dataclass(slots=True, kw_only=True)
 class RequestMetrics:
     """Performance metrics for a Request."""
 
@@ -48,26 +70,24 @@ class RequestMetrics:
     task_completed: int | None = None
     primary_request_started: int | None = None
     primary_request_completed: int | None = None
-    paged_requests_start: int | None = None
-    paged_requests_completed: int | None = None
-    additional_pages_count: int = 0
-    cache_response_status: CachedResponseStatus | None = None
+    paged_responses_metrics: PagedResponseMetrics | None = None
+    cache_status: CachedResponseStatus | None = None
     cache_action: CacheAction | None = None
-    cache_check_started: int | None = None
-    cache_check_completed: int | None = None
-    cache_action_started: int | None = None
-    cache_action_completed: int | None = None
+    cached_response_metrics: CachedResponseMetrics | None = None
 
     @property
     def cache_action_duration(self) -> float:
         """Calculate the duration of adding a response to the cache."""
+        if self.cached_response_metrics is None:
+            return -1.0
+        metrics = self.cached_response_metrics
         if (
-            self.cache_action_started is not None
-            and self.cache_action_completed is not None
+            metrics.cache_action_started is not None
+            and metrics.cache_action_completed is not None
         ):
             return (
-                Instant.from_timestamp_nanos(self.cache_action_completed)
-                - Instant.from_timestamp_nanos(self.cache_action_started)
+                Instant.from_timestamp_nanos(metrics.cache_action_completed)
+                - Instant.from_timestamp_nanos(metrics.cache_action_started)
             ).total("seconds")
         return -1.0
 
@@ -97,26 +117,32 @@ class RequestMetrics:
     @property
     def paged_requests_duration(self) -> float:
         """Calculate the total duration of the paged requests."""
+        if self.paged_responses_metrics is None:
+            return -1.0
+        metrics = self.paged_responses_metrics
         if (
-            self.paged_requests_start is not None
-            and self.paged_requests_completed is not None
+            metrics.paged_requests_start is not None
+            and metrics.paged_requests_completed is not None
         ):
             return (
-                Instant.from_timestamp_nanos(self.paged_requests_completed)
-                - Instant.from_timestamp_nanos(self.paged_requests_start)
+                Instant.from_timestamp_nanos(metrics.paged_requests_completed)
+                - Instant.from_timestamp_nanos(metrics.paged_requests_start)
             ).total("seconds")
         return -1.0
 
     @property
     def cache_check_duration(self) -> float:
         """Calculate the duration of the cache check."""
+        if self.cached_response_metrics is None:
+            return -1.0
+        metrics = self.cached_response_metrics
         if (
-            self.cache_check_started is not None
-            and self.cache_check_completed is not None
+            metrics.cache_check_started is not None
+            and metrics.cache_check_completed is not None
         ):
             return (
-                Instant.from_timestamp_nanos(self.cache_check_completed)
-                - Instant.from_timestamp_nanos(self.cache_check_started)
+                Instant.from_timestamp_nanos(metrics.cache_check_completed)
+                - Instant.from_timestamp_nanos(metrics.cache_check_started)
             ).total("seconds")
         return -1.0
 
@@ -238,7 +264,7 @@ class RuntimeResponse:
 class FailedRuntimeResponse:
     runtime_request: RuntimeRequest
     http_response: HttpResponse | None
-    exception_msg: str = ""
+    failure_msg: str = ""
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

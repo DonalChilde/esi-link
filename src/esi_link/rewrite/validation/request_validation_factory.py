@@ -373,6 +373,11 @@ def _validate_query_parameters(
             request=request,
             errors=tuple(fail_msgs),
         )
+    # If the `page` query parameter is present, pop it.
+    # Pagination is handled separately in the runtime logic.
+    if "page" in given_query_parameters:
+        given_query_parameters.pop("page")
+
     # Update validated fields.
     if isinstance(inprocess_request, ValidatedRequest):
         inprocess_request = deepcopy(inprocess_request)
