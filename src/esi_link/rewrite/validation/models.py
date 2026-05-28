@@ -15,6 +15,18 @@ from esi_link.type_defs import Lang
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
+class ValidatedRequestAction:
+    action_type: str
+    action_parameters: dict[str, Any] = field(default_factory=dict[str, Any])
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ValidatedRequestGroupAction:
+    action_type: str
+    action_parameters: dict[str, Any] = field(default_factory=dict[str, Any])
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
 class ValidatedRequest:
     """Represents a validated ESI request, ready to be executed.
 
@@ -59,8 +71,8 @@ class ValidatedRequest:
     """The language to use for the request, if applicable. This is used to set the Accept-Language header in the request."""
     json_body: Any | None = None
     """The JSON body of the request, if applicable. This is used for POST, PUT, PATCH requests."""
-    actions_after_response: list[RequestAction] = field(
-        default_factory=list[RequestAction]
+    actions_after_response: list[ValidatedRequestAction] = field(
+        default_factory=list[ValidatedRequestAction]
     )
     # save_directory_template: str | None = None
     # """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
@@ -105,8 +117,8 @@ class ValidatedRequestGroup:
     requests: dict[UUID, ValidatedRequest] = field(
         default_factory=dict[UUID, ValidatedRequest]
     )
-    response_actions: list[RequestGroupAction] = field(
-        default_factory=list[RequestGroupAction]
+    response_actions: list[ValidatedRequestGroupAction] = field(
+        default_factory=list[ValidatedRequestGroupAction]
     )
     # save_directory_template: str | None = None
     # """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
