@@ -44,6 +44,7 @@ class TokenStore:
     @classmethod
     def from_credentials(
         cls,
+        *,
         store_path: Path,
         token_tool: TokenTool,
         credentials: EsiAppCredentials,
@@ -101,6 +102,7 @@ class TokenStore:
     def _refresh_character(
         self,
         character_id: int,
+        *,
         session: Client,
     ) -> CharacterToken:
         """Refresh the token for a character and update the store."""
@@ -125,6 +127,7 @@ class TokenStore:
     async def _async_refresh_character(
         self,
         character_id: int,
+        *,
         client_session: AsyncClient,
     ) -> CharacterToken:
         """Asynchronously refresh the token for a character and update the store."""
@@ -149,6 +152,7 @@ class TokenStore:
     def refresh_character_token(
         self,
         character_id: int,
+        *,
         min_seconds: Annotated[int, Ge(0), Le(1200)] = 300,
         session: Client | None = None,
     ) -> CharacterToken:
@@ -162,11 +166,12 @@ class TokenStore:
             return character_token
         if character_token.expires_in >= min_seconds:
             return character_token
-        new_character_token = self._refresh_character(character_id, session)
+        new_character_token = self._refresh_character(character_id, session=session)
         return new_character_token
 
     async def async_refresh_character_tokens(
         self,
+        *,
         session: AsyncClient,
         min_seconds: Annotated[int, Ge(0), Le(1200)] = 300,
     ) -> dict[int, CharacterToken]:
@@ -177,7 +182,9 @@ class TokenStore:
         tasks: list[CoroutineType[Any, Any, CharacterToken]] = []
         for character_id, character_token in character_tokens.items():
             if character_token.expires_in < min_seconds:
-                task = self._async_refresh_character(character_id, session)
+                task = self._async_refresh_character(
+                    character_id, client_session=session
+                )
                 tasks.append(task)
         await asyncio.gather(*tasks)
         return self._store_data.character_tokens
@@ -201,11 +208,11 @@ class TokenStore:
         self._dirty = True
 
     @property
-    def available_character_ids(self) -> list[int]:
-        """Return a list of character IDs for which tokens are available."""
+    def available_character_ids(self) -> set[int]:
+        """Return a set of character IDs for which tokens are available."""
         if self._store_data is None:
             raise TokenStoreError("TokenStore data is not initialized.")
-        return list(self._store_data.character_tokens.keys())
+        return set(self._store_data.character_tokens.keys())
 
     @property
     def credentials(self) -> EsiAppCredentials:
