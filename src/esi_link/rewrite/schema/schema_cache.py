@@ -110,7 +110,10 @@ class SchemaCache:
         return cached_schemas
 
     def fetch_and_cache_schema(
-        self, session: Client, compatibility_date: str
+        self,
+        compatibility_date: str,
+        *,
+        session: Client,
     ) -> CachedSchema:
         """Fetch the schema for the given compatibility date, cache it, and return the CachedSchema instance."""
         timestamped_schema = self._schema_tool.fetch_schema(session, compatibility_date)
@@ -129,22 +132,29 @@ class SchemaCache:
             f.write(CachedSchemaRoot(root=cached_schema).model_dump_json(indent=2))
         return cached_schema
 
-    def valid_compatibility_dates(self, session: Client) -> CompatibilityDates:
+    def valid_compatibility_dates(self, *, session: Client) -> CompatibilityDates:
         """Return the valid compatibility dates, using the cache if possible."""
         compatibility_dates = self._schema_tool.fetch_compatibility_dates(session)
         return compatibility_dates
 
-    def get_latest_schema(self, session: Client) -> CachedSchema:
+    def latest_compatibility_date(self, *, session: Client) -> str:
+        """Return the latest valid compatibility date, using the cache if possible."""
+        compatibility_dates = self._schema_tool.fetch_compatibility_dates(session)
+        if not compatibility_dates["compatibility_dates"]:
+            raise ValueError("No compatibility dates available")
+        return max(compatibility_dates["compatibility_dates"])
+
+    def get_latest_schema(self, *, session: Client) -> CachedSchema:
         """Get the latest schema, using the cache if possible."""
         compatibility_dates = self._schema_tool.fetch_compatibility_dates(session)
         if not compatibility_dates:
             raise ValueError("No compatibility dates available")
         latest_compatibility_date = max(compatibility_dates)
-        cached_schema = self.get_schema(latest_compatibility_date, session)
+        cached_schema = self.get_schema(latest_compatibility_date, session=session)
 
         return cached_schema
 
-    def get_schema(self, compatibility_date: str, session: Client) -> CachedSchema:
+    def get_schema(self, compatibility_date: str, *, session: Client) -> CachedSchema:
         """Get a cached schema for the given compatibility date, if it exists and is not expired."""
         # First check that the compatibility date is valid
         compatibility_dates = self._schema_tool.fetch_compatibility_dates(session)
@@ -171,7 +181,7 @@ class SchemaCache:
                     self._cached_schemas[compatibility_date] = cached_schema
                     return cached_schema
         # If not in cache and not in cache directory, fetch it, cache it, and return it
-        cached_schema = self.fetch_and_cache_schema(session, compatibility_date)
+        cached_schema = self.fetch_and_cache_schema(compatibility_date, session=session)
         return cached_schema
 
     def list_cached_schemas(self) -> dict[str, CachedSchemaPath]:

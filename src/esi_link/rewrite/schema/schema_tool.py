@@ -70,21 +70,23 @@ class SchemaTool:
         self._compatibility_date_ttl = compatibility_date_ttl
         self._cached_compatibility_dates: CachedCompatibilityDates | None = None
 
-    def _is_valid_compatibility_date(self, date_string: str, session: Client) -> bool:
+    def _is_valid_compatibility_date(
+        self, date_string: str, *, session: Client
+    ) -> bool:
         """Check if a given date string is a valid compatibility date."""
         latest_date = latest_schema_date()
         try:
             date.fromisoformat(date_string)
             if date_string > latest_date:
                 return False
-            possible_dates = self.fetch_compatibility_dates(session)
+            possible_dates = self.fetch_compatibility_dates(session=session)
             if date_string not in possible_dates["compatibility_dates"]:
                 return False
             return True
         except ValueError:
             return False
 
-    def fetch_compatibility_dates(self, session: Client) -> CompatibilityDates:
+    def fetch_compatibility_dates(self, *, session: Client) -> CompatibilityDates:
         """Fetch the compatibility dates from the ESI endpoint."""
         if self._cached_compatibility_dates is not None:
             ttl = self._compatibility_date_ttl
@@ -93,6 +95,8 @@ class SchemaTool:
         response = session.get(self.compatibility_dates_url)
         response.raise_for_status()
         dates = response.json()
+        # Sort the dates in ascending order, so order is guaranteed.
+        dates["compatibility_dates"].sort()
         timestamp = Instant.now().timestamp()
         compatibility_dates = CompatibilityDatesRoot.model_validate(dates).root
         self._cached_compatibility_dates = CachedCompatibilityDates(
@@ -101,10 +105,10 @@ class SchemaTool:
         return self._cached_compatibility_dates.compatibility_dates
 
     def fetch_schema(
-        self, session: Client, compatibility_date: str
+        self, compatibility_date: str, *, session: Client
     ) -> TimestampedSchema:
         """Fetch the ESI OpenAPI schema for a specific compatibility date."""
-        if not self._is_valid_compatibility_date(compatibility_date, session):
+        if not self._is_valid_compatibility_date(compatibility_date, session=session):
             raise ValueError(f"Invalid compatibility date: {compatibility_date}")
         url = f"{ESI_SCHEMA_URL}?compatibility_date={compatibility_date}"
         response = session.get(url)
