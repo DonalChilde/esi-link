@@ -8,7 +8,7 @@ from aiolimiter import AsyncLimiter
 from esi_link import USER_AGENT
 from esi_link.rewrite.actions.response_action import do_response_action
 from esi_link.rewrite.execution.request_executor_httpx2 import (
-    execute_request_with_cache,
+    execute_http_request,
 )
 from esi_link.rewrite.helpers.http_client import (
     config_async_http_client,
@@ -78,7 +78,7 @@ async def dispatch_requests(
         async def execute_with_actions(
             request: RuntimeRequest,
         ) -> RuntimeResponse | FailedRuntimeResponse:
-            response = await execute_request_with_cache(
+            response = await execute_http_request(
                 request=request,
                 session=async_session,
                 cache_manager=cache_manager,
