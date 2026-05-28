@@ -7,9 +7,7 @@ from whenever import Instant
 
 from esi_link.rewrite.request.models import (
     Request,
-    RequestAction,
     RequestGroup,
-    RequestGroupAction,
 )
 from esi_link.type_defs import Lang
 

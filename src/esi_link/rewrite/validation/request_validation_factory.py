@@ -52,7 +52,7 @@ def validate_request(
     in_process: ValidatedRequest | FailedRequestValidation = ValidatedRequest(
         created_on=request.created_on,
         request_id=request.request_id,
-        actions_after_response=request.actions_after_response,  # TODO move to validation step after we have the schema, so we can validate that the actions are valid for the requested operation_id
+        actions_after_response=[],  # TODO move to validation step after we have the schema, so we can validate that the actions are valid for the requested operation_id
     )
     in_process = _validate_request_schema(
         request, in_process, schema_cache=schema_cache, session=session
@@ -143,7 +143,7 @@ def validate_request_group(
             created_on=request_group.created_on,
             group_id=request_group.group_id,
             description=request_group.description,
-            response_actions=request_group.response_actions,  # TODO move to validation step after we have the schema, so we can validate that the actions are valid for the requested operation_ids of the individual requests in the group
+            response_actions=[],  # TODO move to validation step after we have the schema, so we can validate that the actions are valid for the requested operation_ids of the individual requests in the group
         )
     )
     # in_process = _validate_group_directory_template(request_group, in_process)
