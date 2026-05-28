@@ -89,7 +89,6 @@ def generate_doc(
         output_file = (
             f"esi_schema_doc_{compatibility_date}_{cached_schema.timestamp}.md"
         )
-    file_path = output_directory / output_file
     saved = save_text_file(
         text=doc,
         output_dir=output_directory,
