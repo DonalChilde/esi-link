@@ -65,16 +65,13 @@ def validate_request(
             _write_debug_file(in_process, debug_path)
         return in_process
     # Get the schema for use in the rest of the validation steps.
-    assert in_process.compatibility_date is not None, (
-        "compatibility_date should have been set in the schema validation step"
-    )
-    # Since the schema validation step passed, we know that the requested schema is
-    # available in the schema cache, so this should not raise a SchemaCacheError.
-    # If it does, it's an unexpected error and we can just let it propagate.
-    schema = schema_cache.get_schema(
-        compatibility_date=in_process.compatibility_date,
-        session=session,
-    ).esi_schema
+    if in_process.compatibility_date is None:
+        schema = schema_cache.get_latest_schema(session=session).esi_schema
+    else:
+        schema = schema_cache.get_schema(
+            compatibility_date=in_process.compatibility_date,
+            session=session,
+        ).esi_schema
     in_process = _validate_operation_id(request, in_process, schema=schema)
     if isinstance(in_process, FailedRequestValidation):
         # If the operation_id validation failed, we don't need to do any further validation, because the request is already invalid. We can just return the FailedRequestValidation with the operation_id validation error.
@@ -90,7 +87,6 @@ def validate_request(
     in_process = _validate_language(request, in_process, schema=schema)
     in_process = _set_method(request, in_process, schema=schema)
     in_process = _set_url_template(request, in_process, schema=schema)
-    in_process = _set_is_paged(request, in_process, schema=schema)
     in_process = _set_is_paged(request, in_process, schema=schema)
     in_process = _set_is_cached(request, in_process, schema=schema)
     in_process = _set_is_authentication_required(request, in_process, schema=schema)
@@ -401,38 +397,73 @@ def _validate_body_parameters(
     )
     expected_body_parameters = operation.request_body
     given_body_parameters = deepcopy(request.json_body)
+
+    if expected_body_parameters is None and given_body_parameters is None:
+        return deepcopy(inprocess_request)
+
     fail_msgs: list[str] = []
     if expected_body_parameters is None and given_body_parameters is not None:
         fail_msgs.append("Unexpected body parameters provided for this endpoint.")
-    elif expected_body_parameters is not None:
+        return FailedRequestValidation(
+            request=request,
+            errors=tuple(fail_msgs),
+        )
+    assert expected_body_parameters is not None, (
+        "Expected body parameters should not be None at this point, because if it were None we would have already returned above."
+    )
+
+    if given_body_parameters is None:
         is_required = expected_body_parameters.get("required", False)
-        if given_body_parameters is None:
-            if is_required:
-                fail_msgs.append("Missing required body parameters for this endpoint.")
-        else:
-            body_schema = (
-                expected_body_parameters.get("content", {})
-                .get("application/json", {})
-                .get("schema", {})
+        if is_required:
+            fail_msgs.append("Missing required body parameters for this endpoint.")
+            return FailedRequestValidation(
+                request=request,
+                errors=tuple(fail_msgs),
             )
-            given_type = type(given_body_parameters).__name__
-            if body_schema.get("type") == "object" and given_type != "dict":
+
+    body_schema = (
+        expected_body_parameters.get("content", {})
+        .get("application/json", {})
+        .get("schema", {})
+    )
+    # check top level type of body parameters (object, array, etc.) and validate
+    # that the given body parameters are of the correct type.
+    given_type = type(given_body_parameters).__name__
+    match body_schema.get("type"):
+        case "object":
+            if given_type != "dict":
                 fail_msgs.append(
                     f"Invalid type for body parameters: expected object, got {given_type}"
                 )
-            elif body_schema.get("type") == "array" and given_type != "list":
+        case "array":
+            if given_type != "list":
                 fail_msgs.append(
                     f"Invalid type for body parameters: expected array, got {given_type}"
                 )
-            else:
-                # TODO see if there are any other types we need to validate here, and if
-                # so add them. We would also ideally want to do more detailed validation
-                # of the body parameters based on the schema, but that would require implementing
-                # a full JSON schema validator, which is a non-trivial amount of work, so
-                # for now we'll just do basic type validation.
-                fail_msgs.append(
-                    f"Unexpected request body type {given_type} or unable to validate body parameter type."
-                )
+        # TODO examine the schema further for scalar types, and validate.
+
+        # case "string":
+        #     if given_type != "str":
+        #         fail_msgs.append(
+        #             f"Invalid type for body parameters: expected string, got {given_type}"
+        #         )
+        # case "integer":
+        #     if given_type != "int":
+        #         fail_msgs.append(
+        #             f"Invalid type for body parameters: expected integer, got {given_type}"
+        #         )
+        # case "boolean":
+        #     if given_type != "bool":
+        #         fail_msgs.append(
+        #             f"Invalid type for body parameters: expected boolean, got {given_type}"
+        #         )
+        # case "number":
+        #     if given_type not in ("int", "float"):
+        #         fail_msgs.append(
+        #             f"Invalid type for body parameters: expected number, got {given_type}"
+        #         )
+        case _:
+            pass
 
     # If there are any validation errors, return a FailedRequestValidation with the error messages.
     if fail_msgs:
