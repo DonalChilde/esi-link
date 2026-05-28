@@ -20,7 +20,7 @@ async def do_response_action(
     # get action instance from store
     # execute action with response as input
     # return possibly modified response if the action modifies the response.
-    ...
+    return response
 
 
 async def do_group_response_action(
@@ -34,4 +34,4 @@ async def do_group_response_action(
     dict[UUID, FailedRuntimeResponse],
 ]:
     # Implement the logic for handling the group response action here
-    ...
+    return response_group, failed_validations, failed_runtime_responses
