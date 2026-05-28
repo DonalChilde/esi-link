@@ -4,6 +4,7 @@ import typer
 
 from esi_link.rewrite.cli.auth import app as auth_app
 from esi_link.rewrite.cli.callback import default_options
+from esi_link.rewrite.cli.request import app as request_app
 from esi_link.rewrite.cli.schema import app as schema_app
 
 app = typer.Typer(
@@ -13,3 +14,4 @@ app = typer.Typer(
 )
 app.add_typer(auth_app, name="auth", help="Authentication-related commands.")
 app.add_typer(schema_app, name="schema", help="ESI schema-related commands.")
+app.add_typer(request_app, name="request", help="Request-related commands.")

@@ -1,3 +1,5 @@
+"""Generate human readable documentation for the ESI schema."""
+
 # pyright: standard
 from pathlib import Path
 from typing import Annotated

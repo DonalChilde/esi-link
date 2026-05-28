@@ -19,7 +19,7 @@ from esi_link.rewrite.cache.models import (
     CachedResponseStatus,
 )
 from esi_link.rewrite.execution.models import HttpResponse
-from esi_link.rewrite.request.models import Response
+from esi_link.rewrite.response.models import Response
 from esi_link.rewrite.runtime.models import RuntimeRequest
 from esi_link.rewrite.simplified_models import (
     CacheManagerProtocol,

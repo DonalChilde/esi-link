@@ -5,8 +5,12 @@ from uuid import UUID, uuid4
 from pydantic import RootModel
 from whenever import Instant
 
-from esi_link.rewrite.request.models import Request, RequestGroup, ResponseGroupAction
-from esi_link.rewrite.runtime.models import RuntimeResponseAction
+from esi_link.rewrite.request.models import (
+    Request,
+    RequestAction,
+    RequestGroup,
+    RequestGroupAction,
+)
 from esi_link.type_defs import Lang
 
 
@@ -55,8 +59,8 @@ class ValidatedRequest:
     """The language to use for the request, if applicable. This is used to set the Accept-Language header in the request."""
     json_body: Any | None = None
     """The JSON body of the request, if applicable. This is used for POST, PUT, PATCH requests."""
-    actions_after_response: list[RuntimeResponseAction] = field(
-        default_factory=list[RuntimeResponseAction]
+    actions_after_response: list[RequestAction] = field(
+        default_factory=list[RequestAction]
     )
     # save_directory_template: str | None = None
     # """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
@@ -101,8 +105,8 @@ class ValidatedRequestGroup:
     requests: dict[UUID, ValidatedRequest] = field(
         default_factory=dict[UUID, ValidatedRequest]
     )
-    response_actions: list[ResponseGroupAction] = field(
-        default_factory=list[ResponseGroupAction]
+    response_actions: list[RequestGroupAction] = field(
+        default_factory=list[RequestGroupAction]
     )
     # save_directory_template: str | None = None
     # """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""

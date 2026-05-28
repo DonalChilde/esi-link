@@ -1,9 +1,9 @@
 from uuid import UUID
 
-from esi_link.rewrite.request.models import (
+from esi_link.esi_auth.models import (
     ResponseGroup,
-    ResponseGroupAction,
 )
+from esi_link.rewrite.response.models import ResponseGroupAction
 from esi_link.rewrite.runtime.models import (
     FailedRuntimeResponse,
     RuntimeResponse,
