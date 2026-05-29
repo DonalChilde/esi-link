@@ -153,19 +153,22 @@ async def _make_http_request(
     response_data = None
     response_text = ""
     async with rate_limiter:
-        query_params = request.query_parameters | request.additional_query_parameters
+        query_params = (
+            request.validated_request.query_parameters
+            | request.additional_query_parameters
+        )
         http_request = httpx2.Request(
-            method=request.method,
-            url=request.path_url,
+            method=request.validated_request.method,
+            url=request.resolved_path_url,
             headers=request.headers,
             params=query_params,
-            json=request.json_body,
+            json=request.validated_request.json_body,
         )
 
         try:
             network_response = await session.send(http_request)
             logger.info(
-                f"Made HTTP request to {network_response.url} with method {request.method} and received status code {network_response.status_code}"
+                f"Made HTTP request to {network_response.url} with method {request.validated_request.method} and received status code {network_response.status_code}"
             )
             response_text = network_response.text
             headers = tuple(network_response.headers.items())
@@ -270,7 +273,7 @@ async def _check_for_additional_pages_and_fetch(
     for paged_response in additional_responses:
         if isinstance(paged_response, FailedRuntimeResponse):
             logger.error(
-                f"Failed to fetch additional page for request {request.path_url}: {paged_response.failure_msg}"
+                f"Failed to fetch additional page for request {request.resolved_path_url}: {paged_response.failure_msg}"
             )
             return FailedRuntimeResponse(
                 http_response=response.http_response,
@@ -286,7 +289,7 @@ async def _check_for_additional_pages_and_fetch(
     except Exception as e:
         logger.error(
             "Invalid paged responses for request url %s: %s",
-            request.path_url,
+            request.resolved_path_url,
             e,
         )
         return FailedRuntimeResponse(
@@ -338,7 +341,7 @@ async def _fetch_response(
     response = _fail_on_client_server_errors(response)
     if isinstance(response, FailedRuntimeResponse):
         return response
-    if response.http_response.status_code == 200 and request.is_paged:
+    if response.http_response.status_code == 200 and request.validated_request.is_paged:
         # only 200 responses should be considered valid for pagination.
         response = await _check_for_additional_pages_and_fetch(
             response, session, rate_limiter
@@ -355,7 +358,7 @@ async def _fetch_response_with_cache(
     cache_key = request.cache_key
     if cache_key is None:
         raise ValueError(
-            f"Cache key is None for request {request.path_url}, cannot execute with cache"
+            f"Cache key is None for request {request.resolved_path_url}, cannot execute with cache"
         )
     metrics = CachedResponseMetrics()
     request.metrics.cached_response_metrics = metrics
@@ -370,13 +373,13 @@ async def _fetch_response_with_cache(
         request.metrics.cache_status = CachedResponseStatus.MISS
         logger.info(
             "Cache miss (not found) for request %s with cache key %s",
-            request.path_url,
+            request.resolved_path_url,
             cache_key,
         )
         response = await _fetch_response(request, session, rate_limiter)
         if isinstance(response, FailedRuntimeResponse):
             logger.error(
-                f"HTTP request failed, cache not updated for {request.path_url} with cache key {cache_key}: {response.failure_msg}"
+                f"HTTP request failed, cache not updated for {request.resolved_path_url} with cache key {cache_key}: {response.failure_msg}"
             )
             return response
         metrics.cache_action_started = Instant.now().timestamp_nanos()
@@ -399,7 +402,7 @@ async def _fetch_response_with_cache(
         response = await _fetch_response(request, session, rate_limiter)
         if isinstance(response, FailedRuntimeResponse):
             logger.error(
-                f"HTTP request failed when validating stale cache for {request.path_url} "
+                f"HTTP request failed when validating stale cache for {request.resolved_path_url} "
                 f"with cache key {cache_key}: {response.failure_msg}."
             )
             return response
@@ -600,9 +603,9 @@ async def _check_for_additional_page_requests(
     response: RuntimeResponse,
 ) -> list[RuntimeRequest]:
     """Check if the response indicates that there are additional pages of data to fetch."""
-    if not response.runtime_request.is_paged:
+    if not response.runtime_request.validated_request.is_paged:
         raise ValueError(
-            f"Cannot check for additional pages for a request that is not marked as paged: {response.runtime_request.path_url}"
+            f"Cannot check for additional pages for a request that is not marked as paged: {response.runtime_request.resolved_path_url}"
         )
     total_pages = response.http_response.pages
     if total_pages <= 1:

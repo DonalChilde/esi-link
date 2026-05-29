@@ -4,12 +4,9 @@
 
 
 ### FIXME
-- report generation for blueprints and jobs.
-  - inputs need to be updated to use new esd paradigm
-  - cli loads previously saved data for report?
-  - Uses name cache.
-    - make a settings entry for argus data, filename lookup, etc.
-  - avoid network calls in the report generation functions. If necessary, collect names first and pass into the report function.
+- web cache needs a clean function to remove old cache entries.
+- Recheck all cached items, add rebuild cached items util command to cli.
+- Clean out references to other projects in this document, as esi-link is now stand alone.
 
 #### esi-link
 - Currently esi-link (validation?) fails if no creds are present, even if the request
@@ -20,7 +17,7 @@
   only attempt authentication when making requests that require it. This would improve
   the usability of the application for users who do not need authentication, and would
   also make it more robust in cases where credentials are not available or not needed.
-- Integrate esi-link and esi-auth, as we no longer plan to release esi-auth separately
+
 
 
 ### ADD

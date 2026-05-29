@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from typing import Any, Literal
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from pydantic import RootModel
 from whenever import Instant
@@ -48,27 +48,35 @@ class ValidatedRequest:
 
     original_request: Request
     """The original request that was validated to create this ValidatedRequest."""
-    # These fields are copied from the original Request, but are now validated and ready
-    # to be used for the actual HTTP request to ESI.
-
     operation_id: str = "NOT_SET"
-    """The operation ID of the request, corresponding to the operationId in the ESI OpenAPI schema."""
+    """The operation ID of the request, corresponding to the operationId in the ESI OpenAPI 
+        schema."""
     compatibility_date: str = ""
-    """compatibility date for the request. If not provided by Request, the latest schema compatibility date will be used."""
+    """compatibility date for the request. If not provided by Request, the latest schema 
+        compatibility date will be used."""
+    x_compatibility_date: str = ""
+    """The X-Compatibility-Date header value for the request. This is used to version 
+        the cache key for a particular route, so that when the schema changes and the 
+        x_compatibility_date is updated, the cache keys will also be updated, preventing 
+        stale cached responses from being used."""
     path_parameters: dict[str, str | int | float] = field(
         default_factory=dict[str, str | int | float]
     )
-    """The path parameters for the request, if applicable. This is used to fill in the path parameters in the URL template."""
+    """The path parameters for the request, if applicable. This is used to fill in the 
+        path parameters in the URL template."""
     query_parameters: dict[str, str | int | float] = field(
         default_factory=dict[str, str | int | float]
     )
-    """The query parameters for the request, if applicable. This is used to fill in the query parameters in the URL template."""
+    """The query parameters for the request, if applicable. This is used to fill in the 
+        query parameters in the URL template."""
     authorization_id: int | None = None
     """The Character ID to use for authentication, if applicable."""
     language: Lang = "en"
-    """The language to use for the request, if applicable. This is used to set the Accept-Language header in the request."""
+    """The language to use for the request, if applicable. This is used to set the 
+        Accept-Language header in the request."""
     json_body: Any | None = None
-    """The JSON body of the request, if applicable. This is used for POST, PUT, PATCH requests."""
+    """The JSON body of the request, if applicable. This is used for POST, PUT, PATCH 
+        requests."""
     actions_after_response: list[ValidatedRequestAction] = field(
         default_factory=list[ValidatedRequestAction]
     )
@@ -82,15 +90,20 @@ class ValidatedRequest:
     ] = "NOT_SET"
     """The HTTP method for the request."""
     is_paged: bool = False
-    """Whether the request is paged or not, based on the presence of pagination-related parameters in the operation schema."""
+    """Whether the request is paged or not, based on the presence of pagination-related 
+        parameters in the operation schema."""
     is_cached: bool = False
     """Whether the request is cacheable or not, based on the HTTP method of the operation."""
     is_authentication_required: bool = False
-    """Whether the request requires authentication or not, based on the presence of security requirements in the operation schema."""
+    """Whether the request requires authentication or not, based on the presence of 
+        security requirements in the operation schema."""
 
     @property
     def request_id(self) -> UUID:
-        """The unique identifier for the request. This is used to link the request to various objects during the request lifecycle."""
+        """The unique identifier for the request.
+
+        This is used to link the request to various objects during the request lifecycle.
+        """
         return self.original_request.request_id
 
 
@@ -119,10 +132,6 @@ class ValidatedRequestGroup:
     response_actions: list[ValidatedRequestGroupAction] = field(
         default_factory=list[ValidatedRequestGroupAction]
     )
-    # save_directory_template: str | None = None
-    # """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
-    # save_filename_template: str | None = None
-    # """The filename template to save the response group data to, if applicable. If not provided, but a save_directory_template is provided, a default filename will be used."""
 
     failed_request_validations: dict[UUID, FailedRequestValidation] = field(
         default_factory=dict[UUID, FailedRequestValidation]

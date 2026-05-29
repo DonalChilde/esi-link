@@ -119,6 +119,16 @@ class SchemaOperation:
         return self.operation_schema.get("summary")
 
     @property
+    def x_compatibility_date(self) -> str:
+        """Extract the x-compatibility-date from the operation object, if present."""
+        value = self.operation_schema.get("x-compatibility-date")
+        if value is None:
+            raise ValueError(
+                f"Operation {self.operation_id} is missing required x-compatibility-date field."
+            )
+        return value
+
+    @property
     def x_values(self) -> list[dict[str, Any]]:
         """Extract the x-values from the operation object, if present."""
         x_list: list[dict[str, Any]] = []

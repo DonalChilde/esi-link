@@ -84,6 +84,7 @@ def validate_request(
         if debug_path is not None:
             _write_debug_file(in_process, debug_path)
         return in_process
+    in_process = _validate_x_compatibility_date(request, in_process, schema=schema)
     in_process = _validate_path_parameters(request, in_process, schema=schema)
     in_process = _validate_query_parameters(request, in_process, schema=schema)
     in_process = _validate_body_parameters(request, in_process, schema=schema)
@@ -261,13 +262,51 @@ def _validate_request_schema(
     return inprocess_request
 
 
+def _validate_x_compatibility_date(
+    request: Request,
+    inprocess_request: ValidatedRequest | FailedRequestValidation,
+    *,
+    schema: EsiSchema,
+) -> ValidatedRequest | FailedRequestValidation:
+    """Validates the x-compatibility-date field of the request.
+
+    If the x-compatibility-date is invalid, returns a FailedRequestValidation with the appropriate
+    error message. If the x-compatibility-date is valid, returns the inprocess_request unchanged.
+    """
+    try:
+        operation = schema.get_operation_by_id(request.operation_id)
+        if operation is None:
+            raise ValueError(
+                f"Operation with id {request.operation_id} not found in schema."
+            )
+        x_compatibility_date = operation.x_compatibility_date
+    except ValueError as e:
+        fail_msg = str(e)
+        if isinstance(inprocess_request, FailedRequestValidation):
+            fail_msgs = list(inprocess_request.errors) + [fail_msg]
+        else:
+            fail_msgs = [fail_msg]
+        return FailedRequestValidation(
+            request=request,
+            errors=tuple(fail_msgs),
+        )
+    # Update validated fields.
+    if isinstance(inprocess_request, ValidatedRequest):
+        inprocess_request = deepcopy(inprocess_request)
+        inprocess_request = replace(
+            inprocess_request,
+            x_compatibility_date=x_compatibility_date,
+        )
+    return inprocess_request
+
+
 def _validate_operation_id(
     request: Request,
     inprocess_request: ValidatedRequest | FailedRequestValidation,
     *,
     schema: EsiSchema,
 ) -> ValidatedRequest | FailedRequestValidation:
-    """Validates that the operation_id field of the request corresponds to a valid operation in the ESI OpenAPI schema.
+    """Validates the operation_id field of the request.
 
     If the operation_id is invalid, returns a FailedRequestValidation with the appropriate
     error message. If the operation_id is valid, returns the inprocess_request unchanged.
@@ -299,7 +338,7 @@ def _validate_path_parameters(
     *,
     schema: EsiSchema,
 ) -> ValidatedRequest | FailedRequestValidation:
-    """Validates that the path parameters provided in the request are valid for the requested operation_id according to the ESI OpenAPI schema.
+    """Validates that the path parameters provided in the request are valid.
 
     If any path parameters are invalid, returns a FailedRequestValidation with the
     appropriate error messages. If all path parameters are valid, returns the inprocess_
@@ -313,12 +352,14 @@ def _validate_path_parameters(
         param["name"]: param for param in operation.path_parameters
     }
     given_path_parameters = deepcopy(request.path_parameters)
-    # All path parameters defined in the schema must be present in the request, and must be of the correct type.
+    # All path parameters defined in the schema must be present in the request, and
+    # must be of the correct type.
     fail_msgs: list[str] = []
     for param_name, param_schema in expected_path_parameters.items():
         if param_name not in given_path_parameters:
             fail_msgs.append(f"Missing required path parameter: {param_name}")
         else:
+            # TODO match case
             if param_schema["schema"]["type"] == "integer":
                 if not isinstance(given_path_parameters[param_name], int):
                     fail_msgs.append(
@@ -329,7 +370,8 @@ def _validate_path_parameters(
                     fail_msgs.append(
                         f"Invalid type for path parameter {param_name}: expected string, got {type(given_path_parameters[param_name]).__name__}"
                     )
-            logger.warning(f"Unexpected path parameter: {param_schema}")
+            else:
+                logger.warning(f"Unexpected path parameter: {param_schema}")
     # If there are any validation errors, return a FailedRequestValidation with the error messages.
     if fail_msgs:
         if isinstance(inprocess_request, FailedRequestValidation):
@@ -354,7 +396,7 @@ def _validate_query_parameters(
     *,
     schema: EsiSchema,
 ) -> ValidatedRequest | FailedRequestValidation:
-    """Validates that the query parameters provided in the request are valid for the requested operation_id according to the ESI OpenAPI schema. If any query parameters are invalid, returns a FailedRequestValidation with the appropriate error messages. If all query parameters are valid, returns the inprocess_request unchanged."""
+    """Validates that the query parameters provided in the request are valid."""
     operation = schema.get_operation_by_id(request.operation_id)
     assert operation is not None, (
         "operation should have been found in the operation_id validation step"
@@ -371,6 +413,7 @@ def _validate_query_parameters(
         if param_name not in expected_query_parameters:
             fail_msgs.append(f"Unexpected query parameter: {param_name}")
         else:
+            # TODO match case
             param_schema = expected_query_parameters[param_name]
             if param_schema["type"] == "integer":
                 if not isinstance(param_value, int):
@@ -417,7 +460,7 @@ def _validate_body_parameters(
     *,
     schema: EsiSchema,
 ) -> ValidatedRequest | FailedRequestValidation:
-    """Validates that the body parameters provided in the request are valid for the requested operation_id according to the ESI OpenAPI schema. If any body parameters are invalid, returns a FailedRequestValidation with the appropriate error messages. If all body parameters are valid, returns the inprocess_request unchanged."""
+    """Validates that the body parameters provided in the request are valid."""
     operation = schema.get_operation_by_id(request.operation_id)
     assert operation is not None, (
         "operation should have been found in the operation_id validation step"
@@ -517,7 +560,7 @@ def _validate_authentication(
     schema: EsiSchema,
     authorized_characters: set[int],
 ) -> ValidatedRequest | FailedRequestValidation:
-    """Validates that the request is properly authenticated according to the requirements of the requested operation_id in the ESI OpenAPI schema. If the request is not properly authenticated, returns a FailedRequestValidation with the appropriate error message. If the request is properly authenticated, returns the inprocess_request unchanged."""
+    """Validates that authentication is available if required for this request."""
     operation = schema.get_operation_by_id(request.operation_id)
     assert operation is not None, (
         "operation should have been found in the operation_id validation step"
@@ -559,7 +602,7 @@ def _validate_language(
     *,
     schema: EsiSchema,
 ) -> ValidatedRequest | FailedRequestValidation:
-    """Validates that the language parameter provided in the request is valid for the requested operation_id according to the ESI OpenAPI schema. If the language parameter is invalid, returns a FailedRequestValidation with the appropriate error message. If the language parameter is valid, returns the inprocess_request unchanged."""
+    """Validates the language parameter provided in the request."""
     # check that the requested language is available from the ESI.
     available_languages = schema.content_languages
     if request.language not in available_languages:
@@ -590,7 +633,7 @@ def _set_method(
     *,
     schema: EsiSchema,
 ) -> ValidatedRequest | FailedRequestValidation:
-    """Sets the HTTP method for the request based on the requested operation_id and the ESI OpenAPI schema. If the operation_id is invalid or if there is an error determining the HTTP method, returns a FailedRequestValidation with the appropriate error message. If the HTTP method is successfully determined, returns an updated ValidatedRequest with the method field set."""
+    """Sets the HTTP method for the request."""
     operation = schema.get_operation_by_id(request.operation_id)
     assert operation is not None, (
         "operation should have been found in the operation_id validation step"
@@ -611,7 +654,7 @@ def _set_url_template(
     *,
     schema: EsiSchema,
 ) -> ValidatedRequest | FailedRequestValidation:
-    """Sets the URL template for the request based on the requested operation_id and the ESI OpenAPI schema. If the operation_id is invalid or if there is an error determining the URL template, returns a FailedRequestValidation with the appropriate error message. If the URL template is successfully determined, returns an updated ValidatedRequest with the url_template field set."""
+    """Sets the URL template for the request."""
     base_url = schema.base_url
     operation = schema.get_operation_by_id(request.operation_id)
     assert operation is not None, (
@@ -634,7 +677,7 @@ def _set_is_paged(
     *,
     schema: EsiSchema,
 ) -> ValidatedRequest | FailedRequestValidation:
-    """Determines whether the request is for a paged endpoint based on the requested operation_id and the ESI OpenAPI schema, and sets the is_paged field of the ValidatedRequest accordingly. If the operation_id is invalid or if there is an error determining whether the endpoint is paged, returns a FailedRequestValidation with the appropriate error message. If it is successfully determined whether the endpoint is paged, returns an updated ValidatedRequest with the is_paged field set."""
+    """Determines whether the request is for a paged endpoint."""
     # Update validated fields.
     if isinstance(inprocess_request, ValidatedRequest):
         operation = schema.get_operation_by_id(request.operation_id)
@@ -655,7 +698,7 @@ def _set_is_cached(
     *,
     schema: EsiSchema,
 ) -> ValidatedRequest | FailedRequestValidation:
-    """Determines whether the request is for a cached endpoint based on the requested operation_id and the ESI OpenAPI schema, and sets the is_cached field of the ValidatedRequest accordingly. If the operation_id is invalid or if there is an error determining whether the endpoint is cached, returns a FailedRequestValidation with the appropriate error message. If it is successfully determined whether the endpoint is cached, returns an updated ValidatedRequest with the is_cached field set."""
+    """Determines whether the request is for a cached endpoint."""
     # Update validated fields.
     if isinstance(inprocess_request, ValidatedRequest):
         operation = schema.get_operation_by_id(request.operation_id)
@@ -676,7 +719,7 @@ def _set_is_authentication_required(
     *,
     schema: EsiSchema,
 ) -> ValidatedRequest | FailedRequestValidation:
-    """Determines whether the request requires authentication based on the requested operation_id and the ESI OpenAPI schema, and sets the is_authentication_required field of the ValidatedRequest accordingly. If the operation_id is invalid or if there is an error determining whether authentication is required, returns a FailedRequestValidation with the appropriate error message. If it is successfully determined whether authentication is required, returns an updated ValidatedRequest with the is_authentication_required field set."""
+    """Determines whether the request requires authentication."""
     # Update validated fields.
     if isinstance(inprocess_request, ValidatedRequest):
         operation = schema.get_operation_by_id(request.operation_id)

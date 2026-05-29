@@ -72,7 +72,7 @@ def generate_runtime_request_group(
 def _set_path_url(
     inprocess_request: RuntimeRequest,
 ) -> RuntimeRequest:
-    """Sets the path_url field of the RuntimeRequest based on the URL template and path parameters."""
+    """Sets the resolved_path_url field of the RuntimeRequest based on the URL template and path parameters."""
     if not inprocess_request.validated_request.path_parameters:
         path_url = inprocess_request.validated_request.path_url_template
     else:
@@ -90,9 +90,9 @@ def _set_path_url(
             raise ValueError(
                 f"Missing path parameter for URL template substitution. {e}"
             ) from e
-    # Update the inprocess_request with the generated path_url
+    # Update the inprocess_request with the generated resolved_path_url
     inprocess_request = deepcopy(inprocess_request)
-    inprocess_request = replace(inprocess_request, path_url=path_url)
+    inprocess_request = replace(inprocess_request, resolved_path_url=path_url)
     return inprocess_request
 
 
@@ -100,7 +100,7 @@ def _set_cache_url(
     inprocess_request: RuntimeRequest,
 ) -> RuntimeRequest:
     """Sets the cache_url field of the RuntimeRequest based on the path_url and query parameters."""
-    if not inprocess_request.path_url:
+    if not inprocess_request.resolved_path_url:
         raise ValueError(
             "Cannot set cache_url because path_url is not set. Ensure that _set_path_url is called before _set_cache_url."
         )
@@ -108,7 +108,7 @@ def _set_cache_url(
         # If the request is not for a cached endpoint, we can skip generating the cache_url
         # and just return the inprocess_request.
         return deepcopy(inprocess_request)
-    path_url = inprocess_request.path_url
+    path_url = inprocess_request.resolved_path_url
     # NOTE: the `page` query parameter is removed during validation since pagination is
     # handled separately in the runtime logic, so we don't need to worry about it here.
     query_parameters = inprocess_request.validated_request.query_parameters or {}
@@ -126,8 +126,14 @@ def _set_cache_key(
     if not inprocess_request.cache_url:
         return deepcopy(inprocess_request)
     cache_url = inprocess_request.cache_url
+    x_compatibility_date = inprocess_request.validated_request.x_compatibility_date
+    # Incorporate the x_compatibility_date into the cache key generation to ensure that
+    # cache keys are invalidated when the compatibility date **for the route** changes,
+    # which typically indicates a schema change that could affect the structure of the
+    # response data.
+    cache_url_with_compat = f"{cache_url}|{x_compatibility_date}"
     # Generate a UUID5 hash of the cache_url using the ESI_LINK_NAMESPACE
-    cache_key = uuid5(ESI_LINK_NAMESPACE, cache_url)
+    cache_key = uuid5(ESI_LINK_NAMESPACE, cache_url_with_compat)
     # Update the inprocess_request with the generated cache_key
     inprocess_request = deepcopy(inprocess_request)
     inprocess_request = replace(inprocess_request, cache_key=cache_key)

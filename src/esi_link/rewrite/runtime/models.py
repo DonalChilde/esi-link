@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
-from uuid import UUID, uuid4
+from typing import Any
+from uuid import UUID
 
 from pydantic import RootModel
 from whenever import Instant
@@ -9,7 +9,6 @@ from whenever import Instant
 from esi_link.rewrite.cache.models import CacheAction, CachedResponseStatus
 from esi_link.rewrite.execution.models import HttpResponse
 from esi_link.rewrite.validation.models import FailedRequestValidation, ValidatedRequest
-from esi_link.type_defs import Lang
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -153,10 +152,10 @@ class RuntimeRequest:
     """The validated request that was transformed to create this RuntimeRequest."""
 
     # These fields are determined prior to executing the request.
-    path_url: str = ""
+    resolved_path_url: str = ""
     """The resolved URL for the request, after filling in the path parameters in the URL template."""
     cache_url: str = ""
-    """The URL used for caching the request, which is the path url plus most query parameters. 
+    """The URL used for caching the request, which is the resolved path url plus most query parameters. 
     This is used to generate the cache UUID for a  request. For paged requests, the 
     cache_url does not include the page query parameter, so that all pages of a paged 
     request can be identified as the same request for caching purposes."""
