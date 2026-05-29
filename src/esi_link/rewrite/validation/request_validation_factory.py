@@ -54,8 +54,7 @@ def validate_request(
     returns a FailedRequestValidation with the appropriate error messages.
     """
     in_process: ValidatedRequest | FailedRequestValidation = ValidatedRequest(
-        created_on=request.created_on,
-        request_id=request.request_id,
+        original_request=request,
         actions_after_response=[],  # TODO move to validation step after we have the schema, so we can validate that the actions are valid for the requested operation_id
     )
     in_process = _validate_compatibility_date(

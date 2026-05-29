@@ -46,13 +46,11 @@ class ValidatedRequest:
 
     """
 
+    original_request: Request
+    """The original request that was validated to create this ValidatedRequest."""
     # These fields are copied from the original Request, but are now validated and ready
     # to be used for the actual HTTP request to ESI.
 
-    request_id: UUID = field(default_factory=uuid4)
-    """The unique identifier for the request. This is used to link the request to various objects during the request lifecycle."""
-    created_on: Instant = field(default_factory=Instant.now)
-    """The timestamp of when the request was created. This is used for things like determining the age of the request, or for saving response data to disk with a filename that includes the creation date."""
     operation_id: str = "NOT_SET"
     """The operation ID of the request, corresponding to the operationId in the ESI OpenAPI schema."""
     compatibility_date: str = ""
@@ -89,6 +87,11 @@ class ValidatedRequest:
     """Whether the request is cacheable or not, based on the HTTP method of the operation."""
     is_authentication_required: bool = False
     """Whether the request requires authentication or not, based on the presence of security requirements in the operation schema."""
+
+    @property
+    def request_id(self) -> UUID:
+        """The unique identifier for the request. This is used to link the request to various objects during the request lifecycle."""
+        return self.original_request.request_id
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

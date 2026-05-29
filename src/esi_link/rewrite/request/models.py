@@ -50,7 +50,7 @@ class Request:
     """The operation ID of the request, corresponding to the operationId in the ESI 
         OpenAPI schema."""
     compatibility_date: str | None = None
-    """Optional compatibility date for the request. If not provided, the latest schema 
+    """Optional compatibility date for the request. If not provided, the latest schema
         will be used."""
     path_parameters: dict[str, str | int | float] = field(
         default_factory=dict[str, str | int | float]

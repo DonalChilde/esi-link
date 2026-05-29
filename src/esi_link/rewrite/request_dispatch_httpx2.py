@@ -82,7 +82,7 @@ async def dispatch_requests(
                 cache_manager=web_cache,
                 rate_limiter=rate_limiter,
             )
-            for action in request.actions_after_response:
+            for action in request.actions:
                 # NOTE action might modify the response, so we need to update the response variable with the result of the action.
                 response = await do_response_action(action=action, response=response)
             return response

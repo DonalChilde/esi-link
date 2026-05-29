@@ -8,7 +8,7 @@ from whenever import Instant
 
 from esi_link.rewrite.cache.models import CacheAction, CachedResponseStatus
 from esi_link.rewrite.execution.models import HttpResponse
-from esi_link.rewrite.validation.models import FailedRequestValidation
+from esi_link.rewrite.validation.models import FailedRequestValidation, ValidatedRequest
 from esi_link.type_defs import Lang
 
 
@@ -149,51 +149,8 @@ class RequestMetrics:
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class RuntimeRequest:
-    # These fields are copied from the original ValidatedRequestGroup, but are now ready
-    # to be executed.
-    request_id: UUID = field(default_factory=uuid4)
-    """The unique identifier for the request. This is used to link the request to various objects during the request lifecycle."""
-    created_on: Instant = field(default_factory=Instant.now)
-    """The timestamp of when the request was created. This is used for things like determining the age of the request, or for saving response data to disk with a filename that includes the creation date."""
-    operation_id: str = "NOT_SET"
-    """The operation ID of the request, corresponding to the operationId in the ESI OpenAPI schema."""
-    compatibility_date: str = ""
-    """compatibility date for the request."""
-    path_parameters: dict[str, str | int | float] = field(
-        default_factory=dict[str, str | int | float]
-    )
-    """The path parameters for the request, if applicable. This is used to fill in the path parameters in the URL template."""
-    query_parameters: dict[str, str | int | float] = field(
-        default_factory=dict[str, str | int | float]
-    )
-    """The query parameters for the request, if applicable. This is used to fill in the query parameters in the URL template."""
-    authorization_id: int | None = None
-    """The Character ID to use for authentication, if applicable."""
-    language: Lang = "en"
-    """The language to use for the request, if applicable. This is used to set the Accept-Language header in the request."""
-    json_body: Any | None = None
-    """The JSON body of the request, if applicable. This is used for POST, PUT, PATCH requests."""
-    actions_after_response: list[RuntimeResponseAction] = field(
-        default_factory=list[RuntimeResponseAction]
-    )
-    # save_directory_template: str | None = None
-    # """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
-    # save_filename_template: str | None = None
-    # """The filename template to save the response data to, if applicable. If not provided, but a save_directory_template is provided, a default filename will be used."""
-    path_url_template: str = ""
-    """The URL template for the path."""
-    method: Literal[
-        "GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "NOT_SET"
-    ] = "NOT_SET"
-    """The HTTP method for the request."""
-    is_paged: bool = False
-    """Whether the request is paged or not, based on the presence of pagination-related 
-    parameters in the operation schema."""
-    is_cached: bool = False
-    """Whether the request is cacheable or not, based on the HTTP method of the operation."""
-    is_authentication_required: bool = False
-    """Whether the request requires authentication or not, based on the presence of security 
-    requirements in the operation schema."""
+    validated_request: ValidatedRequest
+    """The validated request that was transformed to create this RuntimeRequest."""
 
     # These fields are determined prior to executing the request.
     path_url: str = ""
@@ -220,6 +177,19 @@ class RuntimeRequest:
     parent_id: UUID | None = None
     """The request_id of the parent request if this request is a sub-request, e.g. a paged 
     request or a retry."""
+    _actions_after_response: list[RuntimeResponseAction] = field(
+        default_factory=list[RuntimeResponseAction]
+    )
+
+    @property
+    def actions(self) -> list[RuntimeResponseAction]:
+        """The actions to be taken after receiving a response for this request."""
+        return self._actions_after_response
+
+    @property
+    def request_id(self) -> UUID:
+        """The unique identifier for the request. This is used to link the request to various objects during the request lifecycle."""
+        return self.validated_request.original_request.request_id
 
 
 @dataclass(slots=True, kw_only=True)
