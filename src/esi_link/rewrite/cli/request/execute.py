@@ -7,10 +7,7 @@ import typer
 from rich.console import Console
 from whenever import Instant
 
-from esi_link.rewrite import example_requests
-from esi_link.rewrite.auth.oauth_metadata import OAuthMetadataDiskCache
 from esi_link.rewrite.auth.token_store import TokenStore
-from esi_link.rewrite.auth.token_tool import TokenTool
 from esi_link.rewrite.cli.helpers import get_esi_link_settings_from_context
 from esi_link.rewrite.helpers.file_safe_string import file_safe_string
 from esi_link.rewrite.helpers.save_text_file import save_text_file
@@ -27,14 +24,12 @@ from esi_link.rewrite.request.models import (
     RequestRoot,
 )
 from esi_link.rewrite.request_dispatch_httpx2 import (
-    _dispatch_requests,
     dispatch_request,
     dispatch_request_group,
 )
 from esi_link.rewrite.response.models import Response
 from esi_link.rewrite.runtime.models import FailedRuntimeResponse
 from esi_link.rewrite.schema.schema_cache import SchemaCache
-from esi_link.rewrite.settings import EsiLinkSettings
 from esi_link.rewrite.validation.models import FailedRequestValidation
 
 app = typer.Typer(no_args_is_help=True)
@@ -53,7 +48,29 @@ def execute(
             readable=True,
         ),
     ],
-):
+    output_directory: Annotated[
+        Path | None,
+        typer.Option(
+            "-o",
+            "--output-directory",
+            help="The directory to save the response file to. If not provided, the response will not be saved to disk.",
+            file_okay=False,
+            dir_okay=True,
+            exists=True,
+            writable=True,
+        ),
+    ] = None,
+    debug: Annotated[
+        bool, typer.Option("--debug", help="Whether to save debug information.")
+    ] = False,
+    pipe_output: Annotated[
+        bool,
+        typer.Option(
+            "--pipe",
+            help="Whether to pipe the response output to stdout. If set, the response objects will be printed without extra text.",
+        ),
+    ] = False,
+) -> None:
     """Execute a request or request group from a JSON file."""
     console = Console()
     settings = get_esi_link_settings_from_context(ctx)

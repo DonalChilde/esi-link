@@ -108,6 +108,31 @@ ResponseDataRoot = RootModel[ResponseData]
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
+class GroupResponseData:
+    """Represents the data returned in a successful response to a group of ESI requests."""
+
+    responses: dict[UUID, ResponseData] = field(
+        default_factory=dict[UUID, ResponseData]
+    )
+    """The responses in ResponseData format."""
+
+    def to_string(self, indent: int) -> str:
+        """Return a string representation of the group response data with the specified indentation."""
+        root_model = GroupResponseDataRoot(self)
+        json_str = root_model.model_dump_json(indent=indent)
+        return json_str
+
+    @classmethod
+    def from_string(cls, json_str: str) -> GroupResponseData:
+        """Parse the group response data from a JSON string."""
+        value = GroupResponseDataRoot.model_validate_json(json_str).root
+        return value
+
+
+GroupResponseDataRoot = RootModel[GroupResponseData]
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
 class ResponseDebug:
     """Represents debug information included in the response to an ESI request.
 
