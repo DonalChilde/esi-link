@@ -42,6 +42,7 @@ class ResolvedTimestampedSchema:
     """Seconds since the Unix epoch when the schema was fetched."""
 
 
+# TODO cache this to disk.
 @dataclass(slots=True, kw_only=True, frozen=True)
 class CachedCompatibilityDates:
     """Represents cached compatibility dates, including the list of dates and the timestamp of when they were fetched."""

@@ -114,6 +114,18 @@ class FailedRequestValidation:
     errors: tuple[str, ...]
     """A list of error messages describing the validation failures."""
 
+    def to_string(self, indent: int) -> str:
+        """Return a string representation of the failed request validation with the specified indentation."""
+        root_model = FailedRequestValidationRoot(self)
+        json_str = root_model.model_dump_json(indent=indent)
+        return json_str
+
+    @classmethod
+    def from_string(cls, json_str: str) -> FailedRequestValidation:
+        """Parse the failed request validation from a JSON string."""
+        value = FailedRequestValidationRoot.model_validate_json(json_str).root
+        return value
+
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class ValidatedRequestGroup:

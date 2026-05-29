@@ -21,6 +21,18 @@ class TokenStoreData:
         default_factory=dict[int, CharacterToken]
     )
 
+    def to_string(self, indent: int) -> str:
+        """Return a string representation of the token store data with the specified indentation."""
+        root_model = TokenStoreDataRoot(self)
+        json_str = root_model.model_dump_json(indent=indent)
+        return json_str
+
+    @classmethod
+    def from_string(cls, json_str: str) -> TokenStoreData:
+        """Parse the token store data from a JSON string."""
+        value = TokenStoreDataRoot.model_validate_json(json_str).root
+        return value
+
 
 TokenStoreDataRoot = RootModel[TokenStoreData]
 
@@ -81,9 +93,7 @@ class TokenStore:
         if not self._dirty:
             return
         self._store_path.parent.mkdir(parents=True, exist_ok=True)
-        self._store_path.write_text(
-            TokenStoreDataRoot(self._store_data).model_dump_json(indent=2)
-        )
+        self._store_path.write_text(self._store_data.to_string(indent=2))
         self._dirty = False
 
     def _load_from_disk(self) -> None:
@@ -94,9 +104,7 @@ class TokenStore:
             )
         if not self._store_path.is_file():
             raise TokenStoreError(f"Token store path {self._store_path} is not a file.")
-        self._store_data = TokenStoreDataRoot.model_validate_json(
-            self._store_path.read_text()
-        ).root
+        self._store_data = TokenStoreData.from_string(self._store_path.read_text())
         self._dirty = False
 
     def _refresh_character(

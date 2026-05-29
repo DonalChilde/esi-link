@@ -3,6 +3,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+from pydantic import RootModel
 from whenever import Instant
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,18 @@ class HttpResponse:
                 self.headers,
                 self._headers_lower,
             )
+
+    def to_string(self, indent: int) -> str:
+        """Return a string representation of the HttpResponse with the specified indentation."""
+        root_model = HttpResponseRoot(self)
+        json_str = root_model.model_dump_json(indent=indent)
+        return json_str
+
+    @classmethod
+    def from_string(cls, json_str: str) -> HttpResponse:
+        """Parse the HttpResponse from a JSON string."""
+        value = HttpResponseRoot.model_validate_json(json_str).root
+        return value
 
     @property
     def received_at(self) -> Instant:
@@ -151,3 +164,6 @@ class HttpResponse:
         # if any(value == "unknown" for value in (group, limit, remaining, used)):
         #     return None
         return X_ratelimit(group=group, limit=limit, remaining=remaining, used=used)
+
+
+HttpResponseRoot = RootModel[HttpResponse]

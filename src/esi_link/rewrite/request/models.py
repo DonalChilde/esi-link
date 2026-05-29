@@ -74,12 +74,24 @@ class Request:
         default_factory=list[RequestAction]
     )
 
+    def to_string(self, indent: int) -> str:
+        """Return a string representation of the request with the specified indentation."""
+        root_model = RequestRoot(self)
+        json_str = root_model.model_dump_json(indent=indent)
+        return json_str
+
+    @classmethod
+    def from_string(cls, json_str: str) -> Request:
+        """Parse the request from a JSON string."""
+        value = RequestRoot.model_validate_json(json_str).root
+        return value
+
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class RequestGroup:
     """Represents a batch of ESI requests to be executed.
 
-    Can be loaded from a file or created programmatically. The group_id is used to
+    Can be loaded from a file or created programatically. The group_id is used to
     identify the group, and can be used for things like saving response data to disk with
     a filename that includes the group_id.
     """
@@ -91,6 +103,18 @@ class RequestGroup:
     response_actions: list[RequestGroupAction] = field(
         default_factory=list[RequestGroupAction]
     )
+
+    def to_string(self, indent: int) -> str:
+        """Return a string representation of the RequestGroup with the specified indentation."""
+        root_model = RequestGroupRoot(self)
+        json_str = root_model.model_dump_json(indent=indent)
+        return json_str
+
+    @classmethod
+    def from_string(cls, json_str: str) -> RequestGroup:
+        """Parse the RequestGroup from a JSON string."""
+        value = RequestGroupRoot.model_validate_json(json_str).root
+        return value
 
 
 RequestRoot = RootModel[Request]

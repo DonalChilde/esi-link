@@ -1,6 +1,7 @@
 """Models for esi-link authentication."""
 
 from dataclasses import dataclass, field
+from typing import Self
 
 from pydantic import RootModel
 from whenever import Instant
@@ -89,6 +90,18 @@ class EsiAppCredentials:
     clientSecret: str
     callbackUrl: str
     scopes: list[str] = field(default_factory=list[str])
+
+    def to_string(self, indent: int) -> str:
+        """Return a string representation of the credentials with the specified indentation."""
+        root_model = EsiAppCredentialsRoot(self)
+        json_str = root_model.model_dump_json(indent=indent)
+        return json_str
+
+    @classmethod
+    def from_string(cls, json_str: str) -> EsiAppCredentials:
+        """Parse the credentials from a JSON string."""
+        value = EsiAppCredentialsRoot.model_validate_json(json_str).root
+        return value
 
 
 EsiAppCredentialsRoot = RootModel[EsiAppCredentials]

@@ -55,6 +55,18 @@ class CachedSchema:
         """Return the number of seconds until the cached schema expires, or a negative number if it is already expired."""
         return ttl - (Instant.now().timestamp() - self.timestamp)
 
+    def to_string(self, indent: int) -> str:
+        """Return a string representation of the cached schema with the specified indentation."""
+        root_model = CachedSchemaRoot(self)
+        json_str = root_model.model_dump_json(indent=indent)
+        return json_str
+
+    @classmethod
+    def from_string(cls, json_str: str) -> CachedSchema:
+        """Parse the cached schema from a JSON string."""
+        value = CachedSchemaRoot.model_validate_json(json_str).root
+        return value
+
 
 CachedSchemaRoot = RootModel[CachedSchema]
 
@@ -134,7 +146,7 @@ class SchemaCache:
         cache_file_name = f"{esi_schema.compatibility_date}_{timestamped_schema.fetch_timestamp}_esi-schema.json"
         cache_file_path = self._cache_directory / cache_file_name
         with cache_file_path.open("w", encoding="utf-8") as f:
-            f.write(CachedSchemaRoot(root=cached_schema).model_dump_json(indent=2))
+            f.write(cached_schema.to_string(indent=2))
         return cached_schema
 
     def valid_compatibility_dates(self, *, session: Client) -> CompatibilityDates:
@@ -215,7 +227,7 @@ class SchemaCache:
         Does not check if the cached schema is expired.
         """
         with cached_schema_path.file_path.open("r", encoding="utf-8") as f:
-            cached_schema = CachedSchemaRoot.model_validate_json(f.read()).root
+            cached_schema = CachedSchema.from_string(f.read())
         return cached_schema
 
     def clear_cache(self) -> None:
