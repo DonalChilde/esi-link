@@ -4,6 +4,11 @@ from uuid import uuid4
 
 from esi_link.rewrite.request.models import Request, RequestGroup
 
+# TODO: More examples.
+#   - Example of query parameters.
+#   - Example of a paged request, with query parameters.
+#   - Example of a request with a JSON body. - Post request.
+
 
 def api_status() -> Request:
     """Example request for the EVE ESI api status endpoint."""
