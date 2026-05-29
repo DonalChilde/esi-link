@@ -5,20 +5,37 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
+from whenever import Instant
 
 from esi_link.rewrite import example_requests
+from esi_link.rewrite.auth.oauth_metadata import OAuthMetadataDiskCache
+from esi_link.rewrite.auth.token_store import TokenStore
+from esi_link.rewrite.auth.token_tool import TokenTool
 from esi_link.rewrite.cli.helpers import get_esi_link_settings_from_context
+from esi_link.rewrite.helpers.file_safe_string import file_safe_string
 from esi_link.rewrite.helpers.save_text_file import save_text_file
 from esi_link.rewrite.helpers.settings_factories import (
     schema_cache_factory,
     token_store_factory,
     web_cache_factory,
 )
-from esi_link.rewrite.request.models import Request, RequestGroupRoot, RequestRoot
-from esi_link.rewrite.request_dispatch_httpx2 import (
-    dispatch_request_group,
-    dispatch_requests,
+from esi_link.rewrite.protocols.cache_manager import CacheManagerProtocol
+from esi_link.rewrite.request.models import (
+    Request,
+    RequestGroup,
+    RequestGroupRoot,
+    RequestRoot,
 )
+from esi_link.rewrite.request_dispatch_httpx2 import (
+    _dispatch_requests,
+    dispatch_request,
+    dispatch_request_group,
+)
+from esi_link.rewrite.response.models import Response
+from esi_link.rewrite.runtime.models import FailedRuntimeResponse
+from esi_link.rewrite.schema.schema_cache import SchemaCache
+from esi_link.rewrite.settings import EsiLinkSettings
+from esi_link.rewrite.validation.models import FailedRequestValidation
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -57,31 +74,82 @@ def execute(
     web_cache = web_cache_factory(settings)
     with token_store:
         if isinstance(request_data, Request):
-            request = request_data
-            response, failed_validations, failed_responses = asyncio.run(
-                dispatch_requests(
-                    requests={request.request_id: request},
-                    schema_cache=schema_cache,
-                    token_store=token_store,
-                    web_cache=web_cache,
-                )
+            _make_request(
+                token_store=token_store,
+                schema_cache=schema_cache,
+                web_cache=web_cache,
+                request=request_data,
             )
 
         else:
-            request_group = request_data
-            response, failed_validations, failed_responses = asyncio.run(
-                dispatch_request_group(
-                    request_group=request_group,
-                    schema_cache=schema_cache,
-                    token_store=token_store,
-                    web_cache=web_cache,
-                )
+            _make_request_group(
+                token_store=token_store,
+                schema_cache=schema_cache,
+                web_cache=web_cache,
+                request_group=request_data,
             )
-    console.print(f"[green]Response:[/green] {response}")
-    console.print(response)
-    if failed_validations:
-        console.print(f"[red]Failed Validations:[/red] {failed_validations}")
-        console.print(failed_validations)
-    if failed_responses:
-        console.print(f"[red]Failed Responses:[/red] {failed_responses}")
-        console.print(failed_responses)
+
+
+def _make_request(
+    token_store: TokenStore,
+    schema_cache: SchemaCache,
+    web_cache: CacheManagerProtocol,
+    request: Request,
+) -> None:
+    """Make a single request."""
+    response = asyncio.run(
+        dispatch_request(
+            request=request,
+            schema_cache=schema_cache,
+            token_store=token_store,
+            web_cache=web_cache,
+        )
+    )
+    console = Console()
+    if isinstance(response, Response):
+        console.print(f"[green]Response:[/green] {response}")
+        console.print(response)
+    elif isinstance(response, FailedRequestValidation):
+        console.print(f"[red]Failed Validation:[/red] {response}")
+        console.print(response)
+    elif isinstance(response, FailedRuntimeResponse):
+        console.print(f"[red]Failed Response:[/red] {response}")
+        console.print(response)
+
+
+def _make_request_group(
+    token_store: TokenStore,
+    schema_cache: SchemaCache,
+    web_cache: CacheManagerProtocol,
+    request_group: RequestGroup,
+    output_directory: Path | None = None,
+) -> None:
+    """Make a group of requests."""
+    response_group = asyncio.run(
+        dispatch_request_group(
+            request_group=request_group,
+            schema_cache=schema_cache,
+            token_store=token_store,
+            web_cache=web_cache,
+        )
+    )
+    console = Console()
+    console.print(f"[green]Response Group:[/green]")
+    console.print(f"Out of {len(request_group.requests)} requests:")
+    console.print(f"  Successful responses: {len(response_group.responses)}")
+    console.print(
+        f"  Failed validations: {len(response_group.failed_request_validations)}"
+    )
+    console.print(f"  Failed responses: {len(response_group.failed_runtime_responses)}")
+    if output_directory is not None:
+        now = file_safe_string(f"{Instant.now()}")
+        file_name = f"{request_group.group_id}-{now}-response-group.json"
+        saved = save_text_file(
+            text=response_group.to_string(indent=4),
+            output_dir=output_directory,
+            file_name=file_name,
+            overwrite=False,
+        )
+        console.print(f"[green]Response group saved to:[/green] {saved}")
+    else:
+        console.print(response_group)

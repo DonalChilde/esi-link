@@ -3,9 +3,18 @@
 
 from dataclasses import dataclass, field
 from typing import Any
+from uuid import UUID
+
+from pydantic import RootModel
+from whenever import Instant
 
 from esi_link.rewrite.execution.models import HttpResponse
-from esi_link.rewrite.runtime.models import RuntimeRequest
+from esi_link.rewrite.request.models import GroupAction, Request
+from esi_link.rewrite.runtime.models import (
+    FailedRuntimeResponse,
+    RuntimeRequest,
+)
+from esi_link.rewrite.validation.models import FailedRequestValidation
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -20,3 +29,89 @@ class ResponseGroupAction:
 class Response:
     http_response: HttpResponse
     runtime_request: RuntimeRequest
+
+    def to_string(self, indent: int) -> str:
+        """Return a string representation of the response with the specified indentation."""
+        root_model = ResponseRoot(self)
+        json_str = root_model.model_dump_json(indent=indent)
+        return json_str
+
+    @classmethod
+    def from_string(cls, json_str: str) -> Response:
+        """Parse the response from a JSON string."""
+        value = ResponseRoot.model_validate_json(json_str).root
+        return value
+
+
+ResponseRoot = RootModel[Response]
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ResponseGroup:
+    """Represents a group of responses that are related to each other, such as responses from requests that were part of the same RequestGroup."""
+
+    # These fields are copied from the RequestGroup. requests are not included because
+    # they are in the responses.
+    group_id: UUID
+    created_on: Instant
+    description: str
+    group_actions: list[GroupAction] = field(default_factory=list[GroupAction])
+    responses: dict[UUID, Response] = field(default_factory=dict[UUID, Response])
+    failed_request_validations: dict[UUID, FailedRequestValidation] = field(
+        default_factory=dict[UUID, FailedRequestValidation]
+    )
+    failed_runtime_responses: dict[UUID, FailedRuntimeResponse] = field(
+        default_factory=dict[UUID, FailedRuntimeResponse]
+    )
+
+    def to_string(self, indent: int) -> str:
+        """Return a string representation of the ResponseGroup with the specified indentation."""
+        root_model = ResponseGroupRoot(self)
+        json_str = root_model.model_dump_json(indent=indent)
+        return json_str
+
+    @classmethod
+    def from_string(cls, json_str: str) -> ResponseGroup:
+        """Parse the ResponseGroup from a JSON string."""
+        value = ResponseGroupRoot.model_validate_json(json_str).root
+        return value
+
+
+ResponseGroupRoot = RootModel[ResponseGroup]
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ResponseData:
+    """Represents the data returned in a successful response to an ESI request."""
+
+    request: Request
+    """The original request that this response corresponds to."""
+    data: Any
+    """The actual data returned in the response. This can be of any type, depending on the request and the ESI endpoint. Usually a json list or dict."""
+    metrics: dict[str, Any] = field(default_factory=dict[str, Any])
+    """Performance metrics related to the processing of the request and generation of the response. This can include things like execution time, cache hits/misses, etc."""
+
+    def to_string(self, indent: int) -> str:
+        """Return a string representation of the response data with the specified indentation."""
+        root_model = ResponseDataRoot(self)
+        json_str = root_model.model_dump_json(indent=indent)
+        return json_str
+
+    @classmethod
+    def from_string(cls, json_str: str) -> ResponseData:
+        """Parse the response data from a JSON string."""
+        value = ResponseDataRoot.model_validate_json(json_str).root
+        return value
+
+
+ResponseDataRoot = RootModel[ResponseData]
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ResponseDebug:
+    """Represents debug information included in the response to an ESI request.
+
+    This can include details about the request processing, such as validation results, execution time, etc.
+    """
+
+    pass

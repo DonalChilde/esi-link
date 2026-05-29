@@ -1,11 +1,11 @@
 """Function for dispatching requests."""
 
 import asyncio
+from copy import deepcopy
 from uuid import UUID
 
 from aiolimiter import AsyncLimiter
 
-from esi_link.esi_auth.models import ResponseGroup
 from esi_link.rewrite.actions.response_action import do_response_action
 from esi_link.rewrite.auth.token_store import TokenStore
 from esi_link.rewrite.execution.request_executor_httpx2 import (
@@ -22,7 +22,7 @@ from esi_link.rewrite.request.models import (
     Request,
     RequestGroup,
 )
-from esi_link.rewrite.response.models import Response
+from esi_link.rewrite.response.models import Response, ResponseGroup
 from esi_link.rewrite.runtime.models import (
     FailedRuntimeResponse,
     RuntimeRequest,
@@ -38,7 +38,7 @@ from esi_link.rewrite.validation.request_validation_factory import validate_requ
 # TODO refactor web cache name.
 
 
-async def dispatch_requests(
+async def _dispatch_requests(
     requests: dict[UUID, Request],
     schema_cache: SchemaCache,
     web_cache: CacheManagerProtocol,
@@ -108,6 +108,36 @@ async def dispatch_requests(
     return responses, failed_request_validations, failed_runtime_responses
 
 
+async def dispatch_request(
+    request: Request,
+    schema_cache: SchemaCache,
+    web_cache: CacheManagerProtocol,
+    token_store: TokenStore | None = None,
+    requests_per: float = 100.0,
+    time_period: float = 60.0,
+) -> Response | FailedRuntimeResponse | FailedRequestValidation:
+    """Dispatch a single request and return the response."""
+    responses, failed_validations, failed_responses = await _dispatch_requests(
+        requests={request.request_id: request},
+        schema_cache=schema_cache,
+        web_cache=web_cache,
+        token_store=token_store,
+        requests_per=requests_per,
+        time_period=time_period,
+    )
+
+    if responses:
+        return responses[request.request_id]
+    elif failed_validations:
+        return failed_validations[request.request_id]
+    elif failed_responses:
+        return failed_responses[request.request_id]
+    else:
+        raise RuntimeError(
+            "Unexpected error: no response, failed validation, or failed response returned."
+        )
+
+
 async def dispatch_request_group(
     request_group: RequestGroup,
     schema_cache: SchemaCache,
@@ -115,12 +145,9 @@ async def dispatch_request_group(
     token_store: TokenStore | None = None,
     requests_per: float = 100.0,
     time_period: float = 60.0,
-) -> tuple[
-    ResponseGroup,
-    dict[UUID, FailedRequestValidation],
-    dict[UUID, FailedRuntimeResponse],
-]:
-    responses, failed_validations, failed_responses = await dispatch_requests(
+) -> ResponseGroup:
+    """Dispatch a group of requests and return a group of responses."""
+    responses, failed_validations, failed_responses = await _dispatch_requests(
         requests=request_group.requests,
         schema_cache=schema_cache,
         web_cache=web_cache,
@@ -128,5 +155,13 @@ async def dispatch_request_group(
         requests_per=requests_per,
         time_period=time_period,
     )
-    response_group = ResponseGroup(group_id=request_group.group_id, responses=responses)
-    return response_group, failed_validations, failed_responses
+    response_group = ResponseGroup(
+        group_id=request_group.group_id,
+        created_on=request_group.created_on,
+        description=request_group.description,
+        group_actions=deepcopy(request_group.group_actions),
+        responses=responses,
+        failed_request_validations=failed_validations,
+        failed_runtime_responses=failed_responses,
+    )
+    return response_group

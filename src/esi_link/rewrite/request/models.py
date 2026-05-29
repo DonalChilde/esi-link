@@ -9,7 +9,7 @@ from esi_link.type_defs import Lang
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
-class RequestAction:
+class Action:
     """Represents an action to be taken after receiving a response for a request."""
 
     action_type: str
@@ -17,7 +17,7 @@ class RequestAction:
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
-class RequestGroupAction:
+class GroupAction:
     """Represents an action to be taken after receiving a group of responses."""
 
     action_type: str
@@ -70,9 +70,7 @@ class Request:
     json_body: Any | None = None
     """The JSON body of the request, if applicable. This is used for POST, PUT, PATCH 
         requests."""
-    actions_after_response: list[RequestAction] = field(
-        default_factory=list[RequestAction]
-    )
+    actions: list[Action] = field(default_factory=list[Action])
 
     def to_string(self, indent: int) -> str:
         """Return a string representation of the request with the specified indentation."""
@@ -100,9 +98,7 @@ class RequestGroup:
     group_id: UUID
     description: str = ""
     requests: dict[UUID, Request]
-    response_actions: list[RequestGroupAction] = field(
-        default_factory=list[RequestGroupAction]
-    )
+    group_actions: list[GroupAction] = field(default_factory=list[GroupAction])
 
     def to_string(self, indent: int) -> str:
         """Return a string representation of the RequestGroup with the specified indentation."""
