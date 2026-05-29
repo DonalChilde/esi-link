@@ -1,5 +1,6 @@
 """Functions for validating requests and request groups."""
 
+import logging
 from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
@@ -7,6 +8,7 @@ from uuid import UUID
 
 from httpx2 import Client
 
+from esi_link.rewrite.auth.token_store import TokenStore
 from esi_link.rewrite.helpers.save_text_file import save_text_file
 from esi_link.rewrite.request.models import Request, RequestGroup
 from esi_link.rewrite.schema.models import (
@@ -20,6 +22,8 @@ from esi_link.rewrite.validation.models import (
     ValidatedRequest,
     ValidatedRequestGroup,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _write_debug_file(
@@ -40,8 +44,8 @@ def _write_debug_file(
 def validate_request(
     request: Request,
     schema_cache: SchemaCache,
-    authorized_characters: set[int],
     session: Client,
+    token_store: TokenStore | None = None,
     debug_path: Path | None = None,
 ) -> ValidatedRequest | FailedRequestValidation:
     """Validates an individual request.
@@ -54,6 +58,9 @@ def validate_request(
         request_id=request.request_id,
         actions_after_response=[],  # TODO move to validation step after we have the schema, so we can validate that the actions are valid for the requested operation_id
     )
+    in_process = _validate_compatibility_date(
+        request, in_process, schema_cache=schema_cache, session=session
+    )
     in_process = _validate_request_schema(
         request, in_process, schema_cache=schema_cache, session=session
     )
@@ -64,23 +71,27 @@ def validate_request(
         if debug_path is not None:
             _write_debug_file(in_process, debug_path)
         return in_process
+
     # Get the schema for use in the rest of the validation steps.
-    if in_process.compatibility_date is None:
-        schema = schema_cache.get_latest_schema(session=session).esi_schema
-    else:
-        schema = schema_cache.get_schema(
-            compatibility_date=in_process.compatibility_date,
-            session=session,
-        ).esi_schema
+    schema = schema_cache.get_schema(
+        compatibility_date=in_process.compatibility_date,
+        session=session,
+    ).esi_schema
     in_process = _validate_operation_id(request, in_process, schema=schema)
     if isinstance(in_process, FailedRequestValidation):
-        # If the operation_id validation failed, we don't need to do any further validation, because the request is already invalid. We can just return the FailedRequestValidation with the operation_id validation error.
+        # If the operation_id validation failed, we don't need to do any further validation,
+        # because the request is already invalid. We can just return the FailedRequestValidation
+        # with the operation_id validation error.
         if debug_path is not None:
             _write_debug_file(in_process, debug_path)
         return in_process
     in_process = _validate_path_parameters(request, in_process, schema=schema)
     in_process = _validate_query_parameters(request, in_process, schema=schema)
     in_process = _validate_body_parameters(request, in_process, schema=schema)
+    if token_store is not None:
+        authorized_characters = set(token_store.available_character_ids)
+    else:
+        authorized_characters: set[int] = set()
     in_process = _validate_authentication(
         request, in_process, schema=schema, authorized_characters=authorized_characters
     )
@@ -100,8 +111,8 @@ def validate_request(
 def validate_requests(
     requests: dict[UUID, Request],
     schema_cache: SchemaCache,
-    authorized_characters: set[int],
     session: Client,
+    token_store: TokenStore | None = None,
     debug_path: Path | None = None,
 ) -> tuple[dict[UUID, ValidatedRequest], dict[UUID, FailedRequestValidation]]:
     """Validates a group of requests.
@@ -115,7 +126,7 @@ def validate_requests(
         validation_result = validate_request(
             request=request,
             schema_cache=schema_cache,
-            authorized_characters=authorized_characters,
+            token_store=token_store,
             session=session,
             debug_path=debug_path,
         )
@@ -131,7 +142,7 @@ def validate_request_group(
     schema_cache: SchemaCache,
     *,
     session: Client,
-    authorized_characters: set[int],
+    token_store: TokenStore | None = None,
 ) -> ValidatedRequestGroup | FailedRequestGroupValidation:
     """Validates a request group and all of its individual requests.
 
@@ -149,13 +160,15 @@ def validate_request_group(
     # in_process = _validate_group_directory_template(request_group, in_process)
     # in_process = _validate_group_filename_template(request_group, in_process)
     if isinstance(in_process, FailedRequestGroupValidation):
-        # If the group-level validation failed, we don't need to validate the individual requests, because the group is already invalid. We can just return the FailedRequestGroupValidation with the group-level errors.
+        # If the group-level validation failed, we don't need to validate the individual
+        # requests, because the group is already invalid. We can just return the
+        # FailedRequestGroupValidation with the group-level errors.
         return in_process
     for request_id, request in request_group.requests.items():
         validated_request_or_failure = validate_request(
             request=request,
             schema_cache=schema_cache,
-            authorized_characters=authorized_characters,
+            token_store=token_store,
             session=session,
         )
         if isinstance(validated_request_or_failure, ValidatedRequest):
@@ -166,6 +179,45 @@ def validate_request_group(
                 validated_request_or_failure
             )
 
+    return in_process
+
+
+def _validate_compatibility_date(
+    request: Request,
+    in_process: ValidatedRequest | FailedRequestValidation,
+    *,
+    schema_cache: SchemaCache,
+    session: Client,
+) -> ValidatedRequest | FailedRequestValidation:
+    """Validates that the compatibility date provided in the request is valid.
+
+    If no compatibility date is provided in the request, the latest schema compatibility
+    date will be used.
+    """
+    valid_compatibility_dates = schema_cache.valid_compatibility_dates(session=session)
+    compatibility_date = request.compatibility_date
+    if compatibility_date is None:
+        compatibility_date = schema_cache.latest_compatibility_date(session=session)
+    if compatibility_date not in valid_compatibility_dates["compatibility_dates"]:
+        fail_msg = (
+            f"Requested compatibility date {compatibility_date} is not valid. "
+            f"Valid compatibility dates are: {', '.join(valid_compatibility_dates['compatibility_dates'])}."
+        )
+        if isinstance(in_process, FailedRequestValidation):
+            fail_msgs = list(in_process.errors) + [fail_msg]
+        else:
+            fail_msgs = [fail_msg]
+        return FailedRequestValidation(
+            request=request,
+            errors=tuple(fail_msgs),
+        )
+    # Update validated fields.
+    if isinstance(in_process, ValidatedRequest):
+        in_process = deepcopy(in_process)
+        in_process = replace(
+            in_process,
+            compatibility_date=compatibility_date,
+        )
     return in_process
 
 
@@ -183,47 +235,18 @@ def _validate_request_schema(
     validation. If the requested schema is not available, returns a FailedRequestValidation
     with the appropriate error message.
     """
-    # rewrite using schema cache instead of schema manager.
-    # if compatibility date is provided, check that it is a valid compatibility date, and that its schema is available.
-    # if no compatibility date is provided, we can assume the latest schema will be used, check that it is available.
-
-    valid_compatibility_dates = schema_cache.valid_compatibility_dates(session=session)
-    if request.compatibility_date is not None:
-        # See if the requested compatibility date is in the list of valid compatibility dates.
-        if request.compatibility_date not in valid_compatibility_dates:
-            fail_msg = f"Requested compatibility date {request.compatibility_date} is not valid. Valid compatibility dates are: {', '.join(valid_compatibility_dates)}."
-            if isinstance(inprocess_request, FailedRequestValidation):
-                fail_msgs = list(inprocess_request.errors) + [fail_msg]
-            else:
-                fail_msgs = [fail_msg]
-            return FailedRequestValidation(
-                request=request,
-                errors=tuple(fail_msgs),
-            )
-        else:
-            # If the requested compatibility date is valid, we can check that the schema
-            # for that compatibility date is available in the schema cache.
-            try:
-                _requested_schema = schema_cache.get_schema(
-                    session=session,
-                    compatibility_date=request.compatibility_date,
-                )
-            except Exception as e:
-                fail_msg = f"Error while trying to get the requested schema from the schema cache: {str(e)}"
-                if isinstance(inprocess_request, FailedRequestValidation):
-                    fail_msgs = list(inprocess_request.errors) + [fail_msg]
-                else:
-                    fail_msgs = [fail_msg]
-                return FailedRequestValidation(
-                    request=request,
-                    errors=tuple(fail_msgs),
-                )
-    # No compatibility date was provided, so we can assume the latest schema will be used.
-    # Check that the latest schema is available in the schema cache.
+    if isinstance(inprocess_request, FailedRequestValidation):
+        # If the compatibility date validation already failed, we don't need to check for
+        # the requested schema, because the request is already invalid. We can just return
+        # the FailedRequestValidation with the compatibility date validation error.
+        return deepcopy(inprocess_request)
     try:
-        _latest_schema = schema_cache.get_latest_schema(session=session)
+        _requested_schema = schema_cache.get_schema(
+            session=session,
+            compatibility_date=inprocess_request.compatibility_date,
+        )
     except Exception as e:
-        fail_msg = f"Error while trying to get the latest schema from the schema cache: {str(e)}"
+        fail_msg = f"Error while trying to get the requested schema from the schema cache: {str(e)}"
         if isinstance(inprocess_request, FailedRequestValidation):
             fail_msgs = list(inprocess_request.errors) + [fail_msg]
         else:
@@ -233,13 +256,9 @@ def _validate_request_schema(
             errors=tuple(fail_msgs),
         )
     # compatibility date is valid and the requested schema is available.
-    # Update validated fields.
-    if isinstance(inprocess_request, ValidatedRequest):
-        inprocess_request = deepcopy(inprocess_request)
-        inprocess_request = replace(
-            inprocess_request,
-            compatibility_date=request.compatibility_date,
-        )
+
+    inprocess_request = deepcopy(inprocess_request)
+
     return inprocess_request
 
 
@@ -249,7 +268,11 @@ def _validate_operation_id(
     *,
     schema: EsiSchema,
 ) -> ValidatedRequest | FailedRequestValidation:
-    """Validates that the operation_id field of the request corresponds to a valid operation in the ESI OpenAPI schema. If the operation_id is invalid, returns a FailedRequestValidation with the appropriate error message. If the operation_id is valid, returns the inprocess_request unchanged."""
+    """Validates that the operation_id field of the request corresponds to a valid operation in the ESI OpenAPI schema.
+
+    If the operation_id is invalid, returns a FailedRequestValidation with the appropriate
+    error message. If the operation_id is valid, returns the inprocess_request unchanged.
+    """
     available_operations = schema.operation_ids
     if request.operation_id not in available_operations:
         fail_msg = f"Requested operation_id {request.operation_id} is not available in the schema."
@@ -277,7 +300,12 @@ def _validate_path_parameters(
     *,
     schema: EsiSchema,
 ) -> ValidatedRequest | FailedRequestValidation:
-    """Validates that the path parameters provided in the request are valid for the requested operation_id according to the ESI OpenAPI schema. If any path parameters are invalid, returns a FailedRequestValidation with the appropriate error messages. If all path parameters are valid, returns the inprocess_request unchanged."""
+    """Validates that the path parameters provided in the request are valid for the requested operation_id according to the ESI OpenAPI schema.
+
+    If any path parameters are invalid, returns a FailedRequestValidation with the
+    appropriate error messages. If all path parameters are valid, returns the inprocess_
+    request unchanged.
+    """
     operation = schema.get_operation_by_id(request.operation_id)
     assert operation is not None, (
         "operation should have been found in the operation_id validation step"

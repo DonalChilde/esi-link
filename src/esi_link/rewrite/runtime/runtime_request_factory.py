@@ -6,7 +6,10 @@ from dataclasses import asdict, replace
 from string import Template
 from uuid import UUID, uuid5
 
+from httpx2 import Client
+
 from esi_link import ESI_LINK_NAMESPACE
+from esi_link.rewrite.auth.token_store import TokenStore
 from esi_link.rewrite.helpers.canonicalize_url import combine_and_canonicalize_url
 from esi_link.rewrite.runtime.models import (
     RequestGroupMetrics,
@@ -23,8 +26,8 @@ logger = logging.getLogger(__name__)
 
 def generate_runtime_request(
     validated_request: ValidatedRequest,
-    authorization_headers: dict[int, dict[str, str]],
-    user_agent: str,
+    token_store: TokenStore | None,
+    session: Client,
     timeout_seconds: int = 10,
 ) -> RuntimeRequest:
     """Generate a RuntimeRequest from a ValidatedRequest and the corresponding EsiSchema."""
@@ -33,17 +36,15 @@ def generate_runtime_request(
     in_process = _set_path_url(in_process)
     in_process = _set_cache_url(in_process)
     in_process = _set_cache_key(in_process)
-    in_process = _set_headers(
-        in_process, authorization_headers=authorization_headers, user_agent=user_agent
-    )
+    in_process = _set_headers(in_process, token_store=token_store, session=session)
     in_process = _set_additional_query_parameters(in_process)
     return in_process
 
 
 def generate_runtime_request_group(
     validated_request_group: ValidatedRequestGroup,
-    authorization_headers: dict[int, dict[str, str]],
-    user_agent: str,
+    token_store: TokenStore | None,
+    session: Client,
     timeout_seconds: int = 10,
 ) -> RuntimeRequestGroup:
     """Generate a RuntimeRequestGroup from a ValidatedRequestGroup."""
@@ -51,8 +52,8 @@ def generate_runtime_request_group(
     for request_id, validated_request in validated_request_group.requests.items():
         runtime_request = generate_runtime_request(
             validated_request=validated_request,
-            authorization_headers=authorization_headers,
-            user_agent=user_agent,
+            token_store=token_store,
+            session=session,
             timeout_seconds=timeout_seconds,
         )
         runtime_requests[request_id] = runtime_request
@@ -133,8 +134,8 @@ def _set_cache_key(
 
 def _set_headers(
     inprocess_request: RuntimeRequest,
-    authorization_headers: dict[int, dict[str, str]],
-    user_agent: str,
+    token_store: TokenStore | None,
+    session: Client,
 ) -> RuntimeRequest:
     """Sets the headers field of the RuntimeRequest based on the authentication requirements of the request and the provided authorization headers."""
     headers: dict[str, str] = {}
@@ -143,17 +144,23 @@ def _set_headers(
             raise ValueError(
                 "Request requires authentication but no authorization_id is provided in the request."
             )
-        authorization_header = authorization_headers.get(
-            inprocess_request.authorization_id
-        )
-        if authorization_header is None:
+        if token_store is None:
+            raise ValueError(
+                "Request requires authentication but no token_store is provided."
+            )
+        try:
+            authorization_header = token_store.refresh_character_token(
+                inprocess_request.authorization_id, session=session
+            ).auth_headers
+        except Exception as e:
             raise ValueError(
                 f"Request requires authentication but authentication header is not available "
                 f"for the given authorization_id {inprocess_request.authorization_id}."
-            )
+            ) from e
         headers.update(authorization_header)
-    # Set the User-Agent header for all requests
-    headers["User-Agent"] = user_agent
+    headers["Accept-Language"] = inprocess_request.language
+    headers["X-Compatibility-Date"] = inprocess_request.compatibility_date
+
     # Update the inprocess_request with the generated headers
     inprocess_request = deepcopy(inprocess_request)
     inprocess_request = replace(inprocess_request, headers=headers)

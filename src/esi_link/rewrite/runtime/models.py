@@ -157,10 +157,8 @@ class RuntimeRequest:
     """The timestamp of when the request was created. This is used for things like determining the age of the request, or for saving response data to disk with a filename that includes the creation date."""
     operation_id: str = "NOT_SET"
     """The operation ID of the request, corresponding to the operationId in the ESI OpenAPI schema."""
-    compatibility_date: str | None = None
-    """Optional compatibility date for the request. If not provided, the latest schema will be used."""
-    at_or_after: int | None = None
-    """Used with compatibility date. Optional timestamp to refine compatibility date selection. If provided, the schema with the compatibility date that was downloaded after the provided timestamp will be used."""
+    compatibility_date: str = ""
+    """compatibility date for the request."""
     path_parameters: dict[str, str | int | float] = field(
         default_factory=dict[str, str | int | float]
     )

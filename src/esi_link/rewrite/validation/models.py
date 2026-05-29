@@ -55,8 +55,8 @@ class ValidatedRequest:
     """The timestamp of when the request was created. This is used for things like determining the age of the request, or for saving response data to disk with a filename that includes the creation date."""
     operation_id: str = "NOT_SET"
     """The operation ID of the request, corresponding to the operationId in the ESI OpenAPI schema."""
-    compatibility_date: str | None = None
-    """Optional compatibility date for the request. If not provided, the latest schema will be used."""
+    compatibility_date: str = ""
+    """compatibility date for the request. If not provided by Request, the latest schema compatibility date will be used."""
     path_parameters: dict[str, str | int | float] = field(
         default_factory=dict[str, str | int | float]
     )
@@ -74,10 +74,6 @@ class ValidatedRequest:
     actions_after_response: list[ValidatedRequestAction] = field(
         default_factory=list[ValidatedRequestAction]
     )
-    # save_directory_template: str | None = None
-    # """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
-    # save_filename_template: str | None = None
-    # """The filename template to save the response data to, if applicable. If not provided, but a save_directory_template is provided, a default filename will be used."""
 
     # These fields are added to capture required info from the schema for the request,
     # such as the path URL template, HTTP method, and whether the request is paged or cacheable.

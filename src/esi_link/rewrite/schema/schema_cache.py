@@ -1,5 +1,6 @@
 """Module for caching ESI schemas on disk and in memory, with support for expiration based on a TTL."""
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -10,6 +11,8 @@ from whenever import Instant
 
 from esi_link.rewrite.schema.models import EsiSchema
 from esi_link.rewrite.schema.schema_tool import CompatibilityDates, SchemaTool
+
+logger = logging.getLogger(__name__)
 
 
 class SchemaCacheError(Exception):
@@ -157,7 +160,9 @@ class SchemaCache:
         )
         if not compatibility_dates:
             raise ValueError("No compatibility dates available")
-        latest_compatibility_date = max(compatibility_dates)
+        latest_compatibility_date = max(
+            compatibility_dates.get("compatibility_dates", [])
+        )
         cached_schema = self.get_schema(latest_compatibility_date, session=session)
 
         return cached_schema
