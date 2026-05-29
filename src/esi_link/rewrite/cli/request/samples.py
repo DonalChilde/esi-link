@@ -22,6 +22,12 @@ def save_samples(
             help="Output directory path.",
         ),
     ],
+    character_id: Annotated[
+        int | None,
+        typer.Option(
+            "--character-id", help="Character ID to use for authorized request samples."
+        ),
+    ] = None,
     overwrite: Annotated[
         bool, typer.Option("--overwrite", help="Whether to overwrite existing files.")
     ] = False,
@@ -56,3 +62,16 @@ def save_samples(
         overwrite=overwrite,
     )
     console.print(f"Saved status group request: {saved}")
+    if character_id is not None:
+        character_attributes_request = example_requests.character_attributes(
+            character_id
+        )
+        saved = save_text_file(
+            text=RequestRoot(root=character_attributes_request).model_dump_json(
+                indent=2
+            ),
+            output_dir=output_directory,
+            file_name="character_attributes-request.json",
+            overwrite=overwrite,
+        )
+        console.print(f"Saved character attributes request: {saved}")

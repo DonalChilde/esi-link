@@ -320,17 +320,17 @@ def _validate_path_parameters(
         if param_name not in given_path_parameters:
             fail_msgs.append(f"Missing required path parameter: {param_name}")
         else:
-            if param_schema["type"] == "integer":
+            if param_schema["schema"]["type"] == "integer":
                 if not isinstance(given_path_parameters[param_name], int):
                     fail_msgs.append(
                         f"Invalid type for path parameter {param_name}: expected integer, got {type(given_path_parameters[param_name]).__name__}"
                     )
-            elif param_schema["type"] == "string":
+            elif param_schema["schema"]["type"] == "string":
                 if not isinstance(given_path_parameters[param_name], str):
                     fail_msgs.append(
                         f"Invalid type for path parameter {param_name}: expected string, got {type(given_path_parameters[param_name]).__name__}"
                     )
-            pass
+            logger.warning(f"Unexpected path parameter: {param_schema}")
     # If there are any validation errors, return a FailedRequestValidation with the error messages.
     if fail_msgs:
         if isinstance(inprocess_request, FailedRequestValidation):

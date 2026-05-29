@@ -35,3 +35,15 @@ def status_group() -> RequestGroup:
             server_status_request.request_id: server_status_request,
         },
     )
+
+
+def character_attributes(character_id: int) -> Request:
+    """Example request for the EVE ESI character attributes endpoint."""
+    return Request(
+        request_id=uuid4(),
+        operation_id="GetCharactersCharacterIdAttributes",
+        description=f"Example request for the EVE ESI character attributes endpoint for "
+        f"character ID {character_id}. Showing the use of an authorized request with path parameters.",
+        path_parameters={"character_id": character_id},
+        authorization_id=character_id,
+    )

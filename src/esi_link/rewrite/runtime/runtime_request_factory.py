@@ -3,7 +3,6 @@
 import logging
 from copy import deepcopy
 from dataclasses import asdict, replace
-from string import Template
 from uuid import UUID, uuid5
 
 from httpx2 import Client
@@ -76,9 +75,11 @@ def _set_path_url(
     if not inprocess_request.path_parameters:
         path_url = inprocess_request.path_url_template
     else:
-        template = Template(inprocess_request.path_url_template)
+        # template = Template(inprocess_request.path_url_template)
         try:
-            path_url = template.substitute(inprocess_request.path_parameters)
+            path_url = inprocess_request.path_url_template.format(
+                **inprocess_request.path_parameters
+            )
         except KeyError as e:
             logger.error(
                 "Missing path parameter for URL template substitution. url_template=%s, path_parameters=%r",
