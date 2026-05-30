@@ -55,7 +55,7 @@ def validate_request(
     """
     in_process: ValidatedRequest | FailedRequestValidation = ValidatedRequest(
         original_request=request,
-        actions_after_response=[],  # TODO move to validation step after we have the schema, so we can validate that the actions are valid for the requested operation_id
+        actions=[],  # TODO move to validation step after we have the schema, so we can validate that the actions are valid for the requested operation_id
     )
     in_process = _validate_compatibility_date(
         request, in_process, schema_cache=schema_cache, session=session
@@ -154,7 +154,7 @@ def validate_request_group(
             created_on=request_group.created_on,
             group_id=request_group.group_id,
             description=request_group.description,
-            response_actions=[],  # TODO move to validation step after we have the schema, so we can validate that the actions are valid for the requested operation_ids of the individual requests in the group
+            actions=[],  # TODO move to validation step after we have the schema, so we can validate that the actions are valid for the requested operation_ids of the individual requests in the group
         )
     )
     # in_process = _validate_group_directory_template(request_group, in_process)
@@ -415,15 +415,20 @@ def _validate_query_parameters(
         else:
             # TODO match case
             param_schema = expected_query_parameters[param_name]
-            if param_schema["type"] == "integer":
-                if not isinstance(param_value, int):
+            match param_schema["schema"]["type"]:
+                case "integer":
+                    if not isinstance(param_value, int):
+                        fail_msgs.append(
+                            f"Invalid type for query parameter {param_name}: expected integer, got {type(param_value).__name__}"
+                        )
+                case "string":
+                    if not isinstance(param_value, str):
+                        fail_msgs.append(
+                            f"Invalid type for query parameter {param_name}: expected string, got {type(param_value).__name__}"
+                        )
+                case _:
                     fail_msgs.append(
-                        f"Invalid type for query parameter {param_name}: expected integer, got {type(param_value).__name__}"
-                    )
-            elif param_schema["type"] == "string":
-                if not isinstance(param_value, str):
-                    fail_msgs.append(
-                        f"Invalid type for query parameter {param_name}: expected string, got {type(param_value).__name__}"
+                        f"UnExpected type for query parameter {param_name}: {param_schema['schema']['type']}"
                     )
     for param_name, param_schema in expected_query_parameters.items():
         if (

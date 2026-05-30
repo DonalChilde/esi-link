@@ -1,37 +1,58 @@
-from uuid import UUID
-
-from esi_link.esi_auth.models import (
+from esi_link.rewrite.actions.protocols import (
+    CONTEXT,
+    ActionProtocol,
+    GroupActionProtocol,
+)
+from esi_link.rewrite.response.models import (
+    Response,
     ResponseGroup,
 )
-from esi_link.rewrite.response.models import ResponseGroupAction
 from esi_link.rewrite.runtime.models import (
     FailedRuntimeResponse,
-    RuntimeResponse,
-    RuntimeResponseAction,
 )
-from esi_link.rewrite.validation.models import FailedRequestValidation
+from esi_link.rewrite.validation.models import (
+    FailedRequestValidation,
+    ValidatedRequestAction,
+    ValidatedRequestGroupAction,
+)
+
+
+def get_response_action_instance(action: ValidatedRequestAction) -> ActionProtocol:
+    """Instance an action based on the action type and parameters in the ValidatedRequestAction."""
+    # Implement the logic to retrieve the action instance from the store based on the action type
+    # and parameters in the ValidatedRequestAction
+    pass
+
+
+def get_group_response_action_instance(
+    action: ValidatedRequestGroupAction,
+) -> GroupActionProtocol:
+    """Instance a group action based on the action type and parameters in the ValidatedRequestGroupAction."""
+    # Implement the logic to retrieve the group action instance from the store based on the action type
+    # and parameters in the ValidatedRequestGroupAction
+    pass
 
 
 async def do_response_action(
-    action: RuntimeResponseAction,
-    response: RuntimeResponse | FailedRuntimeResponse,
-) -> RuntimeResponse | FailedRuntimeResponse:
-    # Implement the logic for handling the response action here
-    # get action instance from store
-    # execute action with response as input
-    # return possibly modified response if the action modifies the response.
-    return response
+    action: ActionProtocol,
+    response: Response,
+    context: CONTEXT,
+) -> tuple[Response, CONTEXT]:
+    """Do the response action with the given response and context.
+
+    Return the possibly modified response and context.
+
+    Note that actions are only performed on successful responses. To handle actions on
+    failed responses, use group actions, which have access to the entire response group
+    and can perform actions on failed responses as well.
+    """
+    response, context = action.do_action(response, context)
+    return response, context
 
 
 async def do_group_response_action(
-    action: ResponseGroupAction,
-    response_group: ResponseGroup,
-    failed_validations: dict[UUID, FailedRequestValidation],
-    failed_runtime_responses: dict[UUID, FailedRuntimeResponse],
-) -> tuple[
-    ResponseGroup,
-    dict[UUID, FailedRequestValidation],
-    dict[UUID, FailedRuntimeResponse],
-]:
+    action: GroupActionProtocol, response_group: ResponseGroup, context: CONTEXT
+) -> tuple[ResponseGroup, CONTEXT]:
+    """Do the group response action with the given response group and context, and return the possibly modified response group and context."""
     # Implement the logic for handling the group response action here
-    return response_group, failed_validations, failed_runtime_responses
+    return response_group, context

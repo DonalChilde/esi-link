@@ -176,14 +176,14 @@ class RuntimeRequest:
     parent_id: UUID | None = None
     """The request_id of the parent request if this request is a sub-request, e.g. a paged 
     request or a retry."""
-    _actions_after_response: list[RuntimeResponseAction] = field(
-        default_factory=list[RuntimeResponseAction]
-    )
+    # _actions_after_response: list[RuntimeResponseAction] = field(
+    #     default_factory=list[RuntimeResponseAction]
+    # )
 
-    @property
-    def actions(self) -> list[RuntimeResponseAction]:
-        """The actions to be taken after receiving a response for this request."""
-        return self._actions_after_response
+    # @property
+    # def actions(self) -> list[RuntimeResponseAction]:
+    #     """The actions to be taken after receiving a response for this request."""
+    #     return self._actions_after_response
 
     @property
     def request_id(self) -> UUID:
@@ -201,7 +201,7 @@ class RuntimeRequestGroup:
     requests: dict[UUID, RuntimeRequest] = field(
         default_factory=dict[UUID, RuntimeRequest]
     )
-    actions_after_response: list[RuntimeResponseAction] = field(
+    actions: list[RuntimeResponseAction] = field(
         default_factory=list[RuntimeResponseAction]
     )
     # save_directory_template: str | None = None

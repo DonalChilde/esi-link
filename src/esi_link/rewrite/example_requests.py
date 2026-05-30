@@ -52,3 +52,13 @@ def character_attributes(character_id: int) -> Request:
         path_parameters={"character_id": character_id},
         authorization_id=character_id,
     )
+
+
+def universe_types() -> Request:
+    """Example request for the EVE ESI universe types endpoint."""
+    return Request(
+        request_id=uuid4(),
+        operation_id="GetUniverseTypes",
+        description="Example request for the EVE ESI universe types endpoint, showing the use of query parameters and paged requests.",
+        query_parameters={"page": 1},
+    )

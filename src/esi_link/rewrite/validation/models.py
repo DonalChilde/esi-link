@@ -77,7 +77,7 @@ class ValidatedRequest:
     json_body: Any | None = None
     """The JSON body of the request, if applicable. This is used for POST, PUT, PATCH 
         requests."""
-    actions_after_response: list[ValidatedRequestAction] = field(
+    actions: list[ValidatedRequestAction] = field(
         default_factory=list[ValidatedRequestAction]
     )
 
@@ -141,7 +141,7 @@ class ValidatedRequestGroup:
     requests: dict[UUID, ValidatedRequest] = field(
         default_factory=dict[UUID, ValidatedRequest]
     )
-    response_actions: list[ValidatedRequestGroupAction] = field(
+    actions: list[ValidatedRequestGroupAction] = field(
         default_factory=list[ValidatedRequestGroupAction]
     )
 

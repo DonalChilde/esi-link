@@ -54,6 +54,15 @@ def save_samples(
     )
     console.print(f"Saved server_status request: {saved}")
 
+    universe_types_request = example_requests.universe_types()
+    saved = save_text_file(
+        text=RequestRoot(root=universe_types_request).model_dump_json(indent=2),
+        output_dir=output_directory,
+        file_name="universe_types-request.json",
+        overwrite=overwrite,
+    )
+    console.print(f"Saved universe_types request: {saved}")
+
     status_group_requests = example_requests.status_group()
     saved = save_text_file(
         text=RequestGroupRoot(root=status_group_requests).model_dump_json(indent=2),

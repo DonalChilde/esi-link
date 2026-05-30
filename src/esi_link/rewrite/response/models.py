@@ -8,8 +8,9 @@ from uuid import UUID
 from pydantic import RootModel
 from whenever import Instant
 
+from esi_link.rewrite.actions.models import GroupAction
 from esi_link.rewrite.execution.models import HttpResponse
-from esi_link.rewrite.request.models import GroupAction, Request
+from esi_link.rewrite.request.models import Request
 from esi_link.rewrite.runtime.models import (
     FailedRuntimeResponse,
     RuntimeRequest,

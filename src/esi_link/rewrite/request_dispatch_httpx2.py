@@ -2,11 +2,15 @@
 
 import asyncio
 from copy import deepcopy
+from typing import Any
 from uuid import UUID
 
 from aiolimiter import AsyncLimiter
 
-from esi_link.rewrite.actions.response_action import do_response_action
+from esi_link.rewrite.actions.response_action import (
+    do_response_action,
+    get_response_action_instance,
+)
 from esi_link.rewrite.auth.token_store import TokenStore
 from esi_link.rewrite.execution.request_executor_httpx2 import (
     execute_http_request,
@@ -75,36 +79,47 @@ async def _dispatch_requests(
 
         async def execute_with_actions(
             request: RuntimeRequest,
-        ) -> RuntimeResponse | FailedRuntimeResponse:
-            response = await execute_http_request(
+        ) -> Response | FailedRuntimeResponse:
+            runtime_response = await execute_http_request(
                 request=request,
                 session=async_session,
                 cache_manager=web_cache,
                 rate_limiter=rate_limiter,
             )
-            for action in request.actions:
+            assert runtime_response.http_response is not None, (
+                "HTTP response should not be None for successful runtime responses."
+            )
+            response = Response(
+                http_response=runtime_response.http_response,
+                runtime_request=runtime_response.runtime_request,
+            )
+            context: dict[str, Any] = {}
+            validated_actions = response.runtime_request.validated_request.actions
+
+            for action in validated_actions:
                 # NOTE action might modify the response, so we need to update the response variable with the result of the action.
-                response = await do_response_action(action=action, response=response)
+                action_instance = get_response_action_instance(action)
+                response, context = await do_response_action(
+                    action=action_instance, response=response, context=context
+                )
             return response
 
         tasks = [
             execute_with_actions(request=request)
             for request in runtime_requests.values()
         ]
-        runtime_responses = await asyncio.gather(*tasks)
+        response_list = await asyncio.gather(*tasks)
     responses: dict[UUID, Response] = {}
     failed_runtime_responses: dict[UUID, FailedRuntimeResponse] = {}
-    for runtime_response in runtime_responses:
-        if isinstance(runtime_response, FailedRuntimeResponse):
-            failed_runtime_responses[runtime_response.runtime_request.request_id] = (
-                runtime_response
-            )
+    for response in response_list:
+        if isinstance(response, FailedRuntimeResponse):
+            failed_runtime_responses[response.runtime_request.request_id] = response
         else:
             response = Response(
-                http_response=runtime_response.http_response,
-                runtime_request=runtime_response.runtime_request,
+                http_response=response.http_response,
+                runtime_request=response.runtime_request,
             )
-            responses[runtime_response.runtime_request.request_id] = response
+            responses[response.runtime_request.request_id] = response
     return responses, failed_request_validations, failed_runtime_responses
 
 
@@ -164,4 +179,6 @@ async def dispatch_request_group(
         failed_request_validations=failed_validations,
         failed_runtime_responses=failed_responses,
     )
+    # TODO handle validated group flow?
+    # make an internal group for single actions? Then refactor to use group in execution flow. This makes Sense.
     return response_group
