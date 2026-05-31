@@ -28,6 +28,7 @@ from esi_link.rewrite.request_dispatch_httpx2 import (
     dispatch_request_group,
 )
 from esi_link.rewrite.response.models import Response
+from esi_link.rewrite.response.response_factories import response_to_response_data
 from esi_link.rewrite.runtime.models import FailedRuntimeResponse
 from esi_link.rewrite.schema.schema_cache import SchemaCache
 from esi_link.rewrite.validation.models import FailedRequestValidation
@@ -124,13 +125,14 @@ def _make_request(
     )
     console = Console()
     if isinstance(response, Response):
-        console.print(f"[green]Response:[/green] {response}")
-        console.print(response)
+        console.print(f"[green]Response:[/green]")
+        response_data = response_to_response_data(response)
+        console.print(response_data)
     elif isinstance(response, FailedRequestValidation):
-        console.print(f"[red]Failed Validation:[/red] {response}")
+        console.print(f"[red]Failed Validation:[/red]")
         console.print(response)
     elif isinstance(response, FailedRuntimeResponse):
-        console.print(f"[red]Failed Response:[/red] {response}")
+        console.print(f"[red]Failed Response:[/red]")
         console.print(response)
 
 
