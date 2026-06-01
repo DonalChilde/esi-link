@@ -9,6 +9,7 @@ from esi_link.rewrite.response.models import (
 )
 from esi_link.rewrite.runtime.models import (
     FailedRuntimeResponse,
+    RuntimeResponse,
 )
 from esi_link.rewrite.validation.models import (
     InvalidRequest,
@@ -35,9 +36,9 @@ def get_group_response_action_instance(
 
 async def do_response_action(
     action: ActionProtocol,
-    response: Response,
+    response: RuntimeResponse | FailedRuntimeResponse,
     context: CONTEXT,
-) -> tuple[Response, CONTEXT]:
+) -> tuple[RuntimeResponse | FailedRuntimeResponse, CONTEXT]:
     """Do the response action with the given response and context.
 
     Return the possibly modified response and context.

@@ -54,7 +54,7 @@ def validate_request(
     returns a FailedRequestValidation with the appropriate error messages.
     """
     in_process: ValidatedRequest | InvalidRequest = ValidatedRequest(
-        original_request=request,
+        request_id=request.request_id,
         actions=[],  # TODO move to validation step after we have the schema, so we can validate that the actions are valid for the requested operation_id
     )
     in_process = _validate_compatibility_date(
@@ -150,13 +150,12 @@ def validate_request_group(
     is invalid, returns a FailedRequestGroupValidation with the appropriate error messages.
     """
     in_process: ValidatedRequestGroup | InvalidRequestGroup = ValidatedRequestGroup(
-        created_on=request_group.created_on,
-        group_id=request_group.group_id,
-        description=request_group.description,
-        actions=[],  # TODO move to validation step after we have the schema, so we can validate that the actions are valid for the requested operation_ids of the individual requests in the group
+        request_group=request_group,
     )
-    # in_process = _validate_group_directory_template(request_group, in_process)
-    # in_process = _validate_group_filename_template(request_group, in_process)
+
+    # NOTE For now, there is no group-level validation logic, but if we add any in the future,
+    # it should be done here before the loop that validates the individual requests.
+
     if isinstance(in_process, InvalidRequestGroup):
         # If the group-level validation failed, we don't need to validate the individual
         # requests, because the group is already invalid. We can just return the
@@ -170,12 +169,13 @@ def validate_request_group(
             session=session,
         )
         if isinstance(validated_request_or_failure, ValidatedRequest):
-            in_process.requests[request_id] = validated_request_or_failure
+            in_process.valid_requests[request_id] = validated_request_or_failure
 
         if isinstance(validated_request_or_failure, InvalidRequest):
-            in_process.failed_request_validations[request_id] = (
-                validated_request_or_failure
-            )
+            in_process.invalid_requests[request_id] = validated_request_or_failure
+
+    # TODO Validate group-level actions here, after we have defined what those look like
+    # and how they should be validated against the schema.
 
     return in_process
 
@@ -536,7 +536,9 @@ def _validate_body_parameters(
         #             f"Invalid type for body parameters: expected number, got {given_type}"
         #         )
         case _:
-            pass
+            raise ValueError(
+                f"Unexpected or missing type for body parameters in schema: {body_schema.get('type')}"
+            )
 
     # If there are any validation errors, return a FailedRequestValidation with the error messages.
     if fail_msgs:

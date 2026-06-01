@@ -1,6 +1,7 @@
 from typing import Any, Protocol
 
 from esi_link.rewrite.response.models import Response, ResponseGroup
+from esi_link.rewrite.runtime.models import FailedRuntimeResponse, RuntimeResponse
 
 type CONTEXT = dict[str, Any]
 
@@ -10,9 +11,9 @@ class ActionProtocol(Protocol):
 
     def do_action(
         self,
-        response: Response,
+        response: RuntimeResponse | FailedRuntimeResponse,
         context: CONTEXT,
-    ) -> tuple[Response, CONTEXT]:
+    ) -> tuple[RuntimeResponse | FailedRuntimeResponse, CONTEXT]:
         """Execute the action with the given response."""
         ...
 

@@ -10,12 +10,19 @@ from whenever import Instant
 
 from esi_link.rewrite.actions.models import GroupAction
 from esi_link.rewrite.execution.models import HttpResponse
-from esi_link.rewrite.request.models import Request
+from esi_link.rewrite.request.models import Request, RequestGroup
 from esi_link.rewrite.runtime.models import (
     FailedRuntimeResponse,
+    InvalidRuntimeRequest,
+    RuntimeGroupMetrics,
     RuntimeRequest,
+    RuntimeResponse,
 )
-from esi_link.rewrite.validation.models import InvalidRequest
+from esi_link.rewrite.validation.models import (
+    InvalidRequest,
+    ValidatedRequest,
+    ValidatedRequestGroupAction,
+)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -53,17 +60,42 @@ class ResponseGroup:
 
     # These fields are copied from the RequestGroup. requests are not included because
     # they are in the responses.
-    group_id: UUID
-    created_on: Instant
-    description: str
-    group_actions: list[GroupAction] = field(default_factory=list[GroupAction])
-    responses: dict[UUID, Response] = field(default_factory=dict[UUID, Response])
-    failed_request_validations: dict[UUID, InvalidRequest] = field(
+    request_group: RequestGroup
+    """The original request group that this response group corresponds to."""
+    # These fields are determined during validation.
+    valid_requests: dict[UUID, ValidatedRequest] = field(
+        default_factory=dict[UUID, ValidatedRequest]
+    )
+    invalid_requests: dict[UUID, InvalidRequest] = field(
         default_factory=dict[UUID, InvalidRequest]
     )
+    """The requests that failed validation."""
+    valid_actions: list[ValidatedRequestGroupAction] = field(
+        default_factory=list[ValidatedRequestGroupAction]
+    )
+    invalid_actions: list[ValidatedRequestGroupAction] = field(
+        default_factory=list[ValidatedRequestGroupAction]
+    )
+
+    # These fields are determined prior to executing the requests in the group.
+    metrics: RuntimeGroupMetrics = field(default_factory=RuntimeGroupMetrics)
+    runtime_requests: dict[UUID, RuntimeRequest] = field(
+        default_factory=dict[UUID, RuntimeRequest]
+    )
+    """A mapping of request_id to RuntimeRequest for all requests in the group."""
+    invalid_runtime_requests: dict[UUID, InvalidRuntimeRequest] = field(
+        default_factory=dict[UUID, InvalidRuntimeRequest]
+    )
+    """The requests that failed the transition from Validated to Runtime."""
+    # These fields are determined after the requests are executed
+    runtime_responses: dict[UUID, RuntimeResponse] = field(
+        default_factory=dict[UUID, RuntimeResponse]
+    )
+    """A mapping of request_id to RuntimeResponse for all requests in the group."""
     failed_runtime_responses: dict[UUID, FailedRuntimeResponse] = field(
         default_factory=dict[UUID, FailedRuntimeResponse]
     )
+    """The requests that failed during execution."""
 
     def to_string(self, indent: int) -> str:
         """Return a string representation of the ResponseGroup with the specified indentation."""

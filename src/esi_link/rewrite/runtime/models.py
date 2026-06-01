@@ -12,6 +12,7 @@ from esi_link.rewrite.request.models import RequestGroup
 from esi_link.rewrite.validation.models import (
     InvalidRequest,
     ValidatedRequest,
+    ValidatedRequestAction,
     ValidatedRequestGroupAction,
 )
 
@@ -183,6 +184,10 @@ class RuntimeRequest:
     parent_id: UUID | None = None
     """The request_id of the parent request if this request is a sub-request, e.g. a paged 
     request or a retry."""
+    validated_actions: list[ValidatedRequestAction] = field(
+        default_factory=list[ValidatedRequestAction]
+    )
+    """The actions that were validated for this request. These are used to determine what actions to take after receiving the response for this request."""
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -198,13 +203,13 @@ class InvalidRuntimeRequest:
 @dataclass(slots=True, kw_only=True)
 class RuntimeRequestGroup:
     request_group: RequestGroup
-    valid_requests: dict[UUID, ValidatedRequest] = field(
+    validated_requests: dict[UUID, ValidatedRequest] = field(
         default_factory=dict[UUID, ValidatedRequest]
     )
     invalid_requests: dict[UUID, InvalidRequest] = field(
         default_factory=dict[UUID, InvalidRequest]
     )
-    valid_actions: list[ValidatedRequestGroupAction] = field(
+    validated_actions: list[ValidatedRequestGroupAction] = field(
         default_factory=list[ValidatedRequestGroupAction]
     )
     invalid_actions: list[ValidatedRequestGroupAction] = field(

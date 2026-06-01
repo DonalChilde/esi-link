@@ -11,6 +11,7 @@ from esi_link import ESI_LINK_NAMESPACE
 from esi_link.rewrite.auth.token_store import TokenStore
 from esi_link.rewrite.helpers.canonicalize_url import combine_and_canonicalize_url
 from esi_link.rewrite.runtime.models import (
+    InvalidRuntimeRequest,
     RuntimeGroupMetrics,
     RuntimeRequest,
     RuntimeRequestGroup,
@@ -28,16 +29,18 @@ def generate_runtime_request(
     token_store: TokenStore | None,
     session: Client,
     timeout_seconds: int = 10,
-) -> RuntimeRequest:
+) -> RuntimeRequest | InvalidRuntimeRequest:
     """Generate a RuntimeRequest from a ValidatedRequest and the corresponding EsiSchema."""
     in_process = RuntimeRequest(
-        validated_request=validated_request, timeout=timeout_seconds
+        request_id=validated_request.request_id, timeout=timeout_seconds
     )
-    in_process = _set_path_url(in_process)
-    in_process = _set_cache_url(in_process)
-    in_process = _set_cache_key(in_process)
-    in_process = _set_headers(in_process, token_store=token_store, session=session)
-    in_process = _set_additional_query_parameters(in_process)
+    in_process = _set_path_url(validated_request, in_process)
+    in_process = _set_cache_url(validated_request, in_process)
+    in_process = _set_cache_key(validated_request, in_process)
+    in_process = _set_headers(
+        validated_request, in_process, token_store=token_store, session=session
+    )
+    in_process = _set_additional_query_parameters(validated_request, in_process)
     return in_process
 
 
@@ -49,43 +52,49 @@ def generate_runtime_request_group(
 ) -> RuntimeRequestGroup:
     """Generate a RuntimeRequestGroup from a ValidatedRequestGroup."""
     runtime_requests: dict[UUID, RuntimeRequest] = {}
-    for request_id, validated_request in validated_request_group.requests.items():
+    invalid_runtime_requests: dict[UUID, InvalidRuntimeRequest] = {}
+    for request_id, validated_request in validated_request_group.valid_requests.items():
         runtime_request = generate_runtime_request(
             validated_request=validated_request,
             token_store=token_store,
             session=session,
             timeout_seconds=timeout_seconds,
         )
-        runtime_requests[request_id] = runtime_request
+        if isinstance(runtime_request, InvalidRuntimeRequest):
+            invalid_runtime_requests[request_id] = runtime_request
+        else:
+            runtime_requests[request_id] = runtime_request
     runtime_group = RuntimeRequestGroup(
-        group_id=validated_request_group.group_id,
-        created_on=validated_request_group.created_on,
-        description=validated_request_group.description,
-        # save_directory_template=validated_request_group.save_directory_template,
-        # save_filename_template=validated_request_group.save_filename_template,
-        requests=runtime_requests,
+        request_group=validated_request_group.request_group,
+        validated_requests=validated_request_group.valid_requests,
+        invalid_requests=validated_request_group.invalid_requests,
+        validated_actions=validated_request_group.valid_actions,
+        invalid_actions=validated_request_group.invalid_actions,
+        runtime_requests=runtime_requests,
+        invalid_runtime_requests=invalid_runtime_requests,
         metrics=RuntimeGroupMetrics(),
     )
     return runtime_group
 
 
 def _set_path_url(
+    validated_request: ValidatedRequest,
     inprocess_request: RuntimeRequest,
 ) -> RuntimeRequest:
     """Sets the resolved_path_url field of the RuntimeRequest based on the URL template and path parameters."""
-    if not inprocess_request.validated_request.path_parameters:
-        path_url = inprocess_request.validated_request.path_url_template
+    if not validated_request.path_parameters:
+        path_url = validated_request.path_url_template
     else:
         # template = Template(inprocess_request.path_url_template)
         try:
-            path_url = inprocess_request.validated_request.path_url_template.format(
-                **inprocess_request.validated_request.path_parameters
+            path_url = validated_request.path_url_template.format(
+                **validated_request.path_parameters
             )
         except KeyError as e:
             logger.error(
                 "Missing path parameter for URL template substitution. url_template=%s, path_parameters=%r",
-                inprocess_request.validated_request.path_url_template,
-                inprocess_request.validated_request.path_parameters,
+                validated_request.path_url_template,
+                validated_request.path_parameters,
             )
             raise ValueError(
                 f"Missing path parameter for URL template substitution. {e}"
@@ -97,6 +106,7 @@ def _set_path_url(
 
 
 def _set_cache_url(
+    validated_request: ValidatedRequest,
     inprocess_request: RuntimeRequest,
 ) -> RuntimeRequest:
     """Sets the cache_url field of the RuntimeRequest based on the path_url and query parameters."""
@@ -104,14 +114,14 @@ def _set_cache_url(
         raise ValueError(
             "Cannot set cache_url because path_url is not set. Ensure that _set_path_url is called before _set_cache_url."
         )
-    if not inprocess_request.validated_request.is_cached:
+    if not validated_request.is_cached:
         # If the request is not for a cached endpoint, we can skip generating the cache_url
         # and just return the inprocess_request.
         return deepcopy(inprocess_request)
     path_url = inprocess_request.resolved_path_url
     # NOTE: the `page` query parameter is removed during validation since pagination is
     # handled separately in the runtime logic, so we don't need to worry about it here.
-    query_parameters = inprocess_request.validated_request.query_parameters or {}
+    query_parameters = validated_request.query_parameters or {}
     cache_url = combine_and_canonicalize_url(path_url, query_parameters)
     # Update the inprocess_request with the generated cache_url
     inprocess_request = deepcopy(inprocess_request)
@@ -120,13 +130,14 @@ def _set_cache_url(
 
 
 def _set_cache_key(
+    validated_request: ValidatedRequest,
     inprocess_request: RuntimeRequest,
 ) -> RuntimeRequest:
     """Sets the cache_key field of the RuntimeRequest based on the cache_url."""
     if not inprocess_request.cache_url:
         return deepcopy(inprocess_request)
     cache_url = inprocess_request.cache_url
-    x_compatibility_date = inprocess_request.validated_request.x_compatibility_date
+    x_compatibility_date = validated_request.x_compatibility_date
     # Incorporate the x_compatibility_date into the cache key generation to ensure that
     # cache keys are invalidated when the compatibility date **for the route** changes,
     # which typically indicates a schema change that could affect the structure of the
@@ -141,14 +152,16 @@ def _set_cache_key(
 
 
 def _set_headers(
+    validated_request: ValidatedRequest,
     inprocess_request: RuntimeRequest,
+    *,
     token_store: TokenStore | None,
     session: Client,
 ) -> RuntimeRequest:
     """Sets the headers field of the RuntimeRequest based on the authentication requirements of the request and the provided authorization headers."""
     headers: dict[str, str] = {}
-    if inprocess_request.validated_request.is_authentication_required:
-        if inprocess_request.validated_request.authorization_id is None:
+    if validated_request.is_authentication_required:
+        if validated_request.authorization_id is None:
             raise ValueError(
                 "Request requires authentication but no authorization_id is provided in the request."
             )
@@ -158,18 +171,16 @@ def _set_headers(
             )
         try:
             authorization_header = token_store.refresh_character_token(
-                inprocess_request.validated_request.authorization_id, session=session
+                validated_request.authorization_id, session=session
             ).auth_headers
         except Exception as e:
             raise ValueError(
                 f"Request requires authentication but authentication header is not available "
-                f"for the given authorization_id {inprocess_request.validated_request.authorization_id}."
+                f"for the given authorization_id {validated_request.authorization_id}."
             ) from e
         headers.update(authorization_header)
-    headers["Accept-Language"] = inprocess_request.validated_request.language
-    headers["X-Compatibility-Date"] = (
-        inprocess_request.validated_request.compatibility_date
-    )
+    headers["Accept-Language"] = validated_request.language
+    headers["X-Compatibility-Date"] = validated_request.compatibility_date
 
     # Update the inprocess_request with the generated headers
     inprocess_request = deepcopy(inprocess_request)
@@ -178,12 +189,13 @@ def _set_headers(
 
 
 def _set_additional_query_parameters(
+    validated_request: ValidatedRequest,
     inprocess_request: RuntimeRequest,
 ) -> RuntimeRequest:
     additional_query_params = (
         deepcopy(inprocess_request.additional_query_parameters) or {}
     )
-    if inprocess_request.validated_request.is_paged:
+    if validated_request.is_paged:
         additional_query_params["page"] = 1
     # Update the inprocess_request with the generated query parameters
     inprocess_request = deepcopy(inprocess_request)
