@@ -31,7 +31,7 @@ from esi_link.rewrite.response.models import Response
 from esi_link.rewrite.response.response_factories import response_to_response_data
 from esi_link.rewrite.runtime.models import FailedRuntimeResponse
 from esi_link.rewrite.schema.schema_cache import SchemaCache
-from esi_link.rewrite.validation.models import FailedRequestValidation
+from esi_link.rewrite.validation.models import InvalidRequest
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -128,7 +128,7 @@ def _make_request(
         console.print(f"[green]Response:[/green]")
         response_data = response_to_response_data(response)
         console.print(response_data)
-    elif isinstance(response, FailedRequestValidation):
+    elif isinstance(response, InvalidRequest):
         console.print(f"[red]Failed Validation:[/red]")
         console.print(response)
     elif isinstance(response, FailedRuntimeResponse):

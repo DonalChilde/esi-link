@@ -5,8 +5,8 @@ from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import RootModel
-from whenever import Instant
 
+from esi_link.rewrite.actions.models import Action, GroupAction
 from esi_link.rewrite.request.models import (
     Request,
     RequestGroup,
@@ -21,9 +21,25 @@ class ValidatedRequestAction:
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
+class InvalidRequestAction:
+    request_action: Action
+    """The original request action that failed validation."""
+    errors: tuple[str, ...]
+    """A tuple of error messages describing the validation failures."""
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
 class ValidatedRequestGroupAction:
     action_type: str
     action_parameters: dict[str, Any] = field(default_factory=dict[str, Any])
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class InvalidRequestGroupAction:
+    request_group_action: GroupAction
+    """The original request group action that failed validation."""
+    errors: tuple[str, ...]
+    """A tuple of error messages describing the validation failures."""
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -46,8 +62,9 @@ class ValidatedRequest:
 
     """
 
-    original_request: Request
-    """The original request that was validated to create this ValidatedRequest."""
+    request_id: UUID
+    """The unique identifier for the request. This is used to link the request to various 
+        objects during the request lifecycle."""
     operation_id: str = "NOT_SET"
     """The operation ID of the request, corresponding to the operationId in the ESI OpenAPI 
         schema."""
@@ -98,17 +115,9 @@ class ValidatedRequest:
     """Whether the request requires authentication or not, based on the presence of 
         security requirements in the operation schema."""
 
-    @property
-    def request_id(self) -> UUID:
-        """The unique identifier for the request.
-
-        This is used to link the request to various objects during the request lifecycle.
-        """
-        return self.original_request.request_id
-
 
 @dataclass(slots=True, kw_only=True, frozen=True)
-class FailedRequestValidation:
+class InvalidRequest:
     request: Request
     """The original request that failed validation."""
     errors: tuple[str, ...]
@@ -116,14 +125,14 @@ class FailedRequestValidation:
 
     def to_string(self, indent: int) -> str:
         """Return a string representation of the failed request validation with the specified indentation."""
-        root_model = FailedRequestValidationRoot(self)
+        root_model = InvalidRequestRoot(self)
         json_str = root_model.model_dump_json(indent=indent)
         return json_str
 
     @classmethod
-    def from_string(cls, json_str: str) -> FailedRequestValidation:
+    def from_string(cls, json_str: str) -> InvalidRequest:
         """Parse the failed request validation from a JSON string."""
-        value = FailedRequestValidationRoot.model_validate_json(json_str).root
+        value = InvalidRequestRoot.model_validate_json(json_str).root
         return value
 
 
@@ -131,31 +140,43 @@ class FailedRequestValidation:
 class ValidatedRequestGroup:
     """Represents a validated batch of ESI requests, ready to be executed."""
 
-    # These fields are copied from the original RequestGroup, but are now validated and
-    # ready to be executed. The requests field is now a dictionary of ValidatedRequest,
-    # and an additional field is added to capture any failed request validations, which
-    # is a dictionary of FailedRequestValidation.
-    created_on: Instant
-    group_id: UUID
-    description: str
-    requests: dict[UUID, ValidatedRequest] = field(
+    request_group: RequestGroup
+    valid_requests: dict[UUID, ValidatedRequest] = field(
         default_factory=dict[UUID, ValidatedRequest]
     )
-    actions: list[ValidatedRequestGroupAction] = field(
+    invalid_requests: dict[UUID, InvalidRequest] = field(
+        default_factory=dict[UUID, InvalidRequest]
+    )
+    valid_actions: list[ValidatedRequestGroupAction] = field(
+        default_factory=list[ValidatedRequestGroupAction]
+    )
+    invalid_actions: list[ValidatedRequestGroupAction] = field(
         default_factory=list[ValidatedRequestGroupAction]
     )
 
-    failed_request_validations: dict[UUID, FailedRequestValidation] = field(
-        default_factory=dict[UUID, FailedRequestValidation]
-    )
+    @property
+    def group_id(self) -> UUID:
+        """The unique identifier for the request group.
+
+        This is used to link the request group to various objects during the request group lifecycle.
+        """
+        return self.request_group.group_id
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
-class FailedRequestGroupValidation:
+class InvalidRequestGroup:
     request_group: RequestGroup
     """The original request group that failed validation."""
     errors: tuple[str, ...]
     """A list of error messages describing the validation failures."""
 
+    @property
+    def group_id(self) -> UUID:
+        """The unique identifier for the request group.
 
-FailedRequestValidationRoot = RootModel[FailedRequestValidation]
+        This is used to link the request group to various objects during the request group lifecycle.
+        """
+        return self.request_group.group_id
+
+
+InvalidRequestRoot = RootModel[InvalidRequest]

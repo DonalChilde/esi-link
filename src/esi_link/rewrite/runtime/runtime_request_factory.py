@@ -11,7 +11,7 @@ from esi_link import ESI_LINK_NAMESPACE
 from esi_link.rewrite.auth.token_store import TokenStore
 from esi_link.rewrite.helpers.canonicalize_url import combine_and_canonicalize_url
 from esi_link.rewrite.runtime.models import (
-    RequestGroupMetrics,
+    RuntimeGroupMetrics,
     RuntimeRequest,
     RuntimeRequestGroup,
 )
@@ -64,7 +64,7 @@ def generate_runtime_request_group(
         # save_directory_template=validated_request_group.save_directory_template,
         # save_filename_template=validated_request_group.save_filename_template,
         requests=runtime_requests,
-        metrics=RequestGroupMetrics(),
+        metrics=RuntimeGroupMetrics(),
     )
     return runtime_group
 

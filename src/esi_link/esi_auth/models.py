@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, RootModel
 from whenever import Instant
 
 from esi_link.rewrite.response.models import Response
-from esi_link.rewrite.runtime.models import RequestGroupMetrics
+from esi_link.rewrite.runtime.models import RuntimeGroupMetrics
 
 
 @dataclass(slots=True, frozen=True)
@@ -133,7 +133,7 @@ class ResponseGroup:
     group_id: UUID
     description: str = ""
     responses: dict[UUID, Response] = field(default_factory=dict[UUID, Response])
-    metrics: RequestGroupMetrics = field(default_factory=RequestGroupMetrics)
+    metrics: RuntimeGroupMetrics = field(default_factory=RuntimeGroupMetrics)
 
 
 # class AppCredentials(BaseModel):

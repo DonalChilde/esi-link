@@ -8,7 +8,12 @@ from whenever import Instant
 
 from esi_link.rewrite.cache.models import CacheAction, CachedResponseStatus
 from esi_link.rewrite.execution.models import HttpResponse
-from esi_link.rewrite.validation.models import FailedRequestValidation, ValidatedRequest
+from esi_link.rewrite.request.models import RequestGroup
+from esi_link.rewrite.validation.models import (
+    InvalidRequest,
+    ValidatedRequest,
+    ValidatedRequestGroupAction,
+)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -20,8 +25,8 @@ class RuntimeResponseAction:
 
 
 @dataclass(slots=True, kw_only=True)
-class RequestGroupMetrics:
-    """Performance metrics for a RequestGroup."""
+class RuntimeGroupMetrics:
+    """Performance metrics for a RuntimeRequestGroup."""
 
     group_execution_started: Instant | None = None
     group_execution_completed: Instant | None = None
@@ -62,8 +67,8 @@ class CachedResponseMetrics:
 
 
 @dataclass(slots=True, kw_only=True)
-class RequestMetrics:
-    """Performance metrics for a Request."""
+class RuntimeRequestMetrics:
+    """Performance metrics for a RuntimeRequest."""
 
     task_started: int | None = None
     task_completed: int | None = None
@@ -148,8 +153,10 @@ class RequestMetrics:
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class RuntimeRequest:
-    validated_request: ValidatedRequest
-    """The validated request that was transformed to create this RuntimeRequest."""
+    request_id: UUID
+    """The unique identifier for the request. This is used to link the request to various objects during the request lifecycle."""
+
+    # Other fields from the validated request as required.
 
     # These fields are determined prior to executing the request.
     resolved_path_url: str = ""
@@ -172,53 +179,56 @@ class RuntimeRequest:
     cache_key: UUID | None = None
     """Cache key for the request, if applicable. This is used to identify cached responses. 
     Paged requests only have a cache key for the first page."""
-    metrics: RequestMetrics = field(default_factory=RequestMetrics)
+    metrics: RuntimeRequestMetrics = field(default_factory=RuntimeRequestMetrics)
     parent_id: UUID | None = None
     """The request_id of the parent request if this request is a sub-request, e.g. a paged 
     request or a retry."""
-    # _actions_after_response: list[RuntimeResponseAction] = field(
-    #     default_factory=list[RuntimeResponseAction]
-    # )
 
-    # @property
-    # def actions(self) -> list[RuntimeResponseAction]:
-    #     """The actions to be taken after receiving a response for this request."""
-    #     return self._actions_after_response
 
-    @property
-    def request_id(self) -> UUID:
-        """The unique identifier for the request. This is used to link the request to various objects during the request lifecycle."""
-        return self.validated_request.original_request.request_id
+@dataclass(slots=True, kw_only=True, frozen=True)
+class InvalidRuntimeRequest:
+    """This object is created during the creation of a RuntimeRequest from a Validated Request."""
+
+    validated_request: ValidatedRequest
+    """The original validated request that failed during execution."""
+    errors: tuple[str, ...]
+    """The validation errors that caused the request to be invalid."""
 
 
 @dataclass(slots=True, kw_only=True)
 class RuntimeRequestGroup:
-    # These fields are copied from the original ValidatedRequestGroup, but are now ready
-    # to be executed. The requests field is now a dictionary of RuntimeRequest.
-    created_on: Instant
-    group_id: UUID
-    description: str
-    requests: dict[UUID, RuntimeRequest] = field(
+    request_group: RequestGroup
+    valid_requests: dict[UUID, ValidatedRequest] = field(
+        default_factory=dict[UUID, ValidatedRequest]
+    )
+    invalid_requests: dict[UUID, InvalidRequest] = field(
+        default_factory=dict[UUID, InvalidRequest]
+    )
+    valid_actions: list[ValidatedRequestGroupAction] = field(
+        default_factory=list[ValidatedRequestGroupAction]
+    )
+    invalid_actions: list[ValidatedRequestGroupAction] = field(
+        default_factory=list[ValidatedRequestGroupAction]
+    )
+
+    @property
+    def group_id(self) -> UUID:
+        """The unique identifier for the request group.
+
+        This is used to link the request group to various objects during the request group lifecycle.
+        """
+        return self.request_group.group_id
+
+    # These fields are determined prior to executing the requests in the group.
+    metrics: RuntimeGroupMetrics = field(default_factory=RuntimeGroupMetrics)
+    # These fields are determined after the requests are executed
+    runtime_requests: dict[UUID, RuntimeRequest] = field(
         default_factory=dict[UUID, RuntimeRequest]
     )
-    actions: list[RuntimeResponseAction] = field(
-        default_factory=list[RuntimeResponseAction]
+    """A mapping of request_id to RuntimeRequest for all requests in the group. This is used to link the RuntimeRequest to its original Request, and to the final Response."""
+    invalid_runtime_requests: dict[UUID, InvalidRuntimeRequest] = field(
+        default_factory=dict[UUID, InvalidRuntimeRequest]
     )
-    # save_directory_template: str | None = None
-    # """The directory to save the response data to, if applicable. If not provided, response data will not be saved to disk."""
-    # save_filename_template: str | None = None
-    # """The filename template to save the response group data to, if applicable. If not provided, but a save_directory_template is provided, a default filename will be used."""
-
-    failed_request_validations: dict[UUID, FailedRequestValidation] = field(
-        default_factory=dict[UUID, FailedRequestValidation]
-    )
-    # These fields are determined prior to executing the requests in the group.
-    metrics: RequestGroupMetrics = field(default_factory=RequestGroupMetrics)
-    # These fields are determined after the requests are executed
-    save_directory: Path | None = None
-    """The directory to save the response data to, if applicable. This is the resolved directory after filling in any templates. If not provided, response data will not be saved to disk."""
-    save_filename: str | None = None
-    """The filename to save the response data to, if applicable. This is the resolved filename after filling in any templates. If not provided, but a save_directory is provided, a default filename will be used."""
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -235,7 +245,51 @@ class FailedRuntimeResponse:
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
-class RuntimeResponseGroup: ...
+class RuntimeResponseGroup:
+    request_group: RequestGroup
+    """The original request group that this response group corresponds to."""
+    # These fields are determined during validation.
+    valid_requests: dict[UUID, ValidatedRequest] = field(
+        default_factory=dict[UUID, ValidatedRequest]
+    )
+    invalid_requests: dict[UUID, InvalidRequest] = field(
+        default_factory=dict[UUID, InvalidRequest]
+    )
+    """The requests that failed validation."""
+    valid_actions: list[ValidatedRequestGroupAction] = field(
+        default_factory=list[ValidatedRequestGroupAction]
+    )
+    invalid_actions: list[ValidatedRequestGroupAction] = field(
+        default_factory=list[ValidatedRequestGroupAction]
+    )
+
+    # These fields are determined prior to executing the requests in the group.
+    metrics: RuntimeGroupMetrics = field(default_factory=RuntimeGroupMetrics)
+    runtime_requests: dict[UUID, RuntimeRequest] = field(
+        default_factory=dict[UUID, RuntimeRequest]
+    )
+    """A mapping of request_id to RuntimeRequest for all requests in the group."""
+    invalid_runtime_requests: dict[UUID, InvalidRuntimeRequest] = field(
+        default_factory=dict[UUID, InvalidRuntimeRequest]
+    )
+    """The requests that failed the transition from Validated to Runtime."""
+    # These fields are determined after the requests are executed
+    runtime_responses: dict[UUID, RuntimeResponse] = field(
+        default_factory=dict[UUID, RuntimeResponse]
+    )
+    """A mapping of request_id to RuntimeResponse for all requests in the group."""
+    failed_runtime_responses: dict[UUID, FailedRuntimeResponse] = field(
+        default_factory=dict[UUID, FailedRuntimeResponse]
+    )
+    """The requests that failed during execution."""
+
+    @property
+    def group_id(self) -> UUID:
+        """The unique identifier for the request group.
+
+        This is used to link the request group to various objects during the request group lifecycle.
+        """
+        return self.request_group.group_id
 
 
 RuntimeResponseRoot = RootModel[RuntimeResponse]

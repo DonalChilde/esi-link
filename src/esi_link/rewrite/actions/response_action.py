@@ -11,7 +11,7 @@ from esi_link.rewrite.runtime.models import (
     FailedRuntimeResponse,
 )
 from esi_link.rewrite.validation.models import (
-    FailedRequestValidation,
+    InvalidRequest,
     ValidatedRequestAction,
     ValidatedRequestGroupAction,
 )

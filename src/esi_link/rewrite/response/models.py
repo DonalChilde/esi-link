@@ -15,7 +15,7 @@ from esi_link.rewrite.runtime.models import (
     FailedRuntimeResponse,
     RuntimeRequest,
 )
-from esi_link.rewrite.validation.models import FailedRequestValidation
+from esi_link.rewrite.validation.models import InvalidRequest
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -58,8 +58,8 @@ class ResponseGroup:
     description: str
     group_actions: list[GroupAction] = field(default_factory=list[GroupAction])
     responses: dict[UUID, Response] = field(default_factory=dict[UUID, Response])
-    failed_request_validations: dict[UUID, FailedRequestValidation] = field(
-        default_factory=dict[UUID, FailedRequestValidation]
+    failed_request_validations: dict[UUID, InvalidRequest] = field(
+        default_factory=dict[UUID, InvalidRequest]
     )
     failed_runtime_responses: dict[UUID, FailedRuntimeResponse] = field(
         default_factory=dict[UUID, FailedRuntimeResponse]

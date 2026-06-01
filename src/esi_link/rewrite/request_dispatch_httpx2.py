@@ -36,7 +36,7 @@ from esi_link.rewrite.runtime.runtime_request_factory import (
     generate_runtime_request,
 )
 from esi_link.rewrite.schema.schema_cache import SchemaCache
-from esi_link.rewrite.validation.models import FailedRequestValidation
+from esi_link.rewrite.validation.models import InvalidRequest
 from esi_link.rewrite.validation.request_validation_factory import validate_requests
 
 # TODO refactor web cache name.
@@ -51,7 +51,7 @@ async def _dispatch_requests(
     time_period: float = 60.0,
 ) -> tuple[
     dict[UUID, Response],
-    dict[UUID, FailedRequestValidation],
+    dict[UUID, InvalidRequest],
     dict[UUID, FailedRuntimeResponse],
 ]:
     """Dispatch requests and return the responses."""
@@ -130,7 +130,7 @@ async def dispatch_request(
     token_store: TokenStore | None = None,
     requests_per: float = 100.0,
     time_period: float = 60.0,
-) -> Response | FailedRuntimeResponse | FailedRequestValidation:
+) -> Response | FailedRuntimeResponse | InvalidRequest:
     """Dispatch a single request and return the response."""
     responses, failed_validations, failed_responses = await _dispatch_requests(
         requests={request.request_id: request},

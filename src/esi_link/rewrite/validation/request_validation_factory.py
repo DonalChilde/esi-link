@@ -16,9 +16,9 @@ from esi_link.rewrite.schema.models import (
 )
 from esi_link.rewrite.schema.schema_cache import SchemaCache
 from esi_link.rewrite.validation.models import (
-    FailedRequestGroupValidation,
-    FailedRequestValidation,
-    FailedRequestValidationRoot,
+    InvalidRequest,
+    InvalidRequestGroup,
+    InvalidRequestRoot,
     ValidatedRequest,
     ValidatedRequestGroup,
 )
@@ -27,14 +27,14 @@ logger = logging.getLogger(__name__)
 
 
 def _write_debug_file(
-    in_process: FailedRequestValidation,
+    in_process: InvalidRequest,
     debug_path: Path,
 ):
     """Writes the request and the failed validation result to a debug file at the specified path."""
     # NOTE Not sure this is the way to go. could also output the validation failures after processing.
     # This could be useful when doing only the validation step. Meh, we'll see how this feels in practice and can always change it later.
     save_text_file(
-        text=FailedRequestValidationRoot(in_process).model_dump_json(indent=2),
+        text=InvalidRequestRoot(in_process).model_dump_json(indent=2),
         output_dir=debug_path,
         file_name=f"failed_request_validation_{in_process.request.request_id}.json",
         overwrite=True,
@@ -47,13 +47,13 @@ def validate_request(
     session: Client,
     token_store: TokenStore | None = None,
     debug_path: Path | None = None,
-) -> ValidatedRequest | FailedRequestValidation:
+) -> ValidatedRequest | InvalidRequest:
     """Validates an individual request.
 
     If the request is valid, returns a ValidatedRequest. If the request is invalid,
     returns a FailedRequestValidation with the appropriate error messages.
     """
-    in_process: ValidatedRequest | FailedRequestValidation = ValidatedRequest(
+    in_process: ValidatedRequest | InvalidRequest = ValidatedRequest(
         original_request=request,
         actions=[],  # TODO move to validation step after we have the schema, so we can validate that the actions are valid for the requested operation_id
     )
@@ -63,7 +63,7 @@ def validate_request(
     in_process = _validate_request_schema(
         request, in_process, schema_cache=schema_cache, session=session
     )
-    if isinstance(in_process, FailedRequestValidation):
+    if isinstance(in_process, InvalidRequest):
         # If the schema validation failed, we don't need to do any further validation,
         # because the request is already invalid. We can just return the
         # FailedRequestValidation with the schema validation error.
@@ -77,7 +77,7 @@ def validate_request(
         session=session,
     ).esi_schema
     in_process = _validate_operation_id(request, in_process, schema=schema)
-    if isinstance(in_process, FailedRequestValidation):
+    if isinstance(in_process, InvalidRequest):
         # If the operation_id validation failed, we don't need to do any further validation,
         # because the request is already invalid. We can just return the FailedRequestValidation
         # with the operation_id validation error.
@@ -103,7 +103,7 @@ def validate_request(
     in_process = _set_is_authentication_required(request, in_process, schema=schema)
 
     # Last check before returning the validation result.
-    if isinstance(in_process, FailedRequestValidation) and debug_path is not None:
+    if isinstance(in_process, InvalidRequest) and debug_path is not None:
         _write_debug_file(in_process, debug_path)
     return in_process
 
@@ -114,14 +114,14 @@ def validate_requests(
     session: Client,
     token_store: TokenStore | None = None,
     debug_path: Path | None = None,
-) -> tuple[dict[UUID, ValidatedRequest], dict[UUID, FailedRequestValidation]]:
+) -> tuple[dict[UUID, ValidatedRequest], dict[UUID, InvalidRequest]]:
     """Validates a group of requests.
 
     Returns a tuple containing a dictionary of the valid requests and a dictionary of
     the failed request validations.
     """
     validated_requests: dict[UUID, ValidatedRequest] = {}
-    failed_request_validations: dict[UUID, FailedRequestValidation] = {}
+    failed_request_validations: dict[UUID, InvalidRequest] = {}
     for request_id, request in requests.items():
         validation_result = validate_request(
             request=request,
@@ -143,23 +143,21 @@ def validate_request_group(
     *,
     session: Client,
     token_store: TokenStore | None = None,
-) -> ValidatedRequestGroup | FailedRequestGroupValidation:
+) -> ValidatedRequestGroup | InvalidRequestGroup:
     """Validates a request group and all of its individual requests.
 
     If the request group is valid, returns a ValidatedRequestGroup. If the request group
     is invalid, returns a FailedRequestGroupValidation with the appropriate error messages.
     """
-    in_process: ValidatedRequestGroup | FailedRequestGroupValidation = (
-        ValidatedRequestGroup(
-            created_on=request_group.created_on,
-            group_id=request_group.group_id,
-            description=request_group.description,
-            actions=[],  # TODO move to validation step after we have the schema, so we can validate that the actions are valid for the requested operation_ids of the individual requests in the group
-        )
+    in_process: ValidatedRequestGroup | InvalidRequestGroup = ValidatedRequestGroup(
+        created_on=request_group.created_on,
+        group_id=request_group.group_id,
+        description=request_group.description,
+        actions=[],  # TODO move to validation step after we have the schema, so we can validate that the actions are valid for the requested operation_ids of the individual requests in the group
     )
     # in_process = _validate_group_directory_template(request_group, in_process)
     # in_process = _validate_group_filename_template(request_group, in_process)
-    if isinstance(in_process, FailedRequestGroupValidation):
+    if isinstance(in_process, InvalidRequestGroup):
         # If the group-level validation failed, we don't need to validate the individual
         # requests, because the group is already invalid. We can just return the
         # FailedRequestGroupValidation with the group-level errors.
@@ -174,7 +172,7 @@ def validate_request_group(
         if isinstance(validated_request_or_failure, ValidatedRequest):
             in_process.requests[request_id] = validated_request_or_failure
 
-        if isinstance(validated_request_or_failure, FailedRequestValidation):
+        if isinstance(validated_request_or_failure, InvalidRequest):
             in_process.failed_request_validations[request_id] = (
                 validated_request_or_failure
             )
@@ -184,11 +182,11 @@ def validate_request_group(
 
 def _validate_compatibility_date(
     request: Request,
-    in_process: ValidatedRequest | FailedRequestValidation,
+    in_process: ValidatedRequest | InvalidRequest,
     *,
     schema_cache: SchemaCache,
     session: Client,
-) -> ValidatedRequest | FailedRequestValidation:
+) -> ValidatedRequest | InvalidRequest:
     """Validates that the compatibility date provided in the request is valid.
 
     If no compatibility date is provided in the request, the latest schema compatibility
@@ -203,11 +201,11 @@ def _validate_compatibility_date(
             f"Requested compatibility date {compatibility_date} is not valid. "
             f"Valid compatibility dates are: {', '.join(valid_compatibility_dates['compatibility_dates'])}."
         )
-        if isinstance(in_process, FailedRequestValidation):
+        if isinstance(in_process, InvalidRequest):
             fail_msgs = list(in_process.errors) + [fail_msg]
         else:
             fail_msgs = [fail_msg]
-        return FailedRequestValidation(
+        return InvalidRequest(
             request=request,
             errors=tuple(fail_msgs),
         )
@@ -223,11 +221,11 @@ def _validate_compatibility_date(
 
 def _validate_request_schema(
     request: Request,
-    inprocess_request: ValidatedRequest | FailedRequestValidation,
+    inprocess_request: ValidatedRequest | InvalidRequest,
     *,
     session: Client,
     schema_cache: SchemaCache,
-) -> ValidatedRequest | FailedRequestValidation:
+) -> ValidatedRequest | InvalidRequest:
     """Validates that the requested schema is available in the schema manager.
 
     Because so many of the details of the request validation logic depend on the schema,
@@ -235,7 +233,7 @@ def _validate_request_schema(
     validation. If the requested schema is not available, returns a FailedRequestValidation
     with the appropriate error message.
     """
-    if isinstance(inprocess_request, FailedRequestValidation):
+    if isinstance(inprocess_request, InvalidRequest):
         # If the compatibility date validation already failed, we don't need to check for
         # the requested schema, because the request is already invalid. We can just return
         # the FailedRequestValidation with the compatibility date validation error.
@@ -247,11 +245,11 @@ def _validate_request_schema(
         )
     except Exception as e:
         fail_msg = f"Error while trying to get the requested schema from the schema cache: {str(e)}"
-        if isinstance(inprocess_request, FailedRequestValidation):
+        if isinstance(inprocess_request, InvalidRequest):
             fail_msgs = list(inprocess_request.errors) + [fail_msg]
         else:
             fail_msgs = [fail_msg]
-        return FailedRequestValidation(
+        return InvalidRequest(
             request=request,
             errors=tuple(fail_msgs),
         )
@@ -264,10 +262,10 @@ def _validate_request_schema(
 
 def _validate_x_compatibility_date(
     request: Request,
-    inprocess_request: ValidatedRequest | FailedRequestValidation,
+    inprocess_request: ValidatedRequest | InvalidRequest,
     *,
     schema: EsiSchema,
-) -> ValidatedRequest | FailedRequestValidation:
+) -> ValidatedRequest | InvalidRequest:
     """Validates the x-compatibility-date field of the request.
 
     If the x-compatibility-date is invalid, returns a FailedRequestValidation with the appropriate
@@ -282,11 +280,11 @@ def _validate_x_compatibility_date(
         x_compatibility_date = operation.x_compatibility_date
     except ValueError as e:
         fail_msg = str(e)
-        if isinstance(inprocess_request, FailedRequestValidation):
+        if isinstance(inprocess_request, InvalidRequest):
             fail_msgs = list(inprocess_request.errors) + [fail_msg]
         else:
             fail_msgs = [fail_msg]
-        return FailedRequestValidation(
+        return InvalidRequest(
             request=request,
             errors=tuple(fail_msgs),
         )
@@ -302,10 +300,10 @@ def _validate_x_compatibility_date(
 
 def _validate_operation_id(
     request: Request,
-    inprocess_request: ValidatedRequest | FailedRequestValidation,
+    inprocess_request: ValidatedRequest | InvalidRequest,
     *,
     schema: EsiSchema,
-) -> ValidatedRequest | FailedRequestValidation:
+) -> ValidatedRequest | InvalidRequest:
     """Validates the operation_id field of the request.
 
     If the operation_id is invalid, returns a FailedRequestValidation with the appropriate
@@ -314,11 +312,11 @@ def _validate_operation_id(
     available_operations = schema.operation_ids
     if request.operation_id not in available_operations:
         fail_msg = f"Requested operation_id {request.operation_id} is not available in the schema."
-        if isinstance(inprocess_request, FailedRequestValidation):
+        if isinstance(inprocess_request, InvalidRequest):
             fail_msgs = list(inprocess_request.errors) + [fail_msg]
         else:
             fail_msgs = [fail_msg]
-        return FailedRequestValidation(
+        return InvalidRequest(
             request=request,
             errors=tuple(fail_msgs),
         )
@@ -334,10 +332,10 @@ def _validate_operation_id(
 
 def _validate_path_parameters(
     request: Request,
-    inprocess_request: ValidatedRequest | FailedRequestValidation,
+    inprocess_request: ValidatedRequest | InvalidRequest,
     *,
     schema: EsiSchema,
-) -> ValidatedRequest | FailedRequestValidation:
+) -> ValidatedRequest | InvalidRequest:
     """Validates that the path parameters provided in the request are valid.
 
     If any path parameters are invalid, returns a FailedRequestValidation with the
@@ -374,9 +372,9 @@ def _validate_path_parameters(
                 logger.warning(f"Unexpected path parameter: {param_schema}")
     # If there are any validation errors, return a FailedRequestValidation with the error messages.
     if fail_msgs:
-        if isinstance(inprocess_request, FailedRequestValidation):
+        if isinstance(inprocess_request, InvalidRequest):
             fail_msgs = list(inprocess_request.errors) + fail_msgs
-        return FailedRequestValidation(
+        return InvalidRequest(
             request=request,
             errors=tuple(fail_msgs),
         )
@@ -392,10 +390,10 @@ def _validate_path_parameters(
 
 def _validate_query_parameters(
     request: Request,
-    inprocess_request: ValidatedRequest | FailedRequestValidation,
+    inprocess_request: ValidatedRequest | InvalidRequest,
     *,
     schema: EsiSchema,
-) -> ValidatedRequest | FailedRequestValidation:
+) -> ValidatedRequest | InvalidRequest:
     """Validates that the query parameters provided in the request are valid."""
     operation = schema.get_operation_by_id(request.operation_id)
     assert operation is not None, (
@@ -438,9 +436,9 @@ def _validate_query_parameters(
             fail_msgs.append(f"Missing required query parameter: {param_name}")
     # If there are any validation errors, return a FailedRequestValidation with the error messages.
     if fail_msgs:
-        if isinstance(inprocess_request, FailedRequestValidation):
+        if isinstance(inprocess_request, InvalidRequest):
             fail_msgs = list(inprocess_request.errors) + fail_msgs
-        return FailedRequestValidation(
+        return InvalidRequest(
             request=request,
             errors=tuple(fail_msgs),
         )
@@ -461,10 +459,10 @@ def _validate_query_parameters(
 
 def _validate_body_parameters(
     request: Request,
-    inprocess_request: ValidatedRequest | FailedRequestValidation,
+    inprocess_request: ValidatedRequest | InvalidRequest,
     *,
     schema: EsiSchema,
-) -> ValidatedRequest | FailedRequestValidation:
+) -> ValidatedRequest | InvalidRequest:
     """Validates that the body parameters provided in the request are valid."""
     operation = schema.get_operation_by_id(request.operation_id)
     assert operation is not None, (
@@ -479,7 +477,7 @@ def _validate_body_parameters(
     fail_msgs: list[str] = []
     if expected_body_parameters is None and given_body_parameters is not None:
         fail_msgs.append("Unexpected body parameters provided for this endpoint.")
-        return FailedRequestValidation(
+        return InvalidRequest(
             request=request,
             errors=tuple(fail_msgs),
         )
@@ -491,7 +489,7 @@ def _validate_body_parameters(
         is_required = expected_body_parameters.get("required", False)
         if is_required:
             fail_msgs.append("Missing required body parameters for this endpoint.")
-            return FailedRequestValidation(
+            return InvalidRequest(
                 request=request,
                 errors=tuple(fail_msgs),
             )
@@ -542,9 +540,9 @@ def _validate_body_parameters(
 
     # If there are any validation errors, return a FailedRequestValidation with the error messages.
     if fail_msgs:
-        if isinstance(inprocess_request, FailedRequestValidation):
+        if isinstance(inprocess_request, InvalidRequest):
             fail_msgs = list(inprocess_request.errors) + fail_msgs
-        return FailedRequestValidation(
+        return InvalidRequest(
             request=request,
             errors=tuple(fail_msgs),
         )
@@ -560,11 +558,11 @@ def _validate_body_parameters(
 
 def _validate_authentication(
     request: Request,
-    inprocess_request: ValidatedRequest | FailedRequestValidation,
+    inprocess_request: ValidatedRequest | InvalidRequest,
     *,
     schema: EsiSchema,
     authorized_characters: set[int],
-) -> ValidatedRequest | FailedRequestValidation:
+) -> ValidatedRequest | InvalidRequest:
     """Validates that authentication is available if required for this request."""
     operation = schema.get_operation_by_id(request.operation_id)
     assert operation is not None, (
@@ -573,21 +571,21 @@ def _validate_authentication(
     if operation.is_authentication_required:
         if request.authorization_id is None:
             fail_msg = f"Authentication is required for this endpoint, but no authorization_id was provided in the request."
-            if isinstance(inprocess_request, FailedRequestValidation):
+            if isinstance(inprocess_request, InvalidRequest):
                 fail_msgs = list(inprocess_request.errors) + [fail_msg]
             else:
                 fail_msgs = [fail_msg]
-            return FailedRequestValidation(
+            return InvalidRequest(
                 request=request,
                 errors=tuple(fail_msgs),
             )
         elif request.authorization_id not in authorized_characters:
             fail_msg = f"Authentication is required for this endpoint, but the provided authorization_id {request.authorization_id} is not in the set of authorized characters."
-            if isinstance(inprocess_request, FailedRequestValidation):
+            if isinstance(inprocess_request, InvalidRequest):
                 fail_msgs = list(inprocess_request.errors) + [fail_msg]
             else:
                 fail_msgs = [fail_msg]
-            return FailedRequestValidation(
+            return InvalidRequest(
                 request=request,
                 errors=tuple(fail_msgs),
             )
@@ -603,10 +601,10 @@ def _validate_authentication(
 
 def _validate_language(
     request: Request,
-    inprocess_request: ValidatedRequest | FailedRequestValidation,
+    inprocess_request: ValidatedRequest | InvalidRequest,
     *,
     schema: EsiSchema,
-) -> ValidatedRequest | FailedRequestValidation:
+) -> ValidatedRequest | InvalidRequest:
     """Validates the language parameter provided in the request."""
     # check that the requested language is available from the ESI.
     available_languages = schema.content_languages
@@ -614,11 +612,11 @@ def _validate_language(
         fail_msg = (
             f"Requested language {request.language} is not available for this endpoint."
         )
-        if isinstance(inprocess_request, FailedRequestValidation):
+        if isinstance(inprocess_request, InvalidRequest):
             fail_msgs = list(inprocess_request.errors) + [fail_msg]
         else:
             fail_msgs = [fail_msg]
-        return FailedRequestValidation(
+        return InvalidRequest(
             request=request,
             errors=tuple(fail_msgs),
         )
@@ -634,10 +632,10 @@ def _validate_language(
 
 def _set_method(
     request: Request,
-    inprocess_request: ValidatedRequest | FailedRequestValidation,
+    inprocess_request: ValidatedRequest | InvalidRequest,
     *,
     schema: EsiSchema,
-) -> ValidatedRequest | FailedRequestValidation:
+) -> ValidatedRequest | InvalidRequest:
     """Sets the HTTP method for the request."""
     operation = schema.get_operation_by_id(request.operation_id)
     assert operation is not None, (
@@ -655,10 +653,10 @@ def _set_method(
 
 def _set_url_template(
     request: Request,
-    inprocess_request: ValidatedRequest | FailedRequestValidation,
+    inprocess_request: ValidatedRequest | InvalidRequest,
     *,
     schema: EsiSchema,
-) -> ValidatedRequest | FailedRequestValidation:
+) -> ValidatedRequest | InvalidRequest:
     """Sets the URL template for the request."""
     base_url = schema.base_url
     operation = schema.get_operation_by_id(request.operation_id)
@@ -678,10 +676,10 @@ def _set_url_template(
 
 def _set_is_paged(
     request: Request,
-    inprocess_request: ValidatedRequest | FailedRequestValidation,
+    inprocess_request: ValidatedRequest | InvalidRequest,
     *,
     schema: EsiSchema,
-) -> ValidatedRequest | FailedRequestValidation:
+) -> ValidatedRequest | InvalidRequest:
     """Determines whether the request is for a paged endpoint."""
     # Update validated fields.
     if isinstance(inprocess_request, ValidatedRequest):
@@ -699,10 +697,10 @@ def _set_is_paged(
 
 def _set_is_cached(
     request: Request,
-    inprocess_request: ValidatedRequest | FailedRequestValidation,
+    inprocess_request: ValidatedRequest | InvalidRequest,
     *,
     schema: EsiSchema,
-) -> ValidatedRequest | FailedRequestValidation:
+) -> ValidatedRequest | InvalidRequest:
     """Determines whether the request is for a cached endpoint."""
     # Update validated fields.
     if isinstance(inprocess_request, ValidatedRequest):
@@ -720,10 +718,10 @@ def _set_is_cached(
 
 def _set_is_authentication_required(
     request: Request,
-    inprocess_request: ValidatedRequest | FailedRequestValidation,
+    inprocess_request: ValidatedRequest | InvalidRequest,
     *,
     schema: EsiSchema,
-) -> ValidatedRequest | FailedRequestValidation:
+) -> ValidatedRequest | InvalidRequest:
     """Determines whether the request requires authentication."""
     # Update validated fields.
     if isinstance(inprocess_request, ValidatedRequest):
