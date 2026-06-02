@@ -28,7 +28,9 @@ from esi_link.rewrite.request_dispatch_httpx2 import (
     dispatch_request_group,
 )
 from esi_link.rewrite.response.models import Response
-from esi_link.rewrite.response.response_factories import response_to_response_data
+from esi_link.rewrite.response.response_factories import (
+    response_group_to_response_data_group,
+)
 from esi_link.rewrite.runtime.models import FailedRuntimeResponse
 from esi_link.rewrite.schema.schema_cache import SchemaCache
 from esi_link.rewrite.validation.models import InvalidRequest
@@ -126,7 +128,7 @@ def _make_request(
     console = Console()
     if isinstance(response, Response):
         console.print(f"[green]Response:[/green]")
-        response_data = response_to_response_data(response)
+        response_data = response_group_to_response_data_group(response)
         console.print(response_data)
     elif isinstance(response, InvalidRequest):
         console.print(f"[red]Failed Validation:[/red]")
@@ -156,10 +158,8 @@ def _make_request_group(
     console.print(f"[green]Response Group:[/green]")
     console.print(f"Out of {len(request_group.requests)} requests:")
     console.print(f"  Successful responses: {len(response_group.responses)}")
-    console.print(
-        f"  Failed validations: {len(response_group.failed_request_validations)}"
-    )
-    console.print(f"  Failed responses: {len(response_group.failed_runtime_responses)}")
+    console.print(f"  Failed validations: {len(response_group.invalid_requests)}")
+    console.print(f"  Failed responses: {len(response_group.failed_responses)}")
     if output_directory is not None:
         now = file_safe_string(f"{Instant.now()}")
         file_name = f"{request_group.group_id}-{now}-response-group.json"

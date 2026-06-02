@@ -34,6 +34,10 @@ def generate_runtime_request(
     in_process = RuntimeRequest(
         request_id=validated_request.request_id, timeout=timeout_seconds
     )
+    in_process = _set_method(validated_request, in_process)
+    in_process = _set_query_parameters(validated_request, in_process)
+    in_process = _set_json_body(validated_request, in_process)
+    in_process = _set_paged(validated_request, in_process)
     in_process = _set_path_url(validated_request, in_process)
     in_process = _set_cache_url(validated_request, in_process)
     in_process = _set_cache_key(validated_request, in_process)
@@ -75,6 +79,50 @@ def generate_runtime_request_group(
         metrics=RuntimeGroupMetrics(),
     )
     return runtime_group
+
+
+def _set_method(
+    validated_request: ValidatedRequest,
+    inprocess_request: RuntimeRequest,
+) -> RuntimeRequest:
+    """Sets the HTTP method for the RuntimeRequest based on the validated request."""
+    method = validated_request.method
+    inprocess_request = deepcopy(inprocess_request)
+    inprocess_request = replace(inprocess_request, method=method)
+    return inprocess_request
+
+
+def _set_query_parameters(
+    validated_request: ValidatedRequest,
+    inprocess_request: RuntimeRequest,
+) -> RuntimeRequest:
+    """Sets the query_parameters field of the RuntimeRequest based on the validated request."""
+    query_parameters = deepcopy(validated_request.query_parameters) or {}
+    inprocess_request = deepcopy(inprocess_request)
+    inprocess_request = replace(inprocess_request, query_parameters=query_parameters)
+    return inprocess_request
+
+
+def _set_json_body(
+    validated_request: ValidatedRequest,
+    inprocess_request: RuntimeRequest,
+) -> RuntimeRequest:
+    """Sets the json_body field of the RuntimeRequest based on the validated request."""
+    json_body = deepcopy(validated_request.json_body)
+    inprocess_request = deepcopy(inprocess_request)
+    inprocess_request = replace(inprocess_request, json_body=json_body)
+    return inprocess_request
+
+
+def _set_paged(
+    validated_request: ValidatedRequest,
+    inprocess_request: RuntimeRequest,
+) -> RuntimeRequest:
+    """Sets the is_paged field of the RuntimeRequest based on the validated request."""
+    is_paged = validated_request.is_paged
+    inprocess_request = deepcopy(inprocess_request)
+    inprocess_request = replace(inprocess_request, is_paged=is_paged)
+    return inprocess_request
 
 
 def _set_path_url(

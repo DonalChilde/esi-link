@@ -20,11 +20,13 @@ from esi_link.rewrite.request.models import (
     Request,
     RequestGroup,
 )
-from esi_link.rewrite.response.models import ResponseGroup
+from esi_link.rewrite.response.models import FailedResponse, Response, ResponseGroup
 from esi_link.rewrite.runtime.models import (
     FailedRuntimeResponse,
     RuntimeRequest,
+    RuntimeRequestGroup,
     RuntimeResponse,
+    RuntimeResponseGroup,
 )
 from esi_link.rewrite.runtime.runtime_request_factory import (
     generate_runtime_request_group,
@@ -128,7 +130,6 @@ async def dispatch_request(
     time_period: float = 60.0,
 ) -> ResponseGroup:
     """Dispatch a single request and return the response."""
-
     request_group = RequestGroup(
         group_id=uuid4(),
         created_on=request.created_on,
@@ -220,6 +221,20 @@ async def dispatch_request_group(
         ]
         response_list = await asyncio.gather(*tasks)
 
+    response_group = _to_response_group(
+        runtime_request_group=runtime_request_group,
+        response_list=response_list,
+    )
+    # TODO handle validated group flow?
+    # make an internal group for single actions? Then refactor to use group in execution flow. This makes Sense.
+    return response_group
+
+
+def _to_runtime_response_group(
+    runtime_request_group: RuntimeRequestGroup,
+    response_list: list[RuntimeResponse | FailedRuntimeResponse],
+) -> RuntimeResponseGroup:
+    """Convert a response group to a dict of runtime responses."""
     runtime_responses: dict[UUID, RuntimeResponse] = {}
     failed_runtime_responses: dict[UUID, FailedRuntimeResponse] = {}
     for response in response_list:
@@ -227,9 +242,8 @@ async def dispatch_request_group(
             failed_runtime_responses[response.runtime_request.request_id] = response
         else:
             runtime_responses[response.runtime_request.request_id] = response
-
-    response_group = ResponseGroup(
-        request_group=request_group,
+    runtime_response_group = RuntimeResponseGroup(
+        request_group=runtime_request_group.request_group,
         valid_requests=runtime_request_group.validated_requests,
         invalid_requests=runtime_request_group.invalid_requests,
         valid_actions=runtime_request_group.validated_actions,
@@ -239,6 +253,74 @@ async def dispatch_request_group(
         runtime_responses=runtime_responses,
         failed_runtime_responses=failed_runtime_responses,
     )
-    # TODO handle validated group flow?
-    # make an internal group for single actions? Then refactor to use group in execution flow. This makes Sense.
+    return runtime_response_group
+
+
+def _to_response_group(
+    runtime_request_group: RuntimeRequestGroup,
+    response_list: list[RuntimeResponse | FailedRuntimeResponse],
+) -> ResponseGroup:
+    """Convert a runtime response group to a response group."""
+    responses: dict[UUID, Response] = {}
+    failed_responses: dict[UUID, FailedResponse] = {}
+    for response in response_list:
+        if isinstance(response, FailedRuntimeResponse):
+            failed_responses[response.runtime_request.request_id] = FailedResponse(
+                http_response=response.http_response,
+                runtime_request=response.runtime_request,
+                failure_msg=response.failure_msg,
+            )
+        else:
+            responses[response.runtime_request.request_id] = Response(
+                http_response=response.http_response,
+                runtime_request=response.runtime_request,
+            )
+    response_group = ResponseGroup(
+        request_group=runtime_request_group.request_group,
+        valid_requests=runtime_request_group.validated_requests,
+        invalid_requests=runtime_request_group.invalid_requests,
+        valid_actions=runtime_request_group.validated_actions,
+        invalid_actions=runtime_request_group.invalid_actions,
+        runtime_requests=runtime_request_group.runtime_requests,
+        invalid_runtime_requests=runtime_request_group.invalid_runtime_requests,
+        responses=responses,
+        failed_responses=failed_responses,
+    )
+    return response_group
+
+
+def _to_response_group_from_runtime_response_group(
+    runtime_response_group: RuntimeResponseGroup,
+) -> ResponseGroup:
+    """Convert a runtime response group to a response group."""
+    responses: dict[UUID, Response] = {}
+    failed_responses: dict[UUID, FailedResponse] = {}
+    for (
+        request_id,
+        runtime_response,
+    ) in runtime_response_group.runtime_responses.items():
+        responses[request_id] = Response(
+            http_response=runtime_response.http_response,
+            runtime_request=runtime_response.runtime_request,
+        )
+    for (
+        request_id,
+        failed_runtime_response,
+    ) in runtime_response_group.failed_runtime_responses.items():
+        failed_responses[request_id] = FailedResponse(
+            http_response=failed_runtime_response.http_response,
+            runtime_request=failed_runtime_response.runtime_request,
+            failure_msg=failed_runtime_response.failure_msg,
+        )
+    response_group = ResponseGroup(
+        request_group=runtime_response_group.request_group,
+        valid_requests=runtime_response_group.valid_requests,
+        invalid_requests=runtime_response_group.invalid_requests,
+        valid_actions=runtime_response_group.valid_actions,
+        invalid_actions=runtime_response_group.invalid_actions,
+        runtime_requests=runtime_response_group.runtime_requests,
+        invalid_runtime_requests=runtime_response_group.invalid_runtime_requests,
+        responses=responses,
+        failed_responses=failed_responses,
+    )
     return response_group

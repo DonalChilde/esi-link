@@ -153,22 +153,19 @@ async def _make_http_request(
     response_data = None
     response_text = ""
     async with rate_limiter:
-        query_params = (
-            request.validated_request.query_parameters
-            | request.additional_query_parameters
-        )
+        query_params = request.query_parameters | request.additional_query_parameters
         http_request = httpx2.Request(
-            method=request.validated_request.method,
+            method=request.method,
             url=request.resolved_path_url,
             headers=request.headers,
             params=query_params,
-            json=request.validated_request.json_body,
+            json=request.json_body,
         )
 
         try:
             network_response = await session.send(http_request)
             logger.info(
-                f"Made HTTP request to {network_response.url} with method {request.validated_request.method} and received status code {network_response.status_code}"
+                f"Made HTTP request to {network_response.url} with method {request.method} and received status code {network_response.status_code}"
             )
             response_text = network_response.text
             headers = tuple(network_response.headers.items())
@@ -341,7 +338,7 @@ async def _fetch_response(
     response = _fail_on_client_server_errors(response)
     if isinstance(response, FailedRuntimeResponse):
         return response
-    if response.http_response.status_code == 200 and request.validated_request.is_paged:
+    if response.http_response.status_code == 200 and request.is_paged:
         # only 200 responses should be considered valid for pagination.
         response = await _check_for_additional_pages_and_fetch(
             response, session, rate_limiter
@@ -603,7 +600,7 @@ async def _check_for_additional_page_requests(
     response: RuntimeResponse,
 ) -> list[RuntimeRequest]:
     """Check if the response indicates that there are additional pages of data to fetch."""
-    if not response.runtime_request.validated_request.is_paged:
+    if not response.runtime_request.is_paged:
         raise ValueError(
             f"Cannot check for additional pages for a request that is not marked as paged: {response.runtime_request.resolved_path_url}"
         )

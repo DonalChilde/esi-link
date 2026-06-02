@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -158,6 +157,12 @@ class RuntimeRequest:
     """The unique identifier for the request. This is used to link the request to various objects during the request lifecycle."""
 
     # Other fields from the validated request as required.
+    method: str = "NOT_SET"
+    query_parameters: dict[str, str | int | float] = field(
+        default_factory=dict[str, str | int | float]
+    )
+    json_body: dict[str, Any] | None = None
+    is_paged: bool = False
 
     # These fields are determined prior to executing the request.
     resolved_path_url: str = ""

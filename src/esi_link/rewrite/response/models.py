@@ -1,22 +1,19 @@
 # TODO split this to request and response models, and move to separate files. This file is getting a bit large, and the request and response models are somewhat distinct.
 
 
-from dataclasses import dataclass, field
+import json
+from dataclasses import asdict, dataclass, field
 from typing import Any
 from uuid import UUID
 
 from pydantic import RootModel
-from whenever import Instant
 
-from esi_link.rewrite.actions.models import GroupAction
 from esi_link.rewrite.execution.models import HttpResponse
 from esi_link.rewrite.request.models import Request, RequestGroup
 from esi_link.rewrite.runtime.models import (
-    FailedRuntimeResponse,
     InvalidRuntimeRequest,
     RuntimeGroupMetrics,
     RuntimeRequest,
-    RuntimeResponse,
 )
 from esi_link.rewrite.validation.models import (
     InvalidRequest,
@@ -50,8 +47,20 @@ class Response:
         value = ResponseRoot.model_validate_json(json_str).root
         return value
 
+    @property
+    def request_id(self) -> UUID:
+        """The unique identifier for the request that this response corresponds to."""
+        return self.runtime_request.request_id
+
 
 ResponseRoot = RootModel[Response]
+
+
+@dataclass(slots=True, kw_only=True)
+class FailedResponse:
+    http_response: HttpResponse | None
+    runtime_request: RuntimeRequest
+    failure_msg: str = ""
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -88,12 +97,10 @@ class ResponseGroup:
     )
     """The requests that failed the transition from Validated to Runtime."""
     # These fields are determined after the requests are executed
-    runtime_responses: dict[UUID, RuntimeResponse] = field(
-        default_factory=dict[UUID, RuntimeResponse]
-    )
-    """A mapping of request_id to RuntimeResponse for all requests in the group."""
-    failed_runtime_responses: dict[UUID, FailedRuntimeResponse] = field(
-        default_factory=dict[UUID, FailedRuntimeResponse]
+    responses: dict[UUID, Response] = field(default_factory=dict[UUID, Response])
+    """A mapping of request_id to Response for all requests in the group."""
+    failed_responses: dict[UUID, FailedResponse] = field(
+        default_factory=dict[UUID, FailedResponse]
     )
     """The requests that failed during execution."""
 
@@ -141,7 +148,7 @@ ResponseDataRoot = RootModel[ResponseData]
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
-class GroupResponseData:
+class ResponseDataGroup:
     """Represents the data returned in a successful response to a group of ESI requests."""
 
     responses: dict[UUID, ResponseData] = field(
@@ -151,18 +158,18 @@ class GroupResponseData:
 
     def to_string(self, indent: int) -> str:
         """Return a string representation of the group response data with the specified indentation."""
-        root_model = GroupResponseDataRoot(self)
+        root_model = ResponseDataGroupRoot(self)
         json_str = root_model.model_dump_json(indent=indent)
         return json_str
 
     @classmethod
-    def from_string(cls, json_str: str) -> GroupResponseData:
+    def from_string(cls, json_str: str) -> ResponseDataGroup:
         """Parse the group response data from a JSON string."""
-        value = GroupResponseDataRoot.model_validate_json(json_str).root
+        value = ResponseDataGroupRoot.model_validate_json(json_str).root
         return value
 
 
-GroupResponseDataRoot = RootModel[GroupResponseData]
+ResponseDataGroupRoot = RootModel[ResponseDataGroup]
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
