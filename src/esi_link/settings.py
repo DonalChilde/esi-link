@@ -1,80 +1,96 @@
-"""Settings for the ESI Link application."""
+"""Settings for the Esi Link application.
 
-from dataclasses import dataclass
+The cache configuration shows an example of poissible future expansion
+to support other schema store and metadata cache types. For now, the simple disk based
+versions are fine.
+"""
+
+import json
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-from jwt.jwks_client import PyJWKClient
-from pydantic import Field
+from pydantic import Field, RootModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from whenever import Instant
 
-from esi_link import DEFAULT_APP_DIR, USER_AGENT, __app_name__, __version__
+from esi_link import DEFAULT_APP_DIR
 
 _app_env_prefix = "PFMSOFT_ESI_LINK_"
 
-ESI_SCHEMA_URL = "https://esi.evetech.net/meta/openapi.json"
-"""The URL to download the ESI schema from."""
-ESI_SCHEMA_CHANGELOG_URL = "https://esi.evetech.net/meta/changelog.json"
-"""The URL to download the ESI schema changelog from."""
-# FIXME these are defined in two places, here and in OauthMetadata. Consider a more consistent location for these constants between projects.
 OAUTH_METADATA_URL = (
     "https://login.eveonline.com/.well-known/oauth-authorization-server"
 )
 """URL to fetch OAuth metadata from the ESI auth server."""
-AUDIENCE = "EVE Online"
-"""The audience to use for ESI Auth tokens."""
-ISSUER = "https://login.eveonline.com"
-"""The issuer to use for ESI Auth tokens."""
-JWKS_URI = "https://login.eveonline.com/oauth/jwks"
+ESI_SCHEMA_URL = "https://esi.evetech.net/meta/openapi.json"
+"""URL to fetch ESI OpenAPI schema.
+
+Example: 
+    https://esi.evetech.net/meta/openapi.json?compatibility_date=2026-05-19
+
+The schemas are versioned by compatibility date. If no compatibility date is provided, the 
+schema downloaded will be the OLDEST schema available, which is not likely what is desired.
+
+Provide a date in the past to get the latest schema. future dates are not allowed.
+
+The API changes at 11:00 UTC, so use `now() minus 11 hours` as an iso date to get the latest schema.
+"""
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
+class CacheConfiguration:
+    """Configuration for the cache used by ESI Link."""
+
+    cache_type: Literal["memory", "diskcache", "jsonstore"]
+    configuration: dict[str, str] = Field(
+        default_factory=dict[str, str],
+        description="Additional configuration options for the cache. The specific options depend on the cache type.",
+    )
+
+
+@dataclass(slots=True, frozen=True, kw_only=True)
+class MemoryCacheConfiguration(CacheConfiguration):
+    """Configuration for an in-memory cache used by ESI Link."""
+
+    cache_type: Literal["memory"] = "memory"
+    configuration: dict[str, str] = field(default_factory=dict[str, str])
+
+
+@dataclass(slots=True, frozen=True, kw_only=True)
+class JsonStoreCacheConfiguration(CacheConfiguration):
+    """Configuration for a JSON file-based cache used by ESI Link."""
+
+    cache_type: Literal["jsonstore"] = "jsonstore"
+    configuration: dict[str, str] = field(default_factory=dict[str, str])
+
+
+@dataclass(slots=True, frozen=True, kw_only=True)
+class DiskCacheConfiguration(CacheConfiguration):
+    """Configuration for a disk-based cache using the diskcache library."""
+
+    cache_type: Literal["diskcache"] = "diskcache"
+    configuration: dict[str, str] = field(default_factory=dict[str, str])
+
+
+JsonStoreCacheConfigurationRoot = RootModel[JsonStoreCacheConfiguration]
+DiskCacheConfigurationRoot = RootModel[DiskCacheConfiguration]
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
 class EsiLinkSettings:
     """Settings for the ESI Link application."""
 
     application_directory: Path
     log_directory: Path
-    schema_store_directory: Path
+    cache_directory: Path
     esi_schema_url: str
-    esi_schema_changelog_url: str
-    cache_root_directory: Path
-    diskcache_directory: Path
-    json_cache_directory: Path
-    cache_type: Literal["diskcache", "json"]
+    oauth_metadata_url: str
+    schema_cache_directory: Path
+    token_store_path: Path
+    auth_metadata_cache_path: Path
+    auth_metadata_cache_ttl: int
     rate_limit_connection_period: int
     rate_limit_connection_max_rate: int
-    auth_credentials_file: Path
-    auth_token_refresh_threshold_seconds: int
-    auth_oauth_metadata_url: str
-    auth_cached_oauth_metadata_file: Path
-    auth_cached_metadata_max_age: int
-    auth_server_timeout: int
-    auth_audience: str
-    auth_issuer: str
-    auth_jwks_uri: str
-
-    user_agent: str = USER_AGENT
-    _jwks_client: PyJWKClient | None = None
-
-    @property
-    def cache_directory(self) -> Path:
-        """The directory for ESI Link cache files."""
-        if self.cache_type == "diskcache":
-            return self.diskcache_directory
-        elif self.cache_type == "json":
-            return self.json_cache_directory
-        else:
-            raise ValueError(f"Invalid cache type: {self.cache_type}")
-
-    @property
-    def jwks_client(self) -> PyJWKClient:
-        """Get a PyJWKClient instance for fetching and caching JWKS keys from the ESI auth server."""
-        if self._jwks_client is None:
-            self._jwks_client = PyJWKClient(
-                self.auth_jwks_uri, headers={"User-Agent": USER_AGENT}
-            )
-        return self._jwks_client
+    cache_configuration: CacheConfiguration
 
 
 class EsiLinkSettingsPydantic(BaseSettings):
@@ -92,224 +108,127 @@ class EsiLinkSettingsPydantic(BaseSettings):
     settings class. This separation allows us to use Pydantic's powerful settings management
     features while keeping the main settings class simple and focused on the application's
     needs.
+
+    Example env file (.esi-link.env):
+    ```
+    # Load settings from environment variables or .esi-link.env file
+    PFMSOFT_ESI_LINK_APPLICATION_DIRECTORY=./dev-data/app-dir
+    ```
     """
 
-    app_dir: Path = Field(
-        default=DEFAULT_APP_DIR,
-        description="The application directory for ESI Link.",
+    model_config = SettingsConfigDict(
+        env_prefix=_app_env_prefix,
+        env_file=".esi-link-env",
+        env_file_encoding="utf-8",
+        extra="forbid",
     )
 
-    @property
-    def log_dir(self) -> Path:
-        """The log directory for ESI Link."""
-        return self.app_dir / "logs"
-
-    # -----------------------------------------------------------------------------------
-    # Schema settings
-    # -----------------------------------------------------------------------------------
-
-    @property
-    def schema_store_dir(self) -> Path:
-        """The directory for ESI schema files."""
-        return self.app_dir / "schema-store"
+    application_directory: Path = Field(
+        default=DEFAULT_APP_DIR,
+        description="The directory where the ESI Link application stores its data, logs, and cache.",
+    )
 
     esi_schema_url: str = Field(
         default=ESI_SCHEMA_URL,
-        description="The URL to download the ESI schema from.",
+        description="The URL to fetch the ESI OpenAPI schema from.",
     )
-    esi_schema_changelog_url: str = Field(
-        default=ESI_SCHEMA_CHANGELOG_URL,
-        description="The URL to download the ESI schema changelog from.",
-    )
-
-    # -----------------------------------------------------------------------------------
-    # Cache settings
-    # -----------------------------------------------------------------------------------
-    @property
-    def cache_root_dir(self) -> Path:
-        """The root directory for ESI Link cache files."""
-        return self.app_dir / "cache"
-
-    @property
-    def cache_directory(self) -> Path:
-        """The directory for ESI Link cache files."""
-        if self.cache_type == "diskcache":
-            return self.cache_root_dir / "diskcache"
-        elif self.cache_type == "json":
-            return self.cache_root_dir / "json"
-        else:
-            raise ValueError(f"Invalid cache type: {self.cache_type}")
-
-    cache_type: Literal["diskcache", "json"] = Field(
-        default="diskcache",
-        description="The type of cache to use for ESI Link.",
-    )
-
-    # -----------------------------------------------------------------------------------
-    # Rate limiting settings
-    # -----------------------------------------------------------------------------------
-
-    connection_period: int = Field(
-        default=1,
-        description="Period (in seconds) for ESI Link connection rate limiting.",
-    )
-    """Period (in seconds) for ESI Link connection rate limiting."""
-    connection_max_rate: int = Field(
-        default=30,
-        description="Maximum number of requests per period for ESI Link connections.",
-    )
-    """Maximum number of concurrent connections to ESI per period."""
-
-    # -----------------------------------------------------------------------------------
-    # ESI Auth settings
-    # -----------------------------------------------------------------------------------
-
-    @property
-    def app_credentials_file(self) -> Path:
-        """The path to the application credential JSON file."""
-        return self.app_dir / "auth" / "credentials.json"
-
-    token_refresh_threshold_seconds: int = Field(
-        default=300,
-        description="Minimum number of seconds of validity required for an authentication token before it is considered invalid and a new token must be obtained.",
-    )
-    """Minimum number of seconds of validity required for an authentication token before it is considered invalid and a new token must be obtained."""
-
-    """Directory for the application ESI token JSON files."""
     oauth_metadata_url: str = Field(
         default=OAUTH_METADATA_URL,
-        description="URL to fetch OAuth metadata from the ESI auth server.",
+        description="The URL to fetch OAuth metadata from the ESI auth server.",
     )
-    """URL to fetch OAuth metadata from the ESI auth server."""
 
-    @property
-    def cached_oauth_metadata_file(self) -> Path:
-        """Path to the cached OAuth metadata JSON file."""
-        return self.app_dir / "esi-auth" / "oauth_metadata.json"
-
-    cached_metadata_max_age: int = Field(
-        default=86400,
-        description="Maximum age (in seconds) for cached OAuth metadata before it is considered expired.",
-    )
-    """Maximum age (in seconds) for cached OAuth metadata before it is considered expired."""
-
-    auth_server_timeout: int = Field(
-        default=300,
-        description="Timeout (in seconds) for the local auth server used by esi-auth.",
-        ge=1,
-        le=300,  # Max 5 minutes
-    )
-    """Timeout (in seconds) for the local auth server used by esi-auth."""
-    audience: str = Field(
-        default=AUDIENCE,
-        description="The audience to use for ESI Auth tokens.",
-    )
-    """The audience to use for ESI Auth tokens."""
-    issuer: str = Field(
-        default=ISSUER,
-        description="The issuer to use for ESI Auth tokens.",
-    )
-    """The issuer to use for ESI Auth tokens."""
-    jwks_uri: str = Field(
-        default=JWKS_URI,
-        description="The JWKS URI to use for fetching public keys to verify ESI Auth tokens.",
-    )
-    """The JWKS URI to use for fetching public keys to verify ESI Auth tokens."""
-
-    model_config = SettingsConfigDict(
-        env_file=(
-            f"{DEFAULT_APP_DIR}/.esi-link.env",
-            ".esi-link.env",
+    auth_metadata_cache_ttl: int = Field(
+        default=3600,
+        description=(
+            "The time-to-live (TTL) for cached OAuth metadata, in seconds. "
+            "After this time, the cached metadata will be considered stale and will be refreshed."
         ),
-        env_prefix=_app_env_prefix,
+    )
+    rate_limit_connection_period: int = Field(
+        default=60,
+        description=(
+            "The period over which to calculate the rate limit for connections to the ESI API, in seconds."
+            "This is used to determine how many requests can be made within this period without exceeding the rate limit."
+        ),
+    )
+    rate_limit_connection_max_rate: int = Field(
+        default=1000,
+        description=(
+            "The maximum number of requests that can be made to the ESI API within the rate limit connection period."
+            "This is used in conjunction with the rate_limit_connection_period setting to enforce rate limits on API requests."
+        ),
+    )
+    cache_type: Literal["memory", "diskcache", "jsonstore"] = Field(
+        default="diskcache",
+        description=(
+            "The type of cache to use for storing data. Options are 'memory' for an "
+            "in-memory cache, 'diskcache' for a disk-based cache using the diskcache library, "
+            "and 'jsonstore' for a simple JSON file-based cache."
+        ),
+    )
+
+    cache_configuration: str = Field(
+        default="{}",
+        description=(
+            "Additional configuration options for the cache, provided as a JSON string. "
+            "The specific options depend on the cache type. For example, for 'diskcache', "
+            "you might provide options like {'size_limit': 1e9} to set a size limit on the cache."
+        ),
     )
 
 
 def get_settings(
     pydantic_settings: EsiLinkSettingsPydantic | None = None,
 ) -> EsiLinkSettings:
-    """Get the ESI Link settings."""
+    """Get the settings for the ESI Link application.
+
+    This function loads settings from environment variables using the EsiLinkSettingsPydantic class,
+    and then constructs an EsiLinkSettings dataclass instance from the loaded Pydantic settings.
+    This allows us to use Pydantic's powerful settings management features while keeping the main
+    settings class simple and focused on the application's needs.
+
+    Args:
+        pydantic_settings: An optional instance of EsiLinkSettingsPydantic. If not provided, a new instance will be created by loading from environment variables.
+
+    Returns:
+        An instance of EsiLinkSettings with the loaded configuration.
+    """
     if pydantic_settings is None:
         pydantic_settings = EsiLinkSettingsPydantic()
-    settings = EsiLinkSettings(
-        application_directory=pydantic_settings.app_dir,
-        log_directory=pydantic_settings.log_dir,
-        schema_store_directory=pydantic_settings.schema_store_dir,
+    # Use cache type to select the appropriate cache configuration class and parse the cache configuration JSON string if provided.
+    match pydantic_settings.cache_type:
+        case "memory":
+            # No additional configuration needed for memory cache, just use an empty dict.
+            cache_configuration = MemoryCacheConfiguration(
+                cache_type="memory", configuration={}
+            )
+        case "diskcache":
+            config_obj = json.loads(pydantic_settings.cache_configuration)
+            config_obj["cache_type"] = "diskcache"
+            cache_configuration = DiskCacheConfigurationRoot.model_validate(
+                config_obj
+            ).root
+        case "jsonstore":
+            config_obj = json.loads(pydantic_settings.cache_configuration)
+            config_obj["cache_type"] = "jsonstore"
+            cache_configuration = JsonStoreCacheConfigurationRoot.model_validate(
+                config_obj
+            ).root
+        case _:
+            raise ValueError(f"Unsupported cache type: {pydantic_settings.cache_type}")
+
+    return EsiLinkSettings(
+        application_directory=pydantic_settings.application_directory,
+        log_directory=pydantic_settings.application_directory / "logs",
+        cache_directory=pydantic_settings.application_directory / "cache",
         esi_schema_url=pydantic_settings.esi_schema_url,
-        esi_schema_changelog_url=pydantic_settings.esi_schema_changelog_url,
-        cache_root_directory=pydantic_settings.cache_root_dir,
-        diskcache_directory=pydantic_settings.cache_root_dir / "diskcache",
-        json_cache_directory=pydantic_settings.cache_root_dir / "json",
-        cache_type=pydantic_settings.cache_type,
-        rate_limit_connection_period=pydantic_settings.connection_period,
-        rate_limit_connection_max_rate=pydantic_settings.connection_max_rate,
-        auth_credentials_file=pydantic_settings.app_credentials_file,
-        auth_token_refresh_threshold_seconds=pydantic_settings.token_refresh_threshold_seconds,
-        auth_oauth_metadata_url=pydantic_settings.oauth_metadata_url,
-        auth_cached_oauth_metadata_file=pydantic_settings.cached_oauth_metadata_file,
-        auth_cached_metadata_max_age=pydantic_settings.cached_metadata_max_age,
-        auth_server_timeout=pydantic_settings.auth_server_timeout,
-        auth_audience=pydantic_settings.audience,
-        auth_issuer=pydantic_settings.issuer,
-        auth_jwks_uri=pydantic_settings.jwks_uri,
+        oauth_metadata_url=pydantic_settings.oauth_metadata_url,
+        schema_cache_directory=pydantic_settings.application_directory / "schema_cache",
+        auth_metadata_cache_path=pydantic_settings.application_directory
+        / "auth_metadata_cache.json",
+        auth_metadata_cache_ttl=pydantic_settings.auth_metadata_cache_ttl,
+        rate_limit_connection_period=pydantic_settings.rate_limit_connection_period,
+        rate_limit_connection_max_rate=pydantic_settings.rate_limit_connection_max_rate,
+        token_store_path=pydantic_settings.application_directory / "token_store.json",
+        cache_configuration=cache_configuration,
     )
-
-    # Ensure application directories exist
-    settings.application_directory.mkdir(parents=True, exist_ok=True)
-    settings.diskcache_directory.mkdir(parents=True, exist_ok=True)
-    settings.json_cache_directory.mkdir(parents=True, exist_ok=True)
-    settings.auth_cached_oauth_metadata_file.parent.mkdir(parents=True, exist_ok=True)
-    return settings
-
-
-def env_example() -> str:
-    """Get an example of environment variables for ESI Link settings."""
-    # TODO include instructions on how to set up esi-auth env vars too
-    env_example_str = f"""# ESI Link Environment Variables
-    # File generated by {__app_name__}/{__version__} at {Instant.now().format_iso()}\n
-
-    # Env variable load order, last loaded takes precedence:
-    # 1. .esi-link.env files in application directory
-    # 2. .esi-link.env files in current working directory
-    # 3. System environment variables
-
-    # Instructions:
-    # - Uncomment and set the environment variables to override default settings.
-    # - a set of env files are created in the default application directory when you run
-    #   `esi-link <some command>` for the first time.
-    # - You can also create env files in the current working directory to customize these 
-    #   variables persistently. See `esi-link example-env`--help` for more details.
-    # - See the documentation for more details on each setting.
-    # - Remember to also set up esi-auth environment variables if you plan to use authentication.
-    #   - You will normally change the esi-auth app_dir and auth_connection_string settings to
-    #     point to the same application directory as esi-link, with a sub-directory of 'esi-auth'.
-    #     - Example: PFMSOFT_ESI_AUTH_APP_DIR="{DEFAULT_APP_DIR.resolve()}/esi-auth"
-    #     - Example: PFMSOFT_ESI_AUTH_AUTH_CONNECTION_STRING="esi-auth-file:{DEFAULT_APP_DIR.resolve()}/esi-auth/esi-auth-cache.json"
-    #     If you do not set these, esi-auth will use its own default application directory.
-    
-
-    # Application Directory
-    #{_app_env_prefix}APP_DIR="{DEFAULT_APP_DIR.resolve()}"
-
-    # Log Directory
-    #{_app_env_prefix}LOG_DIR="${{{_app_env_prefix}APP_DIR}}/logs"
-
-    # Configuration File
-    #{_app_env_prefix}CONFIG_FILE="${{{_app_env_prefix}APP_DIR}}/esi_link_config.json"
-
-    # Esi Schema Url
-    #{_app_env_prefix}ESI_SCHEMA_URL="https://esi.evetech.net/meta/openapi.json"
-
-    # Cache Connection String
-    #{_app_env_prefix}CACHE_CONNECTION_STRING="esi-link-cache-file:${{{_app_env_prefix}APP_DIR}}/esi-link-cache.json"
-
-    # Connection Rate Limiting
-    #{_app_env_prefix}CONNECTION_PERIOD=60
-    #{_app_env_prefix}CONNECTION_MAX_RATE=100
-
-    # ESI Auth settings
-    #AUTH_APP_DIR="${{{_app_env_prefix}APP_DIR}}/esi-auth"
-    #AUTH_CONNECTION_STRING="esi-auth-file:${{{_app_env_prefix}APP_DIR}}/esi-auth/esi-auth-store.json"
-    #AUTH_SERVER_TIMEOUT=300
-    """
-    return env_example_str

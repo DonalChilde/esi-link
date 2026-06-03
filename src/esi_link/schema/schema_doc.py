@@ -1,4 +1,13 @@
-"""Generate human readable schema documentation."""
+"""Generate human readable schema documentation.
+
+Generates a human readable markdown document from an ESI schema, grouping operations by
+tag and including relevant information about each operation such as its path, method,
+description, parameters, request body, and response schema. The generated documentation
+is intended to be easily readable and navigable for developers working with the ESI schema.
+
+If your editor supports navigation by header, you can use the generated documentation to
+quickly jump to the section for a specific tag or operation.
+"""
 
 import json
 from pathlib import Path
@@ -7,7 +16,7 @@ from typing import Any, TypedDict
 from whenever import Instant
 from yaml import safe_dump
 
-from esi_link.models_and_protocols import EsiSchema, SchemaOperation
+from esi_link.schema.models import EsiSchema, SchemaOperation
 
 
 class OperationDoc(TypedDict):
@@ -15,7 +24,7 @@ class OperationDoc(TypedDict):
     path: str
     method: str
     description: str
-    auth_required: bool
+    authorization_required: bool
     tags: list[str]
     path_and_query_parameters: list[dict[str, Any]]
     request_body: dict[str, Any]
@@ -33,19 +42,19 @@ def doc_dict_from_operation(operation: SchemaOperation) -> OperationDoc:
     Returns:
         An OperationDoc dictionary containing the relevant information from the SchemaOperation.
     """
-    return {
-        "operation_id": operation.operation_id,
-        "path": operation.path,
-        "method": operation.method,
-        "description": operation.description.replace("\n", " "),
-        "auth_required": operation.auth_required,
-        "tags": operation.tags or [],
-        "path_and_query_parameters": operation.path_and_query_parameters,
-        "request_body": operation.request_body or {},
-        "response_schema": operation.responses,
-        "summary": operation.summary,
-        "x_values": operation.x_values,
-    }
+    return OperationDoc(
+        operation_id=operation.operation_id,
+        path=operation.path,
+        method=operation.method,
+        description=operation.description.replace("\n", " "),
+        authorization_required=operation.is_authentication_required,
+        tags=operation.tags or [],
+        path_and_query_parameters=operation.path_and_query_parameters,
+        request_body=operation.request_body or {},
+        response_schema=operation.responses,
+        summary=operation.summary,
+        x_values=operation.x_values,
+    )
 
 
 def doc_dict_by_tag(

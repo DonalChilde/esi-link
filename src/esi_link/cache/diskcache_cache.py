@@ -1,6 +1,7 @@
 """A disk-based cache implementation for ESI responses using the diskcache library."""
 
 import logging
+from dataclasses import replace
 from pathlib import Path
 from types import TracebackType
 from typing import Any, Self
@@ -9,11 +10,11 @@ from uuid import UUID
 from diskcache import Cache  # type: ignore
 from whenever import Instant
 
-from esi_link.rewrite.cache.models import (
+from esi_link.cache.models import (
     CachedResponse,
 )
-from esi_link.rewrite.execution.models import HttpResponse
-from esi_link.rewrite.protocols.cache_manager import CacheManagerProtocol
+from esi_link.execution.models import HttpResponse
+from esi_link.protocols.cache_manager import CacheManagerProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -90,17 +91,12 @@ class DiskCache(CacheManagerProtocol):
         if cached_response is None:
             logger.info(f"No cached response found for key {key} to refresh.")
             raise KeyError(f"No cached response found for key {key} to refresh.")
-        data = cached_response.http_response.body_text
-        updated_http_response = HttpResponse(
-            status_code=new_http_response.status_code,
-            url=new_http_response.url,
-            headers=new_http_response.headers,
-            body_text=data,
-            received_timestamp=new_http_response.received_timestamp,
-        )
         logger.info(
             f"Refreshing cache for key {key} with new HTTP response received at {new_http_response.received_timestamp}"
         )
+        data = cached_response.http_response.text
+        updated_http_response = replace(cached_response.http_response, text=data)
+
         return await self.set(key, updated_http_response)
 
     async def clear(self, only_stale: bool = False) -> int:
