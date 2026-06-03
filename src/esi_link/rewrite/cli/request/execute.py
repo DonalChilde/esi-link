@@ -27,7 +27,7 @@ from esi_link.rewrite.request_dispatch_httpx2 import (
     dispatch_request,
     dispatch_request_group,
 )
-from esi_link.rewrite.response.models import Response
+from esi_link.rewrite.response.models import Response, ResponseGroup
 from esi_link.rewrite.response.response_factories import (
     response_group_to_response_data_group,
 )
@@ -94,81 +94,22 @@ def execute(
     web_cache = web_cache_factory(settings)
     with token_store:
         if isinstance(request_data, Request):
-            _make_request(
-                token_store=token_store,
-                schema_cache=schema_cache,
-                web_cache=web_cache,
-                request=request_data,
+            response = asyncio.run(
+                dispatch_request(
+                    request=request_data,
+                    schema_cache=schema_cache,
+                    token_store=token_store,
+                    web_cache=web_cache,
+                )
             )
 
         else:
-            _make_request_group(
-                token_store=token_store,
-                schema_cache=schema_cache,
-                web_cache=web_cache,
-                request_group=request_data,
+            response = asyncio.run(
+                dispatch_request_group(
+                    request_group=request_data,
+                    schema_cache=schema_cache,
+                    token_store=token_store,
+                    web_cache=web_cache,
+                )
             )
-
-
-def _make_request(
-    token_store: TokenStore,
-    schema_cache: SchemaCache,
-    web_cache: CacheManagerProtocol,
-    request: Request,
-) -> None:
-    """Make a single request."""
-    response = asyncio.run(
-        dispatch_request(
-            request=request,
-            schema_cache=schema_cache,
-            token_store=token_store,
-            web_cache=web_cache,
-        )
-    )
-    console = Console()
-    if isinstance(response, Response):
-        console.print(f"[green]Response:[/green]")
-        response_data = response_group_to_response_data_group(response)
-        console.print(response_data)
-    elif isinstance(response, InvalidRequest):
-        console.print(f"[red]Failed Validation:[/red]")
-        console.print(response)
-    elif isinstance(response, FailedRuntimeResponse):
-        console.print(f"[red]Failed Response:[/red]")
-        console.print(response)
-
-
-def _make_request_group(
-    token_store: TokenStore,
-    schema_cache: SchemaCache,
-    web_cache: CacheManagerProtocol,
-    request_group: RequestGroup,
-    output_directory: Path | None = None,
-) -> None:
-    """Make a group of requests."""
-    response_group = asyncio.run(
-        dispatch_request_group(
-            request_group=request_group,
-            schema_cache=schema_cache,
-            token_store=token_store,
-            web_cache=web_cache,
-        )
-    )
-    console = Console()
-    console.print(f"[green]Response Group:[/green]")
-    console.print(f"Out of {len(request_group.requests)} requests:")
-    console.print(f"  Successful responses: {len(response_group.responses)}")
-    console.print(f"  Failed validations: {len(response_group.invalid_requests)}")
-    console.print(f"  Failed responses: {len(response_group.failed_responses)}")
-    if output_directory is not None:
-        now = file_safe_string(f"{Instant.now()}")
-        file_name = f"{request_group.group_id}-{now}-response-group.json"
-        saved = save_text_file(
-            text=response_group.to_string(indent=4),
-            output_dir=output_directory,
-            file_name=file_name,
-            overwrite=False,
-        )
-        console.print(f"[green]Response group saved to:[/green] {saved}")
-    else:
-        console.print(response_group)
+    console.print(response)
