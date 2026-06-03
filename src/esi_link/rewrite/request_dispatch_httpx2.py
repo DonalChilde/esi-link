@@ -131,7 +131,7 @@ async def dispatch_request(
 ) -> ResponseGroup:
     """Dispatch a single request and return the response."""
     request_group = RequestGroup(
-        group_id=uuid4(),
+        group_id=request.request_id,
         created_on=request.created_on,
         description="Single request group",
         requests={request.request_id: request},
