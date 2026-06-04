@@ -7,7 +7,7 @@ from aiolimiter import AsyncLimiter
 from whenever import Instant
 
 from esi_link.auth.token_store import TokenStore
-from esi_link.execution.request_executor_httpx2 import (
+from esi_link.execution.http_executor import (
     execute_http_request,
 )
 from esi_link.helpers.http_client import (

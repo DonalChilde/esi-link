@@ -1,6 +1,6 @@
 """Resolve internal json references."""
 
-# pyright: basic
+# pyright: standard
 from typing import Any
 
 

@@ -1,3 +1,5 @@
+"""PKCE code challenge and verifier generation."""
+
 import base64
 import hashlib
 import secrets

@@ -3,7 +3,10 @@
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 
-# TODO  - Add tuple pairs as possible query parameter values, use doseq=True in urlencode, and update type hints accordingly, to support repeated query parameters with multiple values (e.g. ?foo=1&foo=2). This is necessary to correctly canonicalize URLs that use repeated query parameters, which are common in some APIs.
+# TODO  - Add tuple pairs as possible query parameter values, use doseq=True in urlencode,
+# and update type hints accordingly, to support repeated query parameters with multiple
+# values (e.g. ?foo=1&foo=2). This is necessary to correctly canonicalize URLs that use
+# repeated query parameters, which are common in some APIs.
 def combine_and_canonicalize_url(
     path_url: str, query_parameters: dict[str, str | int | float]
 ) -> str:

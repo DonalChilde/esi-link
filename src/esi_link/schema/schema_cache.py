@@ -16,9 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 class SchemaCacheError(Exception):
-    """Custom exception for errors related to the SchemaCache."""
-
     def __init__(self, *args: Any, **kwargs: dict[str, Any]):
+        """Custom exception for errors related to the SchemaCache."""
         super().__init__(*args, **kwargs)
 
 

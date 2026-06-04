@@ -1,3 +1,5 @@
+"""This module defines the CacheManagerProtocol, which is an interface for managing cached responses in the ESI Link system."""
+
 from types import TracebackType
 from typing import Any, Self
 from uuid import UUID
@@ -7,16 +9,20 @@ from esi_link.execution.models import HttpResponse
 
 
 class CacheManagerProtocol:
-    # TODO Returned CachedResponses should not have any connection to the cache data.
-    # This would happen naturally with some cache implemetations, like a per file cache
-    # where each CachedResponse is read from a separate file, but for in-memory caches
-    # we need to make sure that the CachedResponse instances returned by get, set, and
-    # refresh are copies of the data stored in the cache, to avoid unintended side effects
-    # from modifying the returned CachedResponse directly. This should be called out in
-    # the docstrings for these methods, and we should make sure to implement this behavior
-    # in any in-memory cache implementations.
+    """An Interface for managing cached responses in the ESI Link system.
 
-    # TODO batch writes to the cache, and provide a hot cache for recently accessed items. See Claude's suggestions for cache management strategies.
+    Returned CachedResponses should not have any connection to the cache data.
+    This would happen naturally with some cache implemetations, like a per file cache
+    where each CachedResponse is read from a separate file, but for in-memory caches
+    we need to make sure that the CachedResponse instances returned by get, set, and
+    refresh are copies of the data stored in the cache, to avoid unintended side effects
+    from modifying the returned CachedResponse directly. This should be called out in
+    the docstrings for these methods, and we should make sure to implement this behavior
+    in any in-memory cache implementations.
+    """
+
+    # TODO batch writes to the cache, and provide a hot cache for recently accessed items.
+    # See Claude's suggestions for cache management strategies.
     async def __aenter__(self) -> Self:
         """Enter the runtime context related to this object."""
         return self

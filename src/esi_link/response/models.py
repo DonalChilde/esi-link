@@ -1,3 +1,5 @@
+"""This module defines the Response and ResponseGroup data models for representing ESI responses and groups of responses in the ESI Link system."""
+
 from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID

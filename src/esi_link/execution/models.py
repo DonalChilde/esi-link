@@ -1,3 +1,5 @@
+"""Models for representing the http response data."""
+
 import json
 import logging
 from dataclasses import dataclass, field

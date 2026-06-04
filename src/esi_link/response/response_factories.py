@@ -20,7 +20,7 @@ def response_group_to_response_data(
         request_id: ResponseData(
             request=request_group.requests[request_id],
             data=json.loads(response.http_response.text),
-            metrics=asdict(response.runtime_request.metrics),
+            metrics=asdict(response.metrics),
         )
         for request_id, response in response_group.responses.items()
     }

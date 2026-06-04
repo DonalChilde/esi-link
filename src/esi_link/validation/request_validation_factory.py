@@ -3,42 +3,22 @@
 import logging
 from copy import deepcopy
 from dataclasses import replace
-from pathlib import Path
 from uuid import UUID
 
 from httpx2 import Client
 
 from esi_link.auth.token_store import TokenStore
-from esi_link.helpers.save_text_file import save_text_file
-from esi_link.request.models import Request, RequestGroup
+from esi_link.request.models import Request
 from esi_link.schema.models import (
     EsiSchema,
 )
 from esi_link.schema.schema_cache import SchemaCache
 from esi_link.validation.models import (
     InvalidRequest,
-    InvalidRequestGroup,
-    InvalidRequestRoot,
     ValidatedRequest,
-    ValidatedRequestGroup,
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _write_debug_file(
-    in_process: InvalidRequest,
-    debug_path: Path,
-):
-    """Writes the request and the failed validation result to a debug file at the specified path."""
-    # NOTE Not sure this is the way to go. could also output the validation failures after processing.
-    # This could be useful when doing only the validation step. Meh, we'll see how this feels in practice and can always change it later.
-    save_text_file(
-        text=InvalidRequestRoot(in_process).model_dump_json(indent=2),
-        output_dir=debug_path,
-        file_name=f"failed_request_validation_{in_process.request.request_id}.json",
-        overwrite=True,
-    )
 
 
 def validate_request(
@@ -46,7 +26,6 @@ def validate_request(
     schema_cache: SchemaCache,
     session: Client,
     token_store: TokenStore | None = None,
-    debug_path: Path | None = None,
 ) -> ValidatedRequest | InvalidRequest:
     """Validates an individual request.
 
@@ -67,8 +46,6 @@ def validate_request(
         # If the schema validation failed, we don't need to do any further validation,
         # because the request is already invalid. We can just return the
         # FailedRequestValidation with the schema validation error.
-        if debug_path is not None:
-            _write_debug_file(in_process, debug_path)
         return in_process
 
     # Get the schema for use in the rest of the validation steps.
@@ -81,8 +58,6 @@ def validate_request(
         # If the operation_id validation failed, we don't need to do any further validation,
         # because the request is already invalid. We can just return the FailedRequestValidation
         # with the operation_id validation error.
-        if debug_path is not None:
-            _write_debug_file(in_process, debug_path)
         return in_process
     in_process = _validate_x_compatibility_date(request, in_process, schema=schema)
     in_process = _validate_path_parameters(request, in_process, schema=schema)
@@ -103,8 +78,6 @@ def validate_request(
     in_process = _set_is_authentication_required(request, in_process, schema=schema)
 
     # Last check before returning the validation result.
-    if isinstance(in_process, InvalidRequest) and debug_path is not None:
-        _write_debug_file(in_process, debug_path)
     return in_process
 
 
@@ -113,7 +86,6 @@ def validate_requests(
     schema_cache: SchemaCache,
     session: Client,
     token_store: TokenStore | None = None,
-    debug_path: Path | None = None,
 ) -> tuple[dict[UUID, ValidatedRequest], dict[UUID, InvalidRequest]]:
     """Validates a group of requests.
 
@@ -128,56 +100,12 @@ def validate_requests(
             schema_cache=schema_cache,
             token_store=token_store,
             session=session,
-            debug_path=debug_path,
         )
         if isinstance(validation_result, ValidatedRequest):
             validated_requests[request_id] = validation_result
         else:
             failed_request_validations[request_id] = validation_result
     return validated_requests, failed_request_validations
-
-
-def validate_request_group(
-    request_group: RequestGroup,
-    schema_cache: SchemaCache,
-    *,
-    session: Client,
-    token_store: TokenStore | None = None,
-) -> ValidatedRequestGroup | InvalidRequestGroup:
-    """Validates a request group and all of its individual requests.
-
-    If the request group is valid, returns a ValidatedRequestGroup. If the request group
-    is invalid, returns a FailedRequestGroupValidation with the appropriate error messages.
-    """
-    in_process: ValidatedRequestGroup | InvalidRequestGroup = ValidatedRequestGroup(
-        request_group=request_group,
-    )
-
-    # NOTE For now, there is no group-level validation logic, but if we add any in the future,
-    # it should be done here before the loop that validates the individual requests.
-
-    if isinstance(in_process, InvalidRequestGroup):
-        # If the group-level validation failed, we don't need to validate the individual
-        # requests, because the group is already invalid. We can just return the
-        # FailedRequestGroupValidation with the group-level errors.
-        return in_process
-    for request_id, request in request_group.requests.items():
-        validated_request_or_failure = validate_request(
-            request=request,
-            schema_cache=schema_cache,
-            token_store=token_store,
-            session=session,
-        )
-        if isinstance(validated_request_or_failure, ValidatedRequest):
-            in_process.valid_requests[request_id] = validated_request_or_failure
-
-        if isinstance(validated_request_or_failure, InvalidRequest):
-            in_process.invalid_requests[request_id] = validated_request_or_failure
-
-    # TODO Validate group-level actions here, after we have defined what those look like
-    # and how they should be validated against the schema.
-
-    return in_process
 
 
 def _validate_compatibility_date(
@@ -411,7 +339,6 @@ def _validate_query_parameters(
         if param_name not in expected_query_parameters:
             fail_msgs.append(f"Unexpected query parameter: {param_name}")
         else:
-            # TODO match case
             param_schema = expected_query_parameters[param_name]
             match param_schema["schema"]["type"]:
                 case "integer":

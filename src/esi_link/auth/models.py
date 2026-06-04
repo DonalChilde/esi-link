@@ -1,7 +1,6 @@
 """Models for esi-link authentication."""
 
 from dataclasses import dataclass, field
-from typing import Self
 
 from pydantic import RootModel
 from whenever import Instant

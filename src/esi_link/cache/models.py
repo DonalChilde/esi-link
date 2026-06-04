@@ -1,3 +1,5 @@
+"""Models for caching responses in esi-link."""
+
 from dataclasses import dataclass, field
 from enum import StrEnum
 from uuid import UUID

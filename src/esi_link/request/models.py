@@ -1,3 +1,5 @@
+"""This module defines the Request and RequestGroup data models for representing ESI requests and groups of requests in the ESI Link system."""
+
 from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID, uuid4

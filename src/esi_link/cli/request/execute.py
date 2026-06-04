@@ -23,7 +23,7 @@ from esi_link.request.models import (
     RequestGroupRoot,
     RequestRoot,
 )
-from esi_link.request_dispatch_httpx2 import (
+from esi_link.request_dispatch import (
     dispatch_request,
     dispatch_request_group,
 )

@@ -7,10 +7,7 @@ from uuid import UUID
 from pydantic import RootModel
 
 from esi_link.actions.models import Action, GroupAction
-from esi_link.request.models import (
-    Request,
-    RequestGroup,
-)
+from esi_link.request.models import Request
 from esi_link.type_defs import Lang
 
 
@@ -134,49 +131,6 @@ class InvalidRequest:
         """Parse the failed request validation from a JSON string."""
         value = InvalidRequestRoot.model_validate_json(json_str).root
         return value
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class ValidatedRequestGroup:
-    """Represents a validated batch of ESI requests, ready to be executed."""
-
-    request_group: RequestGroup
-    valid_requests: dict[UUID, ValidatedRequest] = field(
-        default_factory=dict[UUID, ValidatedRequest]
-    )
-    invalid_requests: dict[UUID, InvalidRequest] = field(
-        default_factory=dict[UUID, InvalidRequest]
-    )
-    valid_actions: list[ValidatedRequestGroupAction] = field(
-        default_factory=list[ValidatedRequestGroupAction]
-    )
-    invalid_actions: list[ValidatedRequestGroupAction] = field(
-        default_factory=list[ValidatedRequestGroupAction]
-    )
-
-    @property
-    def group_id(self) -> UUID:
-        """The unique identifier for the request group.
-
-        This is used to link the request group to various objects during the request group lifecycle.
-        """
-        return self.request_group.group_id
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class InvalidRequestGroup:
-    request_group: RequestGroup
-    """The original request group that failed validation."""
-    errors: tuple[str, ...]
-    """A list of error messages describing the validation failures."""
-
-    @property
-    def group_id(self) -> UUID:
-        """The unique identifier for the request group.
-
-        This is used to link the request group to various objects during the request group lifecycle.
-        """
-        return self.request_group.group_id
 
 
 InvalidRequestRoot = RootModel[InvalidRequest]
