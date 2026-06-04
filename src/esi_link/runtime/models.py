@@ -25,26 +25,6 @@ class RuntimeResponseAction:
 
 
 @dataclass(slots=True, kw_only=True)
-class RuntimeGroupMetrics:
-    """Performance metrics for a RuntimeRequestGroup."""
-
-    group_execution_started: Instant | None = None
-    group_execution_completed: Instant | None = None
-
-    @property
-    def group_execution_duration(self) -> float:
-        """Calculate the total duration of the group execution."""
-        if (
-            self.group_execution_started is not None
-            and self.group_execution_completed is not None
-        ):
-            return (
-                self.group_execution_completed - self.group_execution_started
-            ).total("seconds")
-        return -1.0
-
-
-@dataclass(slots=True, kw_only=True)
 class PagedResponseMetrics:
     """Performance metrics for a paged response."""
 
@@ -151,6 +131,29 @@ class RuntimeRequestMetrics:
         return -1.0
 
 
+@dataclass(slots=True, kw_only=True)
+class RuntimeGroupMetrics:
+    """Performance metrics for a RuntimeRequestGroup."""
+
+    group_execution_started: Instant | None = None
+    group_execution_completed: Instant | None = None
+    request_metrics: dict[UUID, RuntimeRequestMetrics] = field(
+        default_factory=dict[UUID, RuntimeRequestMetrics]
+    )
+
+    @property
+    def group_execution_duration(self) -> float:
+        """Calculate the total duration of the group execution."""
+        if (
+            self.group_execution_started is not None
+            and self.group_execution_completed is not None
+        ):
+            return (
+                self.group_execution_completed - self.group_execution_started
+            ).total("seconds")
+        return -1.0
+
+
 @dataclass(slots=True, kw_only=True, frozen=True)
 class RuntimeRequest:
     request_id: UUID
@@ -200,7 +203,7 @@ class InvalidRuntimeRequest:
     """This object is created during the creation of a RuntimeRequest from a Validated Request."""
 
     validated_request: ValidatedRequest
-    """The original validated request that failed during execution."""
+    """The original validated request."""
     errors: tuple[str, ...]
     """The validation errors that caused the request to be invalid."""
 
@@ -303,3 +306,53 @@ class RuntimeResponseGroup:
 
 
 RuntimeResponseRoot = RootModel[RuntimeResponse]
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class RuntimeGroup:
+    """Represents the runtime state of a request group as it is being processed through the system."""
+
+    request_group: RequestGroup
+    """The original request group that this runtime group corresponds to."""
+    # These fields are determined during validation.
+    valid_requests: dict[UUID, ValidatedRequest] = field(
+        default_factory=dict[UUID, ValidatedRequest]
+    )
+    invalid_requests: dict[UUID, InvalidRequest] = field(
+        default_factory=dict[UUID, InvalidRequest]
+    )
+    """The requests that failed validation."""
+    valid_actions: list[ValidatedRequestGroupAction] = field(
+        default_factory=list[ValidatedRequestGroupAction]
+    )
+    invalid_actions: list[ValidatedRequestGroupAction] = field(
+        default_factory=list[ValidatedRequestGroupAction]
+    )
+
+    # These fields are determined prior to executing the requests in the group.
+    metrics: RuntimeGroupMetrics = field(default_factory=RuntimeGroupMetrics)
+    runtime_requests: dict[UUID, RuntimeRequest] = field(
+        default_factory=dict[UUID, RuntimeRequest]
+    )
+    """A mapping of request_id to RuntimeRequest for all requests in the group."""
+    invalid_runtime_requests: dict[UUID, InvalidRuntimeRequest] = field(
+        default_factory=dict[UUID, InvalidRuntimeRequest]
+    )
+    """The requests that failed the transition from Validated to Runtime."""
+    # These fields are determined after the requests are executed
+    runtime_responses: dict[UUID, RuntimeResponse] = field(
+        default_factory=dict[UUID, RuntimeResponse]
+    )
+    """A mapping of request_id to RuntimeResponse for all requests in the group."""
+    failed_runtime_responses: dict[UUID, FailedRuntimeResponse] = field(
+        default_factory=dict[UUID, FailedRuntimeResponse]
+    )
+    """The requests that failed during execution."""
+
+    @property
+    def group_id(self) -> UUID:
+        """The unique identifier for the request group.
+
+        This is used to link the request group to various objects during the request group lifecycle.
+        """
+        return self.request_group.group_id
