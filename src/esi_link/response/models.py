@@ -10,6 +10,7 @@ from esi_link.runtime.models import (
     InvalidRuntimeRequest,
     RuntimeGroupMetrics,
     RuntimeRequest,
+    RuntimeRequestMetrics,
 )
 from esi_link.validation.models import (
     InvalidRequest,
@@ -28,8 +29,9 @@ class ResponseGroupAction:
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class Response:
+    request_id: UUID
     http_response: HttpResponse
-    runtime_request: RuntimeRequest
+    metrics: RuntimeRequestMetrics = field(default_factory=RuntimeRequestMetrics)
 
     def to_string(self, indent: int) -> str:
         """Return a string representation of the response with the specified indentation."""
@@ -43,11 +45,6 @@ class Response:
         value = ResponseRoot.model_validate_json(json_str).root
         return value
 
-    @property
-    def request_id(self) -> UUID:
-        """The unique identifier for the request that this response corresponds to."""
-        return self.runtime_request.request_id
-
 
 ResponseRoot = RootModel[Response]
 
@@ -56,6 +53,7 @@ ResponseRoot = RootModel[Response]
 class FailedResponse:
     http_response: HttpResponse | None
     runtime_request: RuntimeRequest
+    metrics: RuntimeRequestMetrics = field(default_factory=RuntimeRequestMetrics)
     failure_msg: str = ""
 
 

@@ -12,13 +12,10 @@ from esi_link.auth.token_store import TokenStore
 from esi_link.helpers.canonicalize_url import combine_and_canonicalize_url
 from esi_link.runtime.models import (
     InvalidRuntimeRequest,
-    RuntimeGroupMetrics,
     RuntimeRequest,
-    RuntimeRequestGroup,
 )
 from esi_link.validation.models import (
     ValidatedRequest,
-    ValidatedRequestGroup,
 )
 
 logger = logging.getLogger(__name__)
@@ -49,15 +46,15 @@ def generate_runtime_request(
 
 
 def generate_runtime_request_group(
-    validated_request_group: ValidatedRequestGroup,
+    validated_requests: dict[UUID, ValidatedRequest],
     token_store: TokenStore | None,
     session: Client,
     timeout_seconds: int = 10,
-) -> RuntimeRequestGroup:
+) -> tuple[dict[UUID, RuntimeRequest], dict[UUID, InvalidRuntimeRequest]]:
     """Generate a RuntimeRequestGroup from a ValidatedRequestGroup."""
     runtime_requests: dict[UUID, RuntimeRequest] = {}
     invalid_runtime_requests: dict[UUID, InvalidRuntimeRequest] = {}
-    for request_id, validated_request in validated_request_group.valid_requests.items():
+    for request_id, validated_request in validated_requests.items():
         runtime_request = generate_runtime_request(
             validated_request=validated_request,
             token_store=token_store,
@@ -68,17 +65,7 @@ def generate_runtime_request_group(
             invalid_runtime_requests[request_id] = runtime_request
         else:
             runtime_requests[request_id] = runtime_request
-    runtime_group = RuntimeRequestGroup(
-        request_group=validated_request_group.request_group,
-        validated_requests=validated_request_group.valid_requests,
-        invalid_requests=validated_request_group.invalid_requests,
-        validated_actions=validated_request_group.valid_actions,
-        invalid_actions=validated_request_group.invalid_actions,
-        runtime_requests=runtime_requests,
-        invalid_runtime_requests=invalid_runtime_requests,
-        metrics=RuntimeGroupMetrics(),
-    )
-    return runtime_group
+    return runtime_requests, invalid_runtime_requests
 
 
 def _set_method(

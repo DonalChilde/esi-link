@@ -23,18 +23,16 @@ from esi_link.request.models import (
 from esi_link.response.models import FailedResponse, Response, ResponseGroup
 from esi_link.runtime.models import (
     FailedRuntimeResponse,
+    RuntimeGroup,
     RuntimeRequest,
-    RuntimeRequestGroup,
     RuntimeResponse,
-    RuntimeResponseGroup,
 )
 from esi_link.runtime.runtime_request_factory import (
     generate_runtime_request_group,
 )
 from esi_link.schema.schema_cache import SchemaCache
 from esi_link.validation.request_validation_factory import (
-    validate_request_group,
-    # validate_requests,
+    validate_requests,
 )
 
 # TODO refactor web cache name.
@@ -160,32 +158,87 @@ async def dispatch_request_group(
 ) -> ResponseGroup:
     """Dispatch a group of requests and return a group of responses."""
     session = config_http_client()
+    runtime_group = RuntimeGroup(request_group=request_group)
     with session:
-        validated_group = validate_request_group(
-            request_group=request_group,
+        valid_requests, invalid_requests = validate_requests(
+            requests=runtime_group.request_group.requests,
             schema_cache=schema_cache,
             session=session,
             token_store=token_store,
         )
-        # if isinstance(validated_group, InvalidRequestGroup):
-        #     # If the entire group is invalid, we can return early with the failed validation results.
-        #     # FIXME This is not the return we want. More thought on failure at this point is needed.
-        #     response_group = ResponseGroup(
-        #         group_id=request_group.group_id,
-        #         created_on=request_group.created_on,
-        #         description=request_group.description,
-        #         group_actions=deepcopy(request_group.group_actions),
-        #         responses={},
-        #         # failed_request_validations=validated_group.invalid_requests,
-        #         failed_runtime_responses={},
-        #     )
-        #     return response_group
-        runtime_request_group = generate_runtime_request_group(
-            validated_request_group=validated_group,
-            token_store=token_store,
-            session=session,
-            timeout_seconds=timeout_seconds,
+        runtime_group.valid_requests = valid_requests
+        runtime_group.invalid_requests = invalid_requests
+        # TODO Validate Group Actions and add to runtime group.
+        valid_runtime_requests, invalid_runtime_requests = (
+            generate_runtime_request_group(
+                validated_requests=runtime_group.valid_requests,
+                token_store=token_store,
+                session=session,
+                timeout_seconds=timeout_seconds,
+            )
         )
+        runtime_group.runtime_requests = valid_runtime_requests
+        runtime_group.invalid_runtime_requests = invalid_runtime_requests
+    responses, failed_responses = await _execute_runtime_requests(
+        requests=runtime_group.runtime_requests,
+        web_cache=web_cache,
+        timeout_seconds=timeout_seconds,
+        requests_per=requests_per,
+        time_period=time_period,
+    )
+    runtime_group.runtime_responses = responses
+    runtime_group.failed_runtime_responses = failed_responses
+    # async_session = await config_async_http_client()
+    # rate_limiter = AsyncLimiter(requests_per, time_period)
+    # async with async_session:
+
+    #     async def execute_with_actions(
+    #         request: RuntimeRequest,
+    #     ) -> RuntimeResponse | FailedRuntimeResponse:
+    #         runtime_response = await execute_http_request(
+    #             request=request,
+    #             session=async_session,
+    #             cache_manager=web_cache,
+    #             rate_limiter=rate_limiter,
+    #         )
+    #         assert runtime_response.http_response is not None, (
+    #             "HTTP response should not be None for successful runtime responses."
+    #         )
+
+    #         # FIXME Actions need more thought.
+
+    #         # context: dict[str, Any] = {}
+
+    #         # for action in request.validated_actions:
+    #         #     # NOTE action might modify the response, so we need to update the response variable with the result of the action.
+    #         #     action_instance = get_response_action_instance(action)
+    #         #     response, context = await do_response_action(
+    #         #         action=action_instance, response=response, context=context
+    #         #     )
+    #         return runtime_response
+
+    #     tasks = [
+    #         execute_with_actions(request=request)
+    #         for request in runtime_group.runtime_requests.values()
+    #     ]
+    #     response_list = await asyncio.gather(*tasks)
+
+    response_group = _to_response_group(
+        runtime_group=runtime_group,
+    )
+    # TODO handle validated group flow?
+    # make an internal group for single actions? Then refactor to use group in execution flow. This makes Sense.
+    return response_group
+
+
+async def _execute_runtime_requests(
+    requests: dict[UUID, RuntimeRequest],
+    web_cache: CacheManagerProtocol,
+    timeout_seconds: int = 10,
+    requests_per: float = 100.0,
+    time_period: float = 60.0,
+) -> tuple[dict[UUID, RuntimeResponse], dict[UUID, FailedRuntimeResponse]]:
+
     async_session = await config_async_http_client()
     rate_limiter = AsyncLimiter(requests_per, time_period)
     async with async_session:
@@ -215,111 +268,49 @@ async def dispatch_request_group(
             #     )
             return runtime_response
 
-        tasks = [
-            execute_with_actions(request=request)
-            for request in runtime_request_group.runtime_requests.values()
-        ]
+        tasks = [execute_with_actions(request=request) for request in requests.values()]
         response_list = await asyncio.gather(*tasks)
 
-    response_group = _to_response_group(
-        runtime_request_group=runtime_request_group,
-        response_list=response_list,
-    )
-    # TODO handle validated group flow?
-    # make an internal group for single actions? Then refactor to use group in execution flow. This makes Sense.
-    return response_group
-
-
-def _to_runtime_response_group(
-    runtime_request_group: RuntimeRequestGroup,
-    response_list: list[RuntimeResponse | FailedRuntimeResponse],
-) -> RuntimeResponseGroup:
-    """Convert a response group to a dict of runtime responses."""
     runtime_responses: dict[UUID, RuntimeResponse] = {}
     failed_runtime_responses: dict[UUID, FailedRuntimeResponse] = {}
     for response in response_list:
         if isinstance(response, FailedRuntimeResponse):
             failed_runtime_responses[response.runtime_request.request_id] = response
         else:
-            runtime_responses[response.runtime_request.request_id] = response
-    runtime_response_group = RuntimeResponseGroup(
-        request_group=runtime_request_group.request_group,
-        valid_requests=runtime_request_group.validated_requests,
-        invalid_requests=runtime_request_group.invalid_requests,
-        valid_actions=runtime_request_group.validated_actions,
-        invalid_actions=runtime_request_group.invalid_actions,
-        runtime_requests=runtime_request_group.runtime_requests,
-        invalid_runtime_requests=runtime_request_group.invalid_runtime_requests,
-        runtime_responses=runtime_responses,
-        failed_runtime_responses=failed_runtime_responses,
-    )
-    return runtime_response_group
+            runtime_responses[response.request_id] = response
+    return runtime_responses, failed_runtime_responses
 
 
 def _to_response_group(
-    runtime_request_group: RuntimeRequestGroup,
-    response_list: list[RuntimeResponse | FailedRuntimeResponse],
+    runtime_group: RuntimeGroup,
 ) -> ResponseGroup:
     """Convert a runtime response group to a response group."""
-    responses: dict[UUID, Response] = {}
-    failed_responses: dict[UUID, FailedResponse] = {}
-    for response in response_list:
-        if isinstance(response, FailedRuntimeResponse):
-            failed_responses[response.runtime_request.request_id] = FailedResponse(
-                http_response=response.http_response,
-                runtime_request=response.runtime_request,
-                failure_msg=response.failure_msg,
-            )
-        else:
-            responses[response.runtime_request.request_id] = Response(
-                http_response=response.http_response,
-                runtime_request=response.runtime_request,
-            )
-    response_group = ResponseGroup(
-        request_group=runtime_request_group.request_group,
-        valid_requests=runtime_request_group.validated_requests,
-        invalid_requests=runtime_request_group.invalid_requests,
-        valid_actions=runtime_request_group.validated_actions,
-        invalid_actions=runtime_request_group.invalid_actions,
-        runtime_requests=runtime_request_group.runtime_requests,
-        invalid_runtime_requests=runtime_request_group.invalid_runtime_requests,
-        responses=responses,
-        failed_responses=failed_responses,
-    )
-    return response_group
-
-
-def _to_response_group_from_runtime_response_group(
-    runtime_response_group: RuntimeResponseGroup,
-) -> ResponseGroup:
-    """Convert a runtime response group to a response group."""
-    responses: dict[UUID, Response] = {}
-    failed_responses: dict[UUID, FailedResponse] = {}
-    for (
-        request_id,
-        runtime_response,
-    ) in runtime_response_group.runtime_responses.items():
-        responses[request_id] = Response(
+    responses = {
+        request_id: Response(
+            request_id=request_id,
             http_response=runtime_response.http_response,
-            runtime_request=runtime_response.runtime_request,
+            metrics=runtime_response.metrics,
         )
-    for (
-        request_id,
-        failed_runtime_response,
-    ) in runtime_response_group.failed_runtime_responses.items():
-        failed_responses[request_id] = FailedResponse(
-            http_response=failed_runtime_response.http_response,
+        for request_id, runtime_response in runtime_group.runtime_responses.items()
+    }
+    failed_responses = {
+        request_id: FailedResponse(
             runtime_request=failed_runtime_response.runtime_request,
+            http_response=failed_runtime_response.http_response,
+            metrics=failed_runtime_response.metrics,
             failure_msg=failed_runtime_response.failure_msg,
         )
+        for request_id, failed_runtime_response in runtime_group.failed_runtime_responses.items()
+    }
+
     response_group = ResponseGroup(
-        request_group=runtime_response_group.request_group,
-        valid_requests=runtime_response_group.valid_requests,
-        invalid_requests=runtime_response_group.invalid_requests,
-        valid_actions=runtime_response_group.valid_actions,
-        invalid_actions=runtime_response_group.invalid_actions,
-        runtime_requests=runtime_response_group.runtime_requests,
-        invalid_runtime_requests=runtime_response_group.invalid_runtime_requests,
+        request_group=runtime_group.request_group,
+        valid_requests=runtime_group.valid_requests,
+        invalid_requests=runtime_group.invalid_requests,
+        valid_actions=runtime_group.valid_actions,
+        invalid_actions=runtime_group.invalid_actions,
+        runtime_requests=runtime_group.runtime_requests,
+        invalid_runtime_requests=runtime_group.invalid_runtime_requests,
         responses=responses,
         failed_responses=failed_responses,
     )
