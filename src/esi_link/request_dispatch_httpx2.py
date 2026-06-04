@@ -4,6 +4,7 @@ import asyncio
 from uuid import UUID
 
 from aiolimiter import AsyncLimiter
+from whenever import Instant
 
 from esi_link.auth.token_store import TokenStore
 from esi_link.execution.request_executor_httpx2 import (
@@ -159,6 +160,7 @@ async def dispatch_request_group(
     """Dispatch a group of requests and return a group of responses."""
     session = config_http_client()
     runtime_group = RuntimeGroup(request_group=request_group)
+    runtime_group.metrics.group_execution_started = Instant.now().timestamp_nanos()
     with session:
         valid_requests, invalid_requests = validate_requests(
             requests=runtime_group.request_group.requests,
@@ -222,7 +224,7 @@ async def dispatch_request_group(
     #         for request in runtime_group.runtime_requests.values()
     #     ]
     #     response_list = await asyncio.gather(*tasks)
-
+    runtime_group.metrics.group_execution_completed = Instant.now().timestamp_nanos()
     response_group = _to_response_group(
         runtime_group=runtime_group,
     )
@@ -313,5 +315,6 @@ def _to_response_group(
         invalid_runtime_requests=runtime_group.invalid_runtime_requests,
         responses=responses,
         failed_responses=failed_responses,
+        metrics=runtime_group.metrics,
     )
     return response_group
