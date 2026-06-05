@@ -1,6 +1,7 @@
 """Function for dispatching requests."""
 
 import asyncio
+import logging
 from uuid import UUID
 
 from aiolimiter import AsyncLimiter
@@ -21,7 +22,13 @@ from esi_link.request.models import (
     Request,
     RequestGroup,
 )
-from esi_link.response.models import FailedResponse, Response, ResponseGroup
+from esi_link.response.models import (
+    FailedResponse,
+    Response,
+    ResponseDebugGroup,
+    ResponseGroup,
+)
+from esi_link.response.response_factories import runtime_group_to_response_debug_group
 from esi_link.runtime.models import (
     FailedRuntimeResponse,
     RuntimeGroup,
@@ -36,88 +43,9 @@ from esi_link.validation.request_validation_factory import (
     validate_requests,
 )
 
+logger = logging.getLogger(__name__)
+
 # TODO refactor web cache name.
-
-
-# async def _dispatch_requests(
-#     requests: dict[UUID, Request],
-#     schema_cache: SchemaCache,
-#     web_cache: CacheManagerProtocol,
-#     token_store: TokenStore | None = None,
-#     requests_per: float = 100.0,
-#     time_period: float = 60.0,
-# ) -> tuple[
-#     dict[UUID, Response],
-#     dict[UUID, InvalidRequest],
-#     dict[UUID, FailedRuntimeResponse],
-# ]:
-#     """Dispatch requests and return the responses."""
-#     if not requests:
-#         raise ValueError("Requests must contain at least one request.")
-#     session = config_http_client()
-#     with session:
-#         valid_requests, failed_request_validations = validate_requests(
-#             requests=requests,
-#             schema_cache=schema_cache,
-#             session=session,
-#             token_store=token_store,
-#         )
-#         runtime_requests: dict[UUID, RuntimeRequest] = {}
-#         for request_id, validated_request in valid_requests.items():
-#             runtime_request = generate_runtime_request(
-#                 validated_request=validated_request,
-#                 token_store=token_store,
-#                 session=session,
-#             )
-#             runtime_requests[request_id] = runtime_request
-#     async_session = await config_async_http_client()
-#     rate_limiter = AsyncLimiter(requests_per, time_period)
-#     async with async_session:
-
-#         async def execute_with_actions(
-#             request: RuntimeRequest,
-#         ) -> Response | FailedRuntimeResponse:
-#             runtime_response = await execute_http_request(
-#                 request=request,
-#                 session=async_session,
-#                 cache_manager=web_cache,
-#                 rate_limiter=rate_limiter,
-#             )
-#             assert runtime_response.http_response is not None, (
-#                 "HTTP response should not be None for successful runtime responses."
-#             )
-#             response = Response(
-#                 http_response=runtime_response.http_response,
-#                 runtime_request=runtime_response.runtime_request,
-#             )
-#             context: dict[str, Any] = {}
-#             validated_actions = response.runtime_request.validated_request.actions
-
-#             for action in validated_actions:
-#                 # NOTE action might modify the response, so we need to update the response variable with the result of the action.
-#                 action_instance = get_response_action_instance(action)
-#                 response, context = await do_response_action(
-#                     action=action_instance, response=response, context=context
-#                 )
-#             return response
-
-#         tasks = [
-#             execute_with_actions(request=request)
-#             for request in runtime_requests.values()
-#         ]
-#         response_list = await asyncio.gather(*tasks)
-#     responses: dict[UUID, Response] = {}
-#     failed_runtime_responses: dict[UUID, FailedRuntimeResponse] = {}
-#     for response in response_list:
-#         if isinstance(response, FailedRuntimeResponse):
-#             failed_runtime_responses[response.runtime_request.request_id] = response
-#         else:
-#             response = Response(
-#                 http_response=response.http_response,
-#                 runtime_request=response.runtime_request,
-#             )
-#             responses[response.runtime_request.request_id] = response
-#     return responses, failed_request_validations, failed_runtime_responses
 
 
 async def dispatch_request(
@@ -127,7 +55,7 @@ async def dispatch_request(
     token_store: TokenStore | None = None,
     requests_per: float = 100.0,
     time_period: float = 60.0,
-) -> ResponseGroup:
+) -> tuple[ResponseGroup, ResponseDebugGroup | None]:
     """Dispatch a single request and return the response."""
     request_group = RequestGroup(
         group_id=request.request_id,
@@ -136,7 +64,7 @@ async def dispatch_request(
         requests={request.request_id: request},
         group_actions=[],
     )
-    response_group = await dispatch_request_group(
+    response_group, debug_group = await dispatch_request_group(
         request_group=request_group,
         schema_cache=schema_cache,
         web_cache=web_cache,
@@ -145,7 +73,7 @@ async def dispatch_request(
         time_period=time_period,
     )
 
-    return response_group
+    return response_group, debug_group
 
 
 async def dispatch_request_group(
@@ -156,7 +84,7 @@ async def dispatch_request_group(
     timeout_seconds: int = 10,
     requests_per: float = 100.0,
     time_period: float = 60.0,
-) -> ResponseGroup:
+) -> tuple[ResponseGroup, ResponseDebugGroup | None]:
     """Dispatch a group of requests and return a group of responses."""
     session = config_http_client()
     runtime_group = RuntimeGroup(request_group=request_group)
@@ -190,47 +118,18 @@ async def dispatch_request_group(
     )
     runtime_group.runtime_responses = responses
     runtime_group.failed_runtime_responses = failed_responses
-    # async_session = await config_async_http_client()
-    # rate_limiter = AsyncLimiter(requests_per, time_period)
-    # async with async_session:
-
-    #     async def execute_with_actions(
-    #         request: RuntimeRequest,
-    #     ) -> RuntimeResponse | FailedRuntimeResponse:
-    #         runtime_response = await execute_http_request(
-    #             request=request,
-    #             session=async_session,
-    #             cache_manager=web_cache,
-    #             rate_limiter=rate_limiter,
-    #         )
-    #         assert runtime_response.http_response is not None, (
-    #             "HTTP response should not be None for successful runtime responses."
-    #         )
-
-    #         # FIXME Actions need more thought.
-
-    #         # context: dict[str, Any] = {}
-
-    #         # for action in request.validated_actions:
-    #         #     # NOTE action might modify the response, so we need to update the response variable with the result of the action.
-    #         #     action_instance = get_response_action_instance(action)
-    #         #     response, context = await do_response_action(
-    #         #         action=action_instance, response=response, context=context
-    #         #     )
-    #         return runtime_response
-
-    #     tasks = [
-    #         execute_with_actions(request=request)
-    #         for request in runtime_group.runtime_requests.values()
-    #     ]
-    #     response_list = await asyncio.gather(*tasks)
     runtime_group.metrics.group_execution_completed = Instant.now().timestamp_nanos()
     response_group = _to_response_group(
         runtime_group=runtime_group,
     )
-    # TODO handle validated group flow?
-    # make an internal group for single actions? Then refactor to use group in execution flow. This makes Sense.
-    return response_group
+    # If there are any errors, include a debug group with the details of the errors.
+    debug_group = runtime_group_to_response_debug_group(runtime_group)
+    if debug_group is not None:
+        logger.error(
+            "Errors occurred during request group processing. Debug information: \n%s",
+            debug_group.to_string(indent=2),
+        )
+    return response_group, debug_group
 
 
 async def _execute_runtime_requests(

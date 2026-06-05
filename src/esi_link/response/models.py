@@ -9,6 +9,7 @@ from pydantic import RootModel
 from esi_link.execution.models import HttpResponse
 from esi_link.request.models import Request, RequestGroup
 from esi_link.runtime.models import (
+    FailedRuntimeResponse,
     InvalidRuntimeRequest,
     RuntimeGroupMetrics,
     RuntimeRequest,
@@ -63,8 +64,6 @@ class FailedResponse:
 class ResponseGroup:
     """Represents a group of responses that are related to each other, such as responses from requests that were part of the same RequestGroup."""
 
-    # These fields are copied from the RequestGroup. requests are not included because
-    # they are in the responses.
     request_group: RequestGroup
     """The original request group that this response group corresponds to."""
     # These fields are determined during validation.
@@ -118,7 +117,14 @@ ResponseGroupRoot = RootModel[ResponseGroup]
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class ResponseData:
-    """Represents the data returned in a successful response to an ESI request."""
+    """Represents the data returned in a successful response to an ESI request.
+
+    TODO this model could use some refinement.
+    Expectations are that this is the data that the user is most interested in, and
+    should be formatted in a way that is easy to understand and work with.
+
+    The inclusion of a more refined metadata field would be useful, instead of just the metrics.
+    """
 
     request: Request
     """The original request that this response corresponds to."""
@@ -168,11 +174,48 @@ class ResponseDataGroup:
 ResponseDataGroupRoot = RootModel[ResponseDataGroup]
 
 
-@dataclass(slots=True, kw_only=True, frozen=True)
-class ResponseDebug:
-    """Represents debug information included in the response to an ESI request.
+@dataclass(slots=True, kw_only=True)
+class ResponseDebugGroup:
+    """Represents debug information included in the response to a group of ESI requests.
 
-    This can include details about the request processing, such as validation results, execution time, etc.
+    Contains only the errors generated during the processing of the request group,
+    and the original request group itself.
     """
 
-    pass
+    request_group: RequestGroup
+    """The original request group that this response group corresponds to."""
+    # These fields are determined during validation.
+    invalid_requests: dict[UUID, InvalidRequest] = field(
+        default_factory=dict[UUID, InvalidRequest]
+    )
+    """The requests that failed validation."""
+    invalid_actions: list[ValidatedRequestGroupAction] = field(
+        default_factory=list[ValidatedRequestGroupAction]
+    )
+
+    # These fields are determined prior to executing the requests in the group.
+    metrics: RuntimeGroupMetrics = field(default_factory=RuntimeGroupMetrics)
+    invalid_runtime_requests: dict[UUID, InvalidRuntimeRequest] = field(
+        default_factory=dict[UUID, InvalidRuntimeRequest]
+    )
+    """The requests that failed the transition from Validated to Runtime."""
+    # These fields are determined after the requests are executed
+    failed_runtime_responses: dict[UUID, FailedRuntimeResponse] = field(
+        default_factory=dict[UUID, FailedRuntimeResponse]
+    )
+    """The requests that failed during execution."""
+
+    def to_string(self, indent: int) -> str:
+        """Return a string representation of the ResponseDebugGroup with the specified indentation."""
+        root_model = ResponseDebugGroupRoot(self)
+        json_str = root_model.model_dump_json(indent=indent)
+        return json_str
+
+    @classmethod
+    def from_string(cls, json_str: str) -> ResponseDebugGroup:
+        """Parse the ResponseDebugGroup from a JSON string."""
+        value = ResponseDebugGroupRoot.model_validate_json(json_str).root
+        return value
+
+
+ResponseDebugGroupRoot = RootModel[ResponseDebugGroup]

@@ -8,6 +8,8 @@ from esi_link.request.models import Request, RequestGroup
 #   - Example of query parameters.
 #   - Example of a paged request, with query parameters.
 #   - Example of a request with a JSON body. - Post request.
+#   - Example of a failed validation request, with validation errors.
+#   - Example of a failed runtime request. NOTE include warning not to spam server with failures.
 
 
 def api_status() -> Request:
