@@ -59,17 +59,29 @@ class Request:
         requests."""
     actions: list[Action] = field(default_factory=list[Action])
 
-    def to_string(self, indent: int) -> str:
+    def to_json_string(self, indent: int) -> str:
         """Return a string representation of the request with the specified indentation."""
         root_model = RequestRoot(self)
         json_str = root_model.model_dump_json(indent=indent)
         return json_str
 
     @classmethod
-    def from_string(cls, json_str: str) -> Request:
+    def from_json_string(cls, json_str: str) -> Request:
         """Parse the request from a JSON string."""
         value = RequestRoot.model_validate_json(json_str).root
         return value
+
+    @classmethod
+    def from_object(cls, obj: dict[str, Any]) -> Request:
+        """Parse the request from a Python object."""
+        root_model = RequestRoot.model_validate(obj)
+        return root_model.root
+
+    def to_object(self) -> dict[str, Any]:
+        """Convert the request to a JSON-compatible Python object."""
+        root_model = RequestRoot(root=self)
+        json_compatible_dict = root_model.model_dump(mode="json")
+        return json_compatible_dict
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -87,17 +99,29 @@ class RequestGroup:
     requests: dict[UUID, Request]
     group_actions: list[GroupAction] = field(default_factory=list[GroupAction])
 
-    def to_string(self, indent: int) -> str:
+    def to_json_string(self, indent: int) -> str:
         """Return a string representation of the RequestGroup with the specified indentation."""
         root_model = RequestGroupRoot(self)
         json_str = root_model.model_dump_json(indent=indent)
         return json_str
 
     @classmethod
-    def from_string(cls, json_str: str) -> RequestGroup:
+    def from_json_string(cls, json_str: str) -> RequestGroup:
         """Parse the RequestGroup from a JSON string."""
         value = RequestGroupRoot.model_validate_json(json_str).root
         return value
+
+    @classmethod
+    def from_object(cls, obj: dict[str, Any]) -> RequestGroup:
+        """Parse the RequestGroup from a Python object."""
+        root_model = RequestGroupRoot.model_validate(obj)
+        return root_model.root
+
+    def to_object(self) -> dict[str, Any]:
+        """Convert the RequestGroup to a JSON-compatible Python object."""
+        root_model = RequestGroupRoot(root=self)
+        json_compatible_dict = root_model.model_dump(mode="json")
+        return json_compatible_dict
 
 
 RequestRoot = RootModel[Request]

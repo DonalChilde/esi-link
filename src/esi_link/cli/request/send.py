@@ -1,45 +1,34 @@
-# pyright: standard
+"""This module contains the implementation of the `send` command for the ESI Link CLI.
+
+This command allows users to send a request or request group defined in a JSON file and
+receive the response.
+"""
+
 import asyncio
 from pathlib import Path
 from typing import Annotated
 
 import typer
 from rich.console import Console
-from whenever import Instant
+from yaml import safe_load
 
-from esi_link.auth.token_store import TokenStore
 from esi_link.cli.helpers import get_esi_link_settings_from_context
-from esi_link.helpers.file_safe_string import file_safe_string
-from esi_link.helpers.save_text_file import save_text_file
 from esi_link.helpers.settings_factories import (
     schema_cache_factory,
     token_store_factory,
     web_cache_factory,
 )
-from esi_link.protocols.cache_manager import CacheManagerProtocol
-from esi_link.request.models import (
-    Request,
-    RequestGroup,
-    RequestGroupRoot,
-    RequestRoot,
-)
+from esi_link.request.models import Request, RequestGroup
 from esi_link.request_dispatch import (
     dispatch_request,
     dispatch_request_group,
 )
-from esi_link.response.models import Response, ResponseGroup
-from esi_link.response.response_factories import (
-    response_group_to_response_data_group,
-)
-from esi_link.runtime.models import FailedRuntimeResponse
-from esi_link.schema.schema_cache import SchemaCache
-from esi_link.validation.models import InvalidRequest
 
 app = typer.Typer(no_args_is_help=True)
 
 
 @app.command()
-def execute(
+def send(
     ctx: typer.Context,
     request_file: Annotated[
         Path,
@@ -63,6 +52,13 @@ def execute(
             writable=True,
         ),
     ] = None,
+    file_name: Annotated[
+        str | None,
+        typer.Option(
+            "--file-name",
+            help="The name to use for the response file. If not provided, a name will be generated based on the request ID and creation date.",
+        ),
+    ] = None,
     debug: Annotated[
         bool, typer.Option("--debug", help="Whether to save debug information.")
     ] = False,
@@ -74,29 +70,18 @@ def execute(
         ),
     ] = False,
 ) -> None:
-    """Execute a request or request group from a JSON file."""
+    """Send a request or request group from a JSON file."""
     console = Console()
     settings = get_esi_link_settings_from_context(ctx)
-    file_name = request_file.name
-    if file_name.endswith("-request.json"):
-        request_data = RequestRoot.model_validate_json(request_file.read_text()).root
-    elif file_name.endswith("-request-group.json"):
-        request_data = RequestGroupRoot.model_validate_json(
-            request_file.read_text()
-        ).root
-    else:
-        console.print(
-            f"[red]The request file name must end with either '-request.json' or '-request-group.json' to indicate whether it contains a Request or RequestGroup object.[/red]"
-        )
-        raise typer.Exit(code=1)
+    loaded_request = _load_request_from_file(request_file)
     token_store = token_store_factory(settings)
     schema_cache = schema_cache_factory(settings)
     web_cache = web_cache_factory(settings)
     with token_store:
-        if isinstance(request_data, Request):
+        if isinstance(loaded_request, Request):
             response = asyncio.run(
                 dispatch_request(
-                    request=request_data,
+                    request=loaded_request,
                     schema_cache=schema_cache,
                     token_store=token_store,
                     web_cache=web_cache,
@@ -106,10 +91,39 @@ def execute(
         else:
             response = asyncio.run(
                 dispatch_request_group(
-                    request_group=request_data,
+                    request_group=loaded_request,
                     schema_cache=schema_cache,
                     token_store=token_store,
                     web_cache=web_cache,
                 )
             )
     console.print(response)
+
+
+def _load_request_from_file(request_file: Path) -> Request | RequestGroup:
+    """Load a Request or RequestGroup object from a JSON or YAML file."""
+    if request_file.stem.endswith("-request"):
+        if request_file.suffix == ".json":
+            request_data = Request.from_json_string(request_file.read_text())
+        elif request_file.suffix in [".yaml", ".yml"]:
+            request_object = safe_load(request_file.read_text())
+            request_data = Request.from_object(request_object)
+        else:
+            raise ValueError(
+                f"Unsupported file format: {request_file.suffix}. Supported formats are .json, .yaml, and .yml."
+            )
+    elif request_file.stem.endswith("-request-group"):
+        if request_file.suffix == ".json":
+            request_data = RequestGroup.from_json_string(request_file.read_text())
+        elif request_file.suffix in [".yaml", ".yml"]:
+            request_object = safe_load(request_file.read_text())
+            request_data = RequestGroup.from_object(request_object)
+        else:
+            raise ValueError(
+                f"Unsupported file format: {request_file.suffix}. Supported formats are .json, .yaml, and .yml."
+            )
+    else:
+        raise ValueError(
+            f"The request file name must end with either '-request.json' or '-request-group.json' to indicate whether it contains a Request or RequestGroup object."
+        )
+    return request_data
