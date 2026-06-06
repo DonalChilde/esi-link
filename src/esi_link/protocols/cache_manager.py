@@ -32,7 +32,7 @@ class CacheManagerProtocol:
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
         traceback: TracebackType | None,
-    ) -> None:
+    ) -> bool | None:
         """Exit the runtime context related to this object."""
         ...
 

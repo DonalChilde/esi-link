@@ -37,8 +37,9 @@ class JsonDiskCache(CacheManagerProtocol):
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
         traceback: TracebackType | None,
-    ) -> None:
+    ) -> bool | None:
         """Exit the runtime context related to this object."""
+        pass
 
     async def get(self, key: UUID) -> CachedResponse | None:
         """Get a value from the disk cache."""
