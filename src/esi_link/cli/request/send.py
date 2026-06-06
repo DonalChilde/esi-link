@@ -15,18 +15,11 @@ from whenever import Instant
 from yaml import safe_load
 
 from esi_link.cli.helpers import get_esi_link_settings_from_context
+from esi_link.esi_link_api import EsiLink
 from esi_link.helpers.file_safe_string import file_safe_string
 from esi_link.helpers.save_text_file import save_text_file
-from esi_link.helpers.settings_factories import (
-    schema_cache_factory,
-    token_store_factory,
-    web_cache_factory,
-)
 from esi_link.request.models import Request, RequestGroup
-from esi_link.request_dispatch import (
-    dispatch_request,
-    dispatch_request_group,
-)
+from esi_link.response.models import ResponseDebugGroup, ResponseGroup
 from esi_link.response.response_factories import (
     response_group_to_response_data_group,
     response_to_data_only,
@@ -108,29 +101,21 @@ def send(
         raise typer.Exit(1)
     settings = get_esi_link_settings_from_context(ctx)
     loaded_request = _load_request_from_file(request_file)
-    token_store = token_store_factory(settings)
-    schema_cache = schema_cache_factory(settings)
-    web_cache = web_cache_factory(settings)
-    with token_store:
-        if isinstance(loaded_request, Request):
-            response, debug_response = asyncio.run(
-                dispatch_request(
-                    request=loaded_request,
-                    schema_cache=schema_cache,
-                    token_store=token_store,
-                    web_cache=web_cache,
-                )
-            )
 
+    access = EsiLink(settings)
+
+    async def get_response(
+        request: Request | RequestGroup,
+    ) -> tuple[ResponseGroup, ResponseDebugGroup | None]:
+        if isinstance(request, Request):
+            async with access:
+                return await access.send_request(request)
         else:
-            response, debug_response = asyncio.run(
-                dispatch_request_group(
-                    request_group=loaded_request,
-                    schema_cache=schema_cache,
-                    token_store=token_store,
-                    web_cache=web_cache,
-                )
-            )
+            async with access:
+                return await access.send_request_group(request)
+
+    response, debug_response = asyncio.run(get_response(loaded_request))
+
     if debug_response is not None:
         if debug:
             err_console.print("[bold red]Debug Information:[/bold red]")
