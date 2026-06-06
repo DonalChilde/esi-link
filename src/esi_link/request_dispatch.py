@@ -5,6 +5,7 @@ import logging
 from uuid import UUID
 
 from aiolimiter import AsyncLimiter
+from httpx2 import AsyncClient, Client
 from whenever import Instant
 
 from esi_link.auth.token_store import TokenStore
@@ -55,6 +56,8 @@ async def dispatch_request(
     token_store: TokenStore | None = None,
     requests_per: float = 100.0,
     time_period: float = 60.0,
+    session: Client | None = None,
+    async_session: AsyncClient | None = None,
 ) -> tuple[ResponseGroup, ResponseDebugGroup | None]:
     """Dispatch a single request and return the response."""
     request_group = RequestGroup(
@@ -71,6 +74,8 @@ async def dispatch_request(
         token_store=token_store,
         requests_per=requests_per,
         time_period=time_period,
+        session=session,
+        async_session=async_session,
     )
 
     return response_group, debug_group
@@ -84,9 +89,12 @@ async def dispatch_request_group(
     timeout_seconds: int = 10,
     requests_per: float = 100.0,
     time_period: float = 60.0,
+    session: Client | None = None,
+    async_session: AsyncClient | None = None,
 ) -> tuple[ResponseGroup, ResponseDebugGroup | None]:
     """Dispatch a group of requests and return a group of responses."""
-    session = config_http_client()
+    if session is None:
+        session = config_http_client()
     runtime_group = RuntimeGroup(request_group=request_group)
     runtime_group.metrics.group_execution_started = Instant.now().timestamp_nanos()
     with session:
@@ -115,6 +123,7 @@ async def dispatch_request_group(
         timeout_seconds=timeout_seconds,
         requests_per=requests_per,
         time_period=time_period,
+        async_session=async_session,
     )
     runtime_group.runtime_responses = responses
     runtime_group.failed_runtime_responses = failed_responses
@@ -138,9 +147,11 @@ async def _execute_runtime_requests(
     timeout_seconds: int = 10,
     requests_per: float = 100.0,
     time_period: float = 60.0,
+    async_session: AsyncClient | None = None,
 ) -> tuple[dict[UUID, RuntimeResponse], dict[UUID, FailedRuntimeResponse]]:
 
-    async_session = await config_async_http_client()
+    if async_session is None:
+        async_session = await config_async_http_client()
     rate_limiter = AsyncLimiter(requests_per, time_period)
     async with async_session:
 
