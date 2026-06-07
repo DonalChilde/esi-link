@@ -80,17 +80,34 @@ class EsiLinkSettings:
     """Settings for the ESI Link application."""
 
     application_directory: Path
+    """The directory where the ESI Link application stores its data, logs, and cache."""
     log_directory: Path
+    """The directory where the ESI Link application stores its log files."""
+    app_data_db_path: Path
+    """The file path for the app-data SQLite database."""
     cache_directory: Path
+    """The directory where the ESI Link application stores its cache files."""
     esi_schema_url: str
+    """The URL to fetch the ESI OpenAPI schema from."""
     oauth_metadata_url: str
+    """The URL to fetch OAuth metadata from the ESI auth server."""
     schema_cache_directory: Path
+    """The directory where the ESI Link application stores its cached ESI OpenAPI schemas."""
     token_store_path: Path
+    """The file path for the token store JSON file."""
     auth_metadata_cache_path: Path
+    """The file path for the OAuth metadata cache."""
     auth_metadata_cache_ttl: int
+    """The time-to-live (TTL) for cached OAuth metadata, in seconds. After this time, the 
+        cached metadata will be considered stale and will be refreshed."""
     rate_limit_connection_period: int
+    """The period over which to calculate the rate limit for connections to the ESI API, 
+        in seconds. This is used to determine how many requests can be made within this 
+        period without exceeding the rate limit."""
     rate_limit_connection_max_rate: int
+    """The maximum number of requests allowed within the rate limit period."""
     cache_configuration: CacheConfiguration
+    """Configuration for the cache used by ESI Link."""
 
 
 class EsiLinkSettingsPydantic(BaseSettings):
@@ -221,6 +238,7 @@ def get_settings(
         application_directory=pydantic_settings.application_directory,
         log_directory=pydantic_settings.application_directory / "logs",
         cache_directory=pydantic_settings.application_directory / "cache",
+        app_data_db_path=pydantic_settings.application_directory / "app_data.db",
         esi_schema_url=pydantic_settings.esi_schema_url,
         oauth_metadata_url=pydantic_settings.oauth_metadata_url,
         schema_cache_directory=pydantic_settings.application_directory / "schema_cache",
