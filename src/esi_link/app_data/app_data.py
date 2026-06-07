@@ -1,24 +1,52 @@
-# AppData is an async context manager class the db connection for the app-data db.
+# AppData is an async context manager class that manages the database connection for the app-data db.
 
 import sqlite3
-from contextlib import contextmanager
 from importlib.resources import files as resource_files
 from types import TracebackType
 from typing import Self
 
 from esi_link.app_data.helpers import transaction
+from esi_link.auth.credential_manager_sqlite import CredentialManagerSqlite
+from esi_link.auth.models import EsiAppCredentials
+from esi_link.auth.oauth_metadata_sqlite import (
+    OAuthMetadataSqliteCache,
+    OAuthMetadataTimestamped,
+)
+from esi_link.auth.token_manager_sqlite import CharacterTokenManagerSqlite
+from esi_link.auth.token_tool import TokenTool
 
 
 class AppDataSqlite:
     def __init__(self, db_uri: str):
-        self.db_uri = db_uri
-        self.connection: sqlite3.Connection | None = None
+        self._db_uri = db_uri
+        self._connection: sqlite3.Connection | None = None
+        self._oauth_cache: OAuthMetadataSqliteCache | None = None
+        self._credential_manager: CredentialManagerSqlite | None = None
+        self._token_manager: CharacterTokenManagerSqlite | None = None
 
     async def __aenter__(self) -> Self:
-        self.connection = self._make_connection()
+        """Initialize the database connection and set up related resources."""
+        self._connection = self._make_connection()
         self._init_db()
+        self._oauth_cache = OAuthMetadataSqliteCache(self._connection)
+        self._credential_manager = CredentialManagerSqlite(self._connection)
+        self._token_manager = self._init_token_manager()
 
         return self
+
+    def _init_token_manager(self) -> CharacterTokenManagerSqlite | None:
+        """Initialize the token manager if credentials are available."""
+        if self._connection is None:
+            raise RuntimeError("Database connection is not established.")
+        credentials = self.get_credentials()
+        if credentials is None:
+            return None
+        token_tool = TokenTool(self.oauth_metadata)
+        return CharacterTokenManagerSqlite(
+            connection=self._connection,
+            client_id=credentials.clientId,
+            token_tool=token_tool,
+        )
 
     async def __aexit__(
         self,
@@ -26,34 +54,60 @@ class AppDataSqlite:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> bool | None:
-        if self.connection:
-            self.connection.close()
-            self.connection = None
+        """Clean up resources by closing the database connection."""
+        if self._connection:
+            self._connection.close()
+            self._connection = None
+        self._oauth_cache = None
+        self._credential_manager = None
+        return None
 
     def _make_connection(self) -> sqlite3.Connection:
         """Create a new connection to the app-data database."""
-        connection = sqlite3.connect(self.db_uri, uri=True)
+        # Keep SQLite in autocommit mode so explicit BEGIN/COMMIT in
+        # app_data.helpers.transaction is the only transaction boundary.
+        connection = sqlite3.connect(self._db_uri, uri=True, autocommit=True)
         connection.row_factory = sqlite3.Row
         return connection
 
     def _init_db(self):
         """Initialize the database schema if it doesn't exist."""
-        if self.connection is None:
+        if self._connection is None:
             raise RuntimeError("Database connection is not established.")
         table_defs = (
             resource_files("esi_link.app_data").joinpath("table_defs.sql").read_text()
         )
-        with transaction(self.connection) as conn:
+        with transaction(self._connection) as conn:
             conn.executescript(table_defs)
-        self.connection.commit()
 
     @property
-    async def token_store(self):
-        pass
+    def token_manager(self) -> CharacterTokenManagerSqlite | None:
+        """Get the token manager, which may be None if credentials are not set."""
+        return self._token_manager
+
+    def get_credentials(self) -> EsiAppCredentials | None:
+        """Get the ESI app credentials from the database."""
+        if self._credential_manager is None:
+            raise RuntimeError("Credential manager is not initialized.")
+        return self._credential_manager.get()
+
+    def save_credentials(
+        self, credentials: EsiAppCredentials, overwrite: bool = False
+    ) -> None:
+        """Save the ESI app credentials to the database."""
+        if self._credential_manager is None:
+            raise RuntimeError("Credential manager is not initialized.")
+        self._credential_manager.save(credentials, overwrite=overwrite)
+        # If credentials are updated, we need to reinitialize the token manager to use
+        # the new client ID.
+        self._token_manager = self._init_token_manager()
 
     @property
-    def oauth_metadata(self):
-        pass
+    def oauth_metadata(self) -> OAuthMetadataTimestamped:
+        """Get the current OAuth metadata, either from cache or freshly fetched."""
+        if self._oauth_cache is None:
+            raise RuntimeError("OAuth metadata cache is not initialized.")
+        return self._oauth_cache.get()
 
     @property
     def schema_store(self):

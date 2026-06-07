@@ -1,9 +1,12 @@
 """Models for esi-link authentication."""
 
 from dataclasses import dataclass, field
+from typing import Any, cast
 
 from pydantic import RootModel
 from whenever import Instant
+
+AUDIENCE = "EVE Online"
 
 
 @dataclass(slots=True, frozen=True)
@@ -110,18 +113,78 @@ EsiAppCredentialsRoot = RootModel[EsiAppCredentials]
 class CharacterToken:
     character_id: int
     character_name: str
-    created: int
-    """Creation time as a UNIX timestamp."""
-    expires: int
+    # created: int
+    # """Creation time as a UNIX timestamp."""
+    expires_at: int
     """Expiration time as a UNIX timestamp."""
     oauth_token: OauthToken
 
     @property
     def expires_in(self) -> int:
         """Return the number of seconds until the token expires."""
-        return self.expires - Instant.now().timestamp()
+        return self.expires_at - Instant.now().timestamp()
 
     @property
     def auth_headers(self) -> dict[str, str]:
         """Return the auth headers to use for authenticated requests to ESI."""
         return {"Authorization": f"Bearer {self.oauth_token.access_token}"}
+
+
+@dataclass(slots=True, frozen=True)
+class OAuthMetadataTimestamped:
+    """A wrapper for OAuth metadata that includes a timestamp of when the metadata was fetched."""
+
+    metadata: dict[str, Any]
+    """The OAuth metadata as a dictionary."""
+    timestamp: int
+    """The timestamp of when the metadata was fetched, in nano_seconds since the epoch."""
+
+    @property
+    def timestamp_instant(self) -> Instant:
+        """Convert the timestamp to an Instant."""
+        return Instant.from_timestamp_nanos(self.timestamp)
+
+    @property
+    def issuers(self) -> list[str]:
+        """The issuers of the OAuth metadata."""
+        value = self.metadata["issuer"]
+        if isinstance(value, str):
+            return [value]
+        elif isinstance(value, list):
+            value = cast(list[str], value)
+            return value
+        else:
+            raise ValueError("Invalid issuer value in OAuth metadata.")
+
+    @property
+    def authorization_endpoint(self) -> str:
+        """The authorization endpoint of the OAuth metadata."""
+        return self.metadata["authorization_endpoint"]
+
+    @property
+    def token_endpoint(self) -> str:
+        """The token endpoint of the OAuth metadata."""
+        return self.metadata["token_endpoint"]
+
+    @property
+    def jwks_uri(self) -> str:
+        """The JWKS URI of the OAuth metadata."""
+        return self.metadata["jwks_uri"]
+
+    @property
+    def revocation_endpoint(self) -> str:
+        """The revocation endpoint of the OAuth metadata."""
+        return self.metadata["revocation_endpoint"]
+
+    @property
+    def code_challenge_methods_supported(self) -> list[str]:
+        """The code challenge methods supported by the OAuth metadata."""
+        return self.metadata["code_challenge_methods_supported"]
+
+    @property
+    def token_endpoint_auth_signing_alg_values_supported(self) -> list[str]:
+        """The token endpoint auth signing algorithms supported by the OAuth metadata."""
+        return self.metadata["token_endpoint_auth_signing_alg_values_supported"]
+
+
+OAuthMetadataTimestampedRoot = RootModel[OAuthMetadataTimestamped]

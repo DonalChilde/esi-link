@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS Credentials (
 --   this table may need to be updated to associate tokens with specific credentials.
 CREATE TABLE IF NOT EXISTS CharacterTokens (
     ID INTEGER PRIMARY KEY AUTOINCREMENT,
-    character_id INTEGER NOT NULL,
+    character_id INTEGER NOT NULL UNIQUE,
     character_name TEXT NOT NULL,
     oauth_token_json BLOB NOT NULL,
     expires_at INTEGER NOT NULL,

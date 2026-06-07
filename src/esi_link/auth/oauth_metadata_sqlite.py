@@ -1,81 +1,75 @@
 """Manage the metadata for the OAuth2 flow."""
 
 import sqlite3
-from dataclasses import dataclass
-from types import TracebackType
-from typing import Any, Self, cast
 
 import httpx2
 from jwt import PyJWKClient
-from pydantic import RootModel
 from pydantic_core import from_json, to_json
 from whenever import Instant
 
 from esi_link import USER_AGENT
 from esi_link.app_data.helpers import transaction
+from esi_link.auth.models import OAuthMetadataTimestamped
 from esi_link.settings import OAUTH_METADATA_URL
 
-AUDIENCE = "EVE Online"
+# @dataclass(slots=True, frozen=True)
+# class OAuthMetadataTimestamped:
+#     """A wrapper for OAuth metadata that includes a timestamp of when the metadata was fetched."""
+
+#     metadata: dict[str, Any]
+#     """The OAuth metadata as a dictionary."""
+#     timestamp: int
+#     """The timestamp of when the metadata was fetched, in nano_seconds since the epoch."""
+
+#     @property
+#     def timestamp_instant(self) -> Instant:
+#         """Convert the timestamp to an Instant."""
+#         return Instant.from_timestamp_nanos(self.timestamp)
+
+#     @property
+#     def issuers(self) -> list[str]:
+#         """The issuers of the OAuth metadata."""
+#         value = self.metadata["issuer"]
+#         if isinstance(value, str):
+#             return [value]
+#         elif isinstance(value, list):
+#             value = cast(list[str], value)
+#             return value
+#         else:
+#             raise ValueError("Invalid issuer value in OAuth metadata.")
+
+#     @property
+#     def authorization_endpoint(self) -> str:
+#         """The authorization endpoint of the OAuth metadata."""
+#         return self.metadata["authorization_endpoint"]
+
+#     @property
+#     def token_endpoint(self) -> str:
+#         """The token endpoint of the OAuth metadata."""
+#         return self.metadata["token_endpoint"]
+
+#     @property
+#     def jwks_uri(self) -> str:
+#         """The JWKS URI of the OAuth metadata."""
+#         return self.metadata["jwks_uri"]
+
+#     @property
+#     def revocation_endpoint(self) -> str:
+#         """The revocation endpoint of the OAuth metadata."""
+#         return self.metadata["revocation_endpoint"]
+
+#     @property
+#     def code_challenge_methods_supported(self) -> list[str]:
+#         """The code challenge methods supported by the OAuth metadata."""
+#         return self.metadata["code_challenge_methods_supported"]
+
+#     @property
+#     def token_endpoint_auth_signing_alg_values_supported(self) -> list[str]:
+#         """The token endpoint auth signing algorithms supported by the OAuth metadata."""
+#         return self.metadata["token_endpoint_auth_signing_alg_values_supported"]
 
 
-@dataclass(slots=True, frozen=True)
-class OAuthMetadataTimestamped:
-    """A wrapper for OAuth metadata that includes a timestamp of when the metadata was fetched."""
-
-    metadata: dict[str, Any]
-    """The OAuth metadata as a dictionary."""
-    timestamp: int
-    """The timestamp of when the metadata was fetched, in nano_seconds since the epoch."""
-
-    @property
-    def timestamp_instant(self) -> Instant:
-        """Convert the timestamp to an Instant."""
-        return Instant.from_timestamp_nanos(self.timestamp)
-
-    @property
-    def issuers(self) -> list[str]:
-        """The issuers of the OAuth metadata."""
-        value = self.metadata["issuer"]
-        if isinstance(value, str):
-            return [value]
-        elif isinstance(value, list):
-            value = cast(list[str], value)
-            return value
-        else:
-            raise ValueError("Invalid issuer value in OAuth metadata.")
-
-    @property
-    def authorization_endpoint(self) -> str:
-        """The authorization endpoint of the OAuth metadata."""
-        return self.metadata["authorization_endpoint"]
-
-    @property
-    def token_endpoint(self) -> str:
-        """The token endpoint of the OAuth metadata."""
-        return self.metadata["token_endpoint"]
-
-    @property
-    def jwks_uri(self) -> str:
-        """The JWKS URI of the OAuth metadata."""
-        return self.metadata["jwks_uri"]
-
-    @property
-    def revocation_endpoint(self) -> str:
-        """The revocation endpoint of the OAuth metadata."""
-        return self.metadata["revocation_endpoint"]
-
-    @property
-    def code_challenge_methods_supported(self) -> list[str]:
-        """The code challenge methods supported by the OAuth metadata."""
-        return self.metadata["code_challenge_methods_supported"]
-
-    @property
-    def token_endpoint_auth_signing_alg_values_supported(self) -> list[str]:
-        """The token endpoint auth signing algorithms supported by the OAuth metadata."""
-        return self.metadata["token_endpoint_auth_signing_alg_values_supported"]
-
-
-OAuthMetadataTimestampedRoot = RootModel[OAuthMetadataTimestamped]
+# OAuthMetadataTimestampedRoot = RootModel[OAuthMetadataTimestamped]
 
 
 class OAuthMetadataSqliteCache:
@@ -98,10 +92,11 @@ class OAuthMetadataSqliteCache:
         self._cached_metadata: OAuthMetadataTimestamped | None = None
         self._jwks_client: PyJWKClient | None = None
         self._timestamped_metadata: OAuthMetadataTimestamped | None = None
+        self._initialize_cache()
 
-    def _load_metadata_from_cache(self) -> OAuthMetadataTimestamped | None:
+    def _load_metadata_from_db(self) -> OAuthMetadataTimestamped | None:
         """Load the cached metadata from db."""
-        sql = "SELECT timestamped, metadata_json FROM oauth_metadata_cache WHERE id = 0"
+        sql = "SELECT timestamped, metadata_json FROM OauthMetadataCache WHERE id = 0"
         with transaction(self._connection) as conn:
             row = conn.execute(sql).fetchone()
             if row is None:
@@ -126,7 +121,7 @@ class OAuthMetadataSqliteCache:
         """Save the metadata to disk."""
         metadata_json = to_json(metadata.metadata)
         sql = """
-        REPLACE INTO oauth_metadata_cache (id, timestamped, metadata_json)
+        REPLACE INTO OauthMetadataCache (id, timestamped, metadata_json)
         VALUES (0, ?, ?)
         """
         with transaction(self._connection) as conn:
@@ -141,31 +136,46 @@ class OAuthMetadataSqliteCache:
         age = (now - cache_time).total("seconds")
         return age < self._cache_ttl
 
-    def __enter__(self) -> Self:
-        """Load the metadata, either from cache or from the URL if the cache is invalid."""
-        cached_metadata = self._load_metadata_from_cache()
+    def _fetch_and_cache_metadata(self) -> None:
+        """Fetch the metadata from the URL and save it to the cache."""
+        fetched_metadata = self._fetch_metadata_from_url()
+        self._save_metadata_to_cache(fetched_metadata)
+        self._cached_metadata = fetched_metadata
+
+    def _initialize_cache(self) -> None:
+        """Initialize the cache by loading metadata from the database or fetching from the URL if necessary."""
+        cached_metadata = self._load_metadata_from_db()
         if cached_metadata is not None and self._is_cache_valid():
             self._cached_metadata = cached_metadata
         else:
-            fetched_metadata = self._fetch_metadata_from_url()
-            self._save_metadata_to_cache(fetched_metadata)
-            self._cached_metadata = fetched_metadata
-        return self
+            self._fetch_and_cache_metadata()
 
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
-    ) -> None:
-        """Clean up any resources if necessary. In this case, there are no resources to clean up."""
-        pass
+    # def __enter__(self) -> Self:
+    #     """Load the metadata, either from cache or from the URL if the cache is invalid."""
+    #     cached_metadata = self._load_metadata_from_db()
+    #     if cached_metadata is not None and self._is_cache_valid():
+    #         self._cached_metadata = cached_metadata
+    #     else:
+    #         fetched_metadata = self._fetch_metadata_from_url()
+    #         self._save_metadata_to_cache(fetched_metadata)
+    #         self._cached_metadata = fetched_metadata
+    #     return self
 
-    @property
-    def metadata(self) -> OAuthMetadataTimestamped:
+    # def __exit__(
+    #     self,
+    #     exc_type: type[BaseException] | None,
+    #     exc_val: BaseException | None,
+    #     exc_tb: TracebackType | None,
+    # ) -> None:
+    #     """Clean up any resources if necessary. In this case, there are no resources to clean up."""
+    #     pass
+
+    def get(self) -> OAuthMetadataTimestamped:
         """Get the current OAuth metadata, either from cache or freshly fetched."""
         if self._cached_metadata is None:
             raise ValueError("OAuth metadata is not loaded.")
+        if not self._is_cache_valid():
+            self._fetch_and_cache_metadata()
         return self._cached_metadata
 
     # @property

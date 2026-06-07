@@ -8,8 +8,13 @@ from jwt.jwks_client import PyJWKClient
 
 from esi_link import USER_AGENT
 from esi_link.auth.helpers import oauth_tokens as oauth_helpers
-from esi_link.auth.models import CharacterToken, OauthToken, ValidatedToken
-from esi_link.auth.oauth_metadata_json import AUDIENCE, OAuthMetadataTimestamped
+from esi_link.auth.models import (
+    AUDIENCE,
+    CharacterToken,
+    OAuthMetadataTimestamped,
+    OauthToken,
+    ValidatedToken,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +127,6 @@ class TokenTool:
             oauth_token=oauth_token,
             character_id=validated_token.character_id,
             character_name=validated_token.character_name,
-            created=validated_token.issued_at,
-            expires=validated_token.expires_at,
+            # created=validated_token.issued_at,
+            expires_at=validated_token.expires_at,
         )

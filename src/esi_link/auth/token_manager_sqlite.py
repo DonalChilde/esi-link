@@ -1,0 +1,153 @@
+import asyncio
+import sqlite3
+from typing import Annotated
+
+from annotated_types import Ge, Le
+from httpx2 import AsyncClient, Client
+from pydantic_core import from_json, to_json
+
+from esi_link.app_data.helpers import transaction
+from esi_link.auth.models import CharacterToken
+from esi_link.auth.token_tool import TokenTool
+
+
+class CharacterTokenManagerSqlite:
+    def __init__(
+        self, connection: sqlite3.Connection, client_id: str, token_tool: TokenTool
+    ):
+        """A simple token manager that stores ESI character tokens in a SQLite database."""
+        self._connection = connection
+        self._client_id = client_id
+        self._token_tool = token_tool
+
+    def save_character(self, character_token: CharacterToken) -> None:
+        """Save a character token to the database."""
+        oauth_token_json = to_json(character_token.oauth_token)
+        sql = """
+        REPLACE INTO CharacterTokens (character_id, character_name, expires_at, oauth_token)
+        VALUES (?, ?, ?, ?)
+        """
+        with transaction(self._connection) as conn:
+            conn.execute(
+                sql,
+                (
+                    character_token.character_id,
+                    character_token.character_name,
+                    character_token.expires_at,
+                    oauth_token_json,
+                ),
+            )
+
+    def get_character(self, character_id: int) -> CharacterToken:
+        """Fetch the token for a specific character ID from the database."""
+        sql = "SELECT * FROM CharacterTokens WHERE character_id = ?"
+        with transaction(self._connection) as conn:
+            cursor = conn.execute(sql, (character_id,))
+            row = cursor.fetchone()
+        if row is None:
+            raise ValueError(f"No token found for character ID {character_id}.")
+        return CharacterToken(
+            character_id=row["character_id"],
+            character_name=row["character_name"],
+            expires_at=row["expires_at"],
+            oauth_token=from_json(row["oauth_token"]),
+        )
+
+    def get_all_characters(self) -> list[CharacterToken]:
+        """Fetch tokens for all characters stored in the database."""
+        sql = "SELECT * FROM CharacterTokens"
+        with transaction(self._connection) as conn:
+            rows = conn.execute(sql).fetchall()
+        character_tokens = [
+            CharacterToken(
+                character_id=row["character_id"],
+                character_name=row["character_name"],
+                expires_at=row["expires_at"],
+                oauth_token=from_json(row["oauth_token"]),
+            )
+            for row in rows
+        ]
+        return character_tokens
+
+    def _refresh_character_token(
+        self, character_id: int, *, session: Client
+    ) -> CharacterToken:
+        """Refresh the token for a specific character ID and update it in the database."""
+        existing_token = self.get_character(character_id)
+        oauth_token = self._token_tool.refresh_existing_token(
+            client_id=self._client_id,
+            refresh_token=existing_token.oauth_token.refresh_token,
+            session=session,
+        )
+        validated_token = self._token_tool.validate_token(oauth_token.access_token)
+        updated_character_token = CharacterToken(
+            character_id=validated_token.character_id,
+            character_name=validated_token.character_name,
+            expires_at=validated_token.expires_at,
+            oauth_token=oauth_token,
+        )
+        self.save_character(updated_character_token)
+        return updated_character_token
+
+    async def _async_refresh_character_token(
+        self, character_id: int, *, session: AsyncClient
+    ) -> CharacterToken:
+        """Asynchronously refresh the token for a specific character ID and update it in the database."""
+        existing_token = self.get_character(character_id)
+        oauth_token = await self._token_tool.async_refresh_existing_token(
+            client_id=self._client_id,
+            refresh_token=existing_token.oauth_token.refresh_token,
+            session=session,
+        )
+        validated_token = self._token_tool.validate_token(oauth_token.access_token)
+        updated_character_token = CharacterToken(
+            character_id=validated_token.character_id,
+            character_name=validated_token.character_name,
+            expires_at=validated_token.expires_at,
+            oauth_token=oauth_token,
+        )
+        self.save_character(updated_character_token)
+        return updated_character_token
+
+    def refresh_character_token(
+        self,
+        character_id: int,
+        *,
+        session: Client,
+        min_seconds: Annotated[int, Ge(0), Le(1200)] = 300,
+    ) -> CharacterToken:
+        """Get the token for a character, refreshing it if it's close to expiring."""
+        character_token = self.get_character(character_id)
+        if character_token.expires_in < min_seconds:
+            return self._refresh_character_token(character_id, session=session)
+        return character_token
+
+    async def refresh_all_character_tokens(
+        self,
+        *,
+        session: AsyncClient,
+        min_seconds: Annotated[int, Ge(0), Le(1200)] = 300,
+    ) -> list[CharacterToken]:
+        """Refresh tokens for all characters that are close to expiring."""
+        character_tokens = self.get_all_characters()
+        tasks = [
+            self._async_refresh_character_token(
+                character_id=token.character_id, session=session
+            )
+            for token in character_tokens
+            if token.expires_in < min_seconds
+        ]
+        _ = await asyncio.gather(*tasks)
+        # After refreshing, fetch all character tokens again to get the updated values
+        character_tokens = self.get_all_characters()
+        return character_tokens
+
+    @property
+    def available_characters(self) -> list[int]:
+        """Get a list of character IDs for which tokens are stored in the database."""
+        sql = "SELECT character_id FROM CharacterTokens"
+        with transaction(self._connection) as conn:
+            cursor = conn.execute(sql)
+            rows = cursor.fetchall()
+        character_ids = [row["character_id"] for row in rows]
+        return character_ids
