@@ -1,6 +1,6 @@
 """Factory functions for creating instances of settings-related classes."""
 
-from esi_link.auth.oauth_metadata import OAuthMetadataDiskCache
+from esi_link.auth.oauth_metadata_json import OAuthMetadataDiskCache
 from esi_link.auth.token_store import TokenStore
 from esi_link.auth.token_tool import TokenTool
 from esi_link.protocols.cache_manager import CacheManagerProtocol
@@ -51,3 +51,8 @@ def web_cache_factory(settings: EsiLinkSettings) -> CacheManagerProtocol:
         )
     else:
         raise ValueError(f"Unsupported cache type: {cache_config.cache_type}")
+
+
+def app_data_db_uri_factory(settings: EsiLinkSettings) -> str:
+    """Factory function to create the URI for the app-data SQLite database."""
+    return f"file:{settings.app_data_db_path}?mode=rwc"
