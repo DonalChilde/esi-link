@@ -9,7 +9,7 @@ from jwt.jwks_client import PyJWKClient
 from esi_link import USER_AGENT
 from esi_link.auth.helpers import oauth_tokens as oauth_helpers
 from esi_link.auth.models import CharacterToken, OauthToken, ValidatedToken
-from esi_link.auth.oauth_metadata import AUDIENCE, OAuthMetadataTimestamped
+from esi_link.auth.oauth_metadata_json import AUDIENCE, OAuthMetadataTimestamped
 
 logger = logging.getLogger(__name__)
 
