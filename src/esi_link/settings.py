@@ -17,6 +17,8 @@ from esi_link import DEFAULT_APP_DIR
 
 _app_env_prefix = "PFMSOFT_ESI_LINK_"
 
+COMPATIBILITY_DATES_URL = "https://esi.evetech.net/meta/compatibility-dates"
+"""URL to fetch the list of compatibility dates from the ESI API."""
 OAUTH_METADATA_URL = (
     "https://login.eveonline.com/.well-known/oauth-authorization-server"
 )
