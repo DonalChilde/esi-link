@@ -10,6 +10,14 @@ from esi_link.app_data.helpers import transaction
 from esi_link.auth.models import CharacterToken
 from esi_link.auth.token_tool import TokenTool
 
+# TODO refactor token manager database table to include client_id.
+# This would be one way to handle changing the app credentials, and avoiding trying to
+# use old tokens with new credentials. It could also support multiple sets of
+# credentials in the same database, if needed in the future.
+# NOTE: another way to handle changing credentials would be to just delete all existing
+# tokens when the client_id changes, since they would all be invalid anyway. This might
+# be simpler than trying to manage multiple sets of credentials and tokens in the same database.
+
 
 class CharacterTokenManagerSqlite:
     def __init__(
@@ -141,6 +149,22 @@ class CharacterTokenManagerSqlite:
         # After refreshing, fetch all character tokens again to get the updated values
         character_tokens = self.get_all_characters()
         return character_tokens
+
+    def revoke_character_token(self, character_id: int) -> None:
+        """Revoke the token for a specific character ID and remove it from the database."""
+        # FIXME implement token revocation using the ESI revoke endpoint, and then delete
+        # the token from the database if revocation is successful.
+        sql = "DELETE FROM CharacterTokens WHERE character_id = ?"
+        with transaction(self._connection) as conn:
+            conn.execute(sql, (character_id,))
+
+    def revoke_all_character_tokens(self) -> None:
+        """Revoke all tokens and remove them from the database."""
+        # FIXME implement token revocation using the ESI revoke endpoint, and then delete
+        # all tokens from the database if revocation is successful.
+        sql = "DELETE FROM CharacterTokens"
+        with transaction(self._connection) as conn:
+            conn.execute(sql)
 
     @property
     def available_characters(self) -> list[int]:
