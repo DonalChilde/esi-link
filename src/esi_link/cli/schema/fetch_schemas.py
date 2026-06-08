@@ -1,15 +1,15 @@
 """CLI commands for fetching ESI schemas."""
 
 # pyright: standard
+import asyncio
 from typing import Annotated
 
 import typer
 from rich.console import Console
-from rich.markdown import Markdown
 
 from esi_link.cli.helpers import get_esi_link_settings_from_context
-from esi_link.helpers.http_client import config_http_client
-from esi_link.helpers.settings_factories import schema_cache_factory
+from esi_link.esi_link_api import EsiLink
+from esi_link.schema.schema_cache_sqlite import CachedSchema
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -27,41 +27,43 @@ def fetch(
         ),
     ] = None,
 ) -> None:
-    """Fetch and cache the ESI schema for a given compatibility date."""
+    """Fetch and cache the ESI schema for a given compatibility date.
+
+    This can be used to update an already cached schema or to fetch and cache a new schema
+    for a compatibility date that has not been cached yet. If no compatibility date is
+    provided, the latest valid compatibility date will be used.
+    """
     console = Console()
     settings = get_esi_link_settings_from_context(ctx)
-    schema_cache = schema_cache_factory(settings)
-    session = config_http_client()
-    with session:
-        valid_dates = schema_cache.valid_compatibility_dates(session)
-        if not valid_dates:
-            console.print("No valid compatibility dates found.")
-            raise typer.Exit(0)
-        if compatibility_date is not None:
-            if compatibility_date not in valid_dates["compatibility_dates"]:
+
+    async def _fetch() -> CachedSchema:
+        esi_link = EsiLink(settings)
+        async with esi_link:
+            valid_dates = esi_link.app_data.schema_cache.schema_versions()
+            if compatibility_date is None:
+                if not valid_dates:
+                    console.print("No valid compatibility dates found.")
+                    raise typer.Exit(0)
+                latest_date = max(valid_dates)
                 console.print(
-                    f"[red]Compatibility date {compatibility_date} is not valid.[/red]"
+                    f"No compatibility date provided. Using latest valid compatibility "
+                    f"date {latest_date}."
                 )
-                console.print("Valid compatibility dates are:")
-                for date in valid_dates["compatibility_dates"]:
-                    console.print(f"- {date}")
-                raise typer.Exit(1)
-            console.print(
-                f"Fetching schema for compatibility date {compatibility_date}..."
+                compatibility_date_to_fetch = latest_date
+            else:
+                if compatibility_date not in valid_dates:
+                    console.print(
+                        f"Compatibility date {compatibility_date} is not valid. Valid "
+                        f"compatibility dates are: {', '.join(valid_dates)}."
+                    )
+                    raise typer.Exit(1)
+                compatibility_date_to_fetch = compatibility_date
+            cached_schema = esi_link.app_data.schema_cache.fetch_and_cache_schema(
+                compatibility_date_to_fetch
             )
-        else:
-            latest_date = max(valid_dates["compatibility_dates"])
-            console.print(f"Fetching latest valid compatibility date {latest_date}...")
-            compatibility_date = latest_date
-        try:
-            cached_schema = schema_cache.fetch_and_cache_schema(
-                session, compatibility_date
-            )
-            console.print(
-                f"Successfully fetched schema for compatibility date {cached_schema.esi_schema.version}."
-            )
-        except Exception as e:
-            console.print(
-                f"[red]Failed to fetch schema for compatibility date {compatibility_date}: {e}[/red]"
-            )
-            raise e
+            return cached_schema
+
+    cached_schema = asyncio.run(_fetch())
+    console.print(
+        f"Fetched and cached schema for compatibility date {cached_schema.esi_schema.version}."
+    )

@@ -1,17 +1,18 @@
 """Generate human readable documentation for the ESI schema."""
 
 # pyright: standard
+import asyncio
 from pathlib import Path
 from typing import Annotated
 
 import typer
 from rich.console import Console
-from whenever import Instant
 
 from esi_link.cli.helpers import get_esi_link_settings_from_context
-from esi_link.helpers.http_client import config_http_client
+from esi_link.esi_link_api import EsiLink
+from esi_link.helpers.file_safe_string import file_safe_string
 from esi_link.helpers.save_text_file import save_text_file
-from esi_link.helpers.settings_factories import schema_cache_factory
+from esi_link.schema.schema_cache_sqlite import CachedSchema
 from esi_link.schema.schema_doc import generate_esi_schema_doc
 
 app = typer.Typer(no_args_is_help=True)
@@ -54,43 +55,46 @@ def generate_doc(
     """Generate human readable schema documentation."""
     console = Console()
     settings = get_esi_link_settings_from_context(ctx)
-    schema_cache = schema_cache_factory(settings)
-    session = config_http_client()
-    with session:
-        compatibility_dates = schema_cache.valid_compatibility_dates(session=session)
-        if not compatibility_dates:
-            console.print("No valid compatibility dates found.")
-            raise typer.Exit(0)
-        if (
-            compatibility_date
-            and compatibility_date not in compatibility_dates["compatibility_dates"]
-        ):
-            console.print(
-                f"Compatibility date {compatibility_date} is not valid. Valid compatibility dates are:"
-            )
-            for date in compatibility_dates["compatibility_dates"]:
-                console.print(f"- {date}")
-            raise typer.Exit(0)
-        if not compatibility_date:
-            compatibility_date = schema_cache.latest_compatibility_date(session=session)
-            if not output_directory:
-                console.print(
-                    f"No compatibility date provided. Using latest valid compatibility date: {compatibility_date}"
-                )
 
-        cached_schema = schema_cache.get_schema(compatibility_date, session=session)
+    async def get_schema() -> CachedSchema:
+        esi_link = EsiLink(settings)
+        async with esi_link:
+            valid_dates = esi_link.app_data.schema_cache.schema_versions()
+            if compatibility_date and compatibility_date not in valid_dates:
+                console.print(
+                    f"Compatibility date {compatibility_date} is not valid. Valid compatibility dates are:"
+                )
+                for date in valid_dates:
+                    console.print(f"- {date}")
+                console.print(
+                    "Did you mean to ask for the latest valid compatibility date? If so, "
+                    "run the command without providing a compatibility date."
+                )
+                raise typer.Exit(0)
+            if not compatibility_date:
+                cached_schema = (
+                    esi_link.app_data.schema_cache.get_latest_cached_schema()
+                )
+            else:
+                cached_schema = esi_link.app_data.schema_cache.get_cached_schema(
+                    compatibility_date=compatibility_date
+                )
+            return cached_schema
+
+    cached_schema = asyncio.run(get_schema())
 
     doc = generate_esi_schema_doc(
         cached_schema.esi_schema,
-        download_date=Instant.from_timestamp(cached_schema.timestamp),
+        download_date=cached_schema.timestamp_instant,
     )
     if not output_directory:
         console.print(doc)
         raise typer.Exit(0)
     if not output_file:
         output_file = (
-            f"esi_schema_doc_{compatibility_date}_{cached_schema.timestamp}.md"
+            f"esi_schema_doc_{compatibility_date}_{cached_schema.timestamp_instant}.md"
         )
+        output_file = file_safe_string(output_file)
     saved = save_text_file(
         text=doc,
         output_dir=output_directory,

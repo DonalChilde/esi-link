@@ -15,6 +15,7 @@ from esi_link.auth.models import (
     OauthToken,
     ValidatedToken,
 )
+from esi_link.helpers.http_client import config_async_http_client, config_http_client
 
 logger = logging.getLogger(__name__)
 
@@ -25,19 +26,26 @@ class TokenTool:
     def __init__(
         self,
         oauth_metadata: OAuthMetadataTimestamped,
+        *,
+        session: Client | None = None,
+        async_session: AsyncClient | None = None,
     ) -> None:
         """Initialize the TokenTool."""
         self._oauth_metadata = oauth_metadata
         self._jwks_client = PyJWKClient(
             self._oauth_metadata.jwks_uri, headers={"User-Agent": USER_AGENT}
         )
+        if session is None:
+            self._session = config_http_client()
+        else:
+            self._session = session
+        self._async_session = async_session
 
     def request_new_token(
         self,
         client_id: str,
         authorization_code: str,
         code_verifier: str,
-        session: Client,
     ) -> OauthToken:
         """Request a new token using the authorization code flow."""
         token_response = oauth_helpers.request_token(
@@ -45,7 +53,7 @@ class TokenTool:
             authorization_code=authorization_code,
             code_verifier=code_verifier,
             token_endpoint=self._oauth_metadata.token_endpoint,
-            session=session,
+            session=self._session,
         )
         return OauthToken(token_data=token_response)
 
@@ -54,15 +62,16 @@ class TokenTool:
         client_id: str,
         authorization_code: str,
         code_verifier: str,
-        client_session: AsyncClient,
     ) -> OauthToken:
         """Asynchronously request a new token using the authorization code flow."""
+        if self._async_session is None:
+            self._async_session = await config_async_http_client()
         token_response = await oauth_helpers.async_request_token(
             client_id=client_id,
             authorization_code=authorization_code,
             code_verifier=code_verifier,
             token_endpoint=self._oauth_metadata.token_endpoint,
-            session=client_session,
+            session=self._async_session,
         )
         return OauthToken(token_data=token_response)
 
@@ -70,14 +79,13 @@ class TokenTool:
         self,
         refresh_token: str,
         client_id: str,
-        session: Client,
     ) -> OauthToken:
         """Refresh an existing token using the refresh token."""
         token_response = oauth_helpers.refresh_token(
             refresh_token=refresh_token,
             client_id=client_id,
             token_endpoint=self._oauth_metadata.token_endpoint,
-            session=session,
+            session=self._session,
         )
         return OauthToken(token_data=token_response)
 
@@ -85,14 +93,15 @@ class TokenTool:
         self,
         refresh_token: str,
         client_id: str,
-        session: AsyncClient,
     ) -> OauthToken:
         """Asynchronously refresh an existing token using the refresh token."""
+        if self._async_session is None:
+            self._async_session = await config_async_http_client()
         token_response = await oauth_helpers.async_refresh_token(
             refresh_token=refresh_token,
             client_id=client_id,
             token_endpoint=self._oauth_metadata.token_endpoint,
-            session=session,
+            session=self._async_session,
         )
         return OauthToken(token_data=token_response)
 
@@ -100,14 +109,13 @@ class TokenTool:
         self,
         refresh_token: str,
         client_id: str,
-        session: Client,
     ) -> Any:
         """Revoke a refresh token."""
         return oauth_helpers.revoke_refresh_token(
             refresh_token=refresh_token,
             revocation_endpoint=self._oauth_metadata.revocation_endpoint,
             client_id=client_id,
-            session=session,
+            session=self._session,
         )
 
     def validate_token(self, access_token: str) -> ValidatedToken:

@@ -5,6 +5,7 @@ from typing import Annotated
 from annotated_types import Ge, Le
 from httpx2 import AsyncClient, Client
 from pydantic_core import from_json, to_json
+from whenever import Instant
 
 from esi_link.app_data.helpers import transaction
 from esi_link.auth.models import CharacterToken
@@ -28,12 +29,14 @@ class CharacterTokenManagerSqlite:
         self._client_id = client_id
         self._token_tool = token_tool
 
+    # TODO make db load/save/get all private methods.
+
     def save_character(self, character_token: CharacterToken) -> None:
         """Save a character token to the database."""
         oauth_token_json = to_json(character_token.oauth_token)
         sql = """
-        REPLACE INTO CharacterTokens (character_id, character_name, expires_at, oauth_token)
-        VALUES (?, ?, ?, ?)
+        REPLACE INTO CharacterTokens (character_id, character_name, expires_at, oauth_token_json, timestamped)
+        VALUES (?, ?, ?, ?, ?)
         """
         with transaction(self._connection) as conn:
             conn.execute(
@@ -43,6 +46,7 @@ class CharacterTokenManagerSqlite:
                     character_token.character_name,
                     character_token.expires_at,
                     oauth_token_json,
+                    Instant.now().timestamp_nanos(),
                 ),
             )
 
@@ -58,7 +62,7 @@ class CharacterTokenManagerSqlite:
             character_id=row["character_id"],
             character_name=row["character_name"],
             expires_at=row["expires_at"],
-            oauth_token=from_json(row["oauth_token"]),
+            oauth_token=from_json(row["oauth_token_json"]),
         )
 
     def get_all_characters(self) -> list[CharacterToken]:
@@ -71,7 +75,7 @@ class CharacterTokenManagerSqlite:
                 character_id=row["character_id"],
                 character_name=row["character_name"],
                 expires_at=row["expires_at"],
-                oauth_token=from_json(row["oauth_token"]),
+                oauth_token=from_json(row["oauth_token_json"]),
             )
             for row in rows
         ]
@@ -85,7 +89,6 @@ class CharacterTokenManagerSqlite:
         oauth_token = self._token_tool.refresh_existing_token(
             client_id=self._client_id,
             refresh_token=existing_token.oauth_token.refresh_token,
-            session=session,
         )
         validated_token = self._token_tool.validate_token(oauth_token.access_token)
         updated_character_token = CharacterToken(
@@ -105,7 +108,6 @@ class CharacterTokenManagerSqlite:
         oauth_token = await self._token_tool.async_refresh_existing_token(
             client_id=self._client_id,
             refresh_token=existing_token.oauth_token.refresh_token,
-            session=session,
         )
         validated_token = self._token_tool.validate_token(oauth_token.access_token)
         updated_character_token = CharacterToken(

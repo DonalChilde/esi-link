@@ -5,11 +5,11 @@ from httpx2 import AsyncClient, Client
 
 from esi_link.app_data.app_data import AppDataSqlite
 from esi_link.auth.token_store import TokenStore
+from esi_link.auth.token_tool import TokenTool
 from esi_link.helpers.http_client import config_async_http_client, config_http_client
 from esi_link.helpers.settings_factories import (
     app_data_db_uri_factory,
     schema_cache_factory,
-    token_store_factory,
     web_cache_factory,
 )
 from esi_link.request.models import Request, RequestGroup
@@ -103,3 +103,14 @@ class EsiLink:
         if self._app_data is None:
             raise RuntimeError("App data context is not initialized.")
         return self._app_data
+
+    @property
+    def token_tool(self) -> TokenTool:
+        """Get the token tool for managing OAuth tokens."""
+        if self._app_data is None:
+            raise RuntimeError("App data context is not initialized.")
+        oauth_metadata = self._app_data.oauth_metadata
+        token_tool = TokenTool(
+            oauth_metadata, session=self._session, async_session=self._async_session
+        )
+        return token_tool

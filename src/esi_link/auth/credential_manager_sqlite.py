@@ -3,6 +3,7 @@
 import sqlite3
 
 from pydantic_core import from_json, to_json
+from whenever import Instant
 
 from esi_link.app_data.helpers import transaction
 from esi_link.auth.models import EsiAppCredentials
@@ -27,7 +28,7 @@ class CredentialManagerSqlite:
             clientId=row["client_id"],
             clientSecret=row["client_secret"],
             callbackUrl=row["callback_url"],
-            scopes=from_json(row["scopes"]),
+            scopes=from_json(row["scopes_json"]),
         )
 
     def get(self) -> EsiAppCredentials | None:
@@ -44,8 +45,8 @@ class CredentialManagerSqlite:
             )
         scopes_json = to_json(credentials.scopes)
         sql = """
-        REPLACE INTO Credentials (ID, app_name, app_description, client_id, client_secret, callback_url, scopes)
-        VALUES (0, ?, ?, ?, ?, ?, ?)
+        REPLACE INTO Credentials (ID, app_name, app_description, client_id, client_secret, callback_url, scopes_json,timestamped)
+        VALUES (0, ?, ?, ?, ?, ?, ?,?)
         """
         with transaction(self._connection) as conn:
             conn.execute(
@@ -57,5 +58,6 @@ class CredentialManagerSqlite:
                     credentials.clientSecret,
                     credentials.callbackUrl,
                     scopes_json,
+                    Instant.now().timestamp_nanos(),
                 ),
             )

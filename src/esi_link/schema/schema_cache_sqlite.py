@@ -61,6 +61,8 @@ class AvailableCachedSchema:
     compatibility_date: str
     timestamp: int
     """Nanoseconds since the Unix epoch when the schema was fetched."""
+    seconds_remaining: int
+    """Number of seconds until the cached schema expires, or a negative number if it is already expired."""
 
     @property
     def timestamp_instant(self) -> Instant:
@@ -143,18 +145,45 @@ class SchemaCacheSqlite:
         """Check if the cached schema has expired based on the provided TTL."""
         return cached_schema.is_expired(ttl)
 
+    def fetch_and_cache_schema(self, compatibility_date: str) -> CachedSchema:
+        """Fetch the ESI schema for the given compatibility date and cache it in the database.
+
+        This method will fetch the schema from the ESI endpoint and save it to the
+        database, regardless of whether there is already a cached schema in the database
+        or not. It does not check if there is a valid cached schema in the database before
+        fetching a new one.
+
+        Args:
+            compatibility_date: The compatibility date to fetch the schema for.
+
+        Returns:
+            A CachedSchema object containing the fetched schema and the timestamp of when it was fetched.
+        """
+        cached_schema = self._fetch_schema_for_date(compatibility_date)
+        self._save_schema_to_db(cached_schema)
+        return cached_schema
+
     def cached_schemas(self) -> list[AvailableCachedSchema]:
         """Return a list of available cached schemas, including their compatibility dates and timestamps."""
         sql = "SELECT compatibility_date, timestamped FROM SchemaCache"
         with transaction(self._connection) as conn:
             rows = conn.execute(sql).fetchall()
-        available_schemas = [
-            AvailableCachedSchema(
-                compatibility_date=row["compatibility_date"],
-                timestamp=row["timestamped"],
+        available_schemas: list[AvailableCachedSchema] = []
+        for row in rows:
+            compatibility_date = row["compatibility_date"]
+            timestamp = row["timestamped"]
+            seconds_remaining = self._ttl - int(
+                (Instant.now() - Instant.from_timestamp_nanos(timestamp)).total(
+                    "seconds"
+                )
             )
-            for row in rows
-        ]
+            available_schemas.append(
+                AvailableCachedSchema(
+                    compatibility_date=compatibility_date,
+                    timestamp=timestamp,
+                    seconds_remaining=seconds_remaining,
+                )
+            )
         return available_schemas
 
     def schema_versions(self) -> list[str]:
