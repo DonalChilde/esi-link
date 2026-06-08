@@ -89,9 +89,9 @@ class SchemaCacheSqlite:
             if row is None:
                 return None
             timestamped, schema_json = row
-        cached_schema = CachedSchema(
-            esi_schema=from_json(schema_json), timestamp=timestamped
-        )
+
+        esi_schema = EsiSchema(dereferenced_schema=from_json(schema_json))
+        cached_schema = CachedSchema(esi_schema=esi_schema, timestamp=timestamped)
         return cached_schema
 
     def _save_schema_to_db(self, cached_schema: CachedSchema) -> None:
@@ -107,7 +107,7 @@ class SchemaCacheSqlite:
                 (
                     cached_schema.timestamp,
                     cached_schema.esi_schema.compatibility_date,
-                    to_json(cached_schema.esi_schema),
+                    to_json(cached_schema.esi_schema.dereferenced_schema),
                 ),
             )
 

@@ -1,5 +1,6 @@
 """Tools for fetching and processing ESI OpenAPI schemas and compatibility dates."""
 
+import logging
 from dataclasses import dataclass
 from typing import Any, TypedDict
 
@@ -10,6 +11,8 @@ from whenever import Instant
 from esi_link.helpers.eve_dates import latest_schema_date
 from esi_link.helpers.resolve_json_ref import resolve_internal_refs
 from esi_link.settings import COMPATIBILITY_DATES_URL, ESI_SCHEMA_URL
+
+logger = logging.getLogger(__name__)
 
 
 class CompatibilityDates(TypedDict):
@@ -71,8 +74,17 @@ def _fetch_schema_for_date(
 ) -> TimestampedSchema:
     """Fetch the ESI OpenAPI schema for a specific compatibility date. This is a helper method for fetch_latest_schema."""
     url = f"{url}?compatibility_date={compatibility_date}"
-    response = session.get(url)
-    response.raise_for_status()
+    try:
+        response = session.get(url)
+        response.raise_for_status()
+        logger.info(
+            f"Fetched schema for compatibility date {compatibility_date} from {url}"
+        )
+    except Exception as e:
+        logger.error(
+            f"Failed to fetch schema for compatibility date {compatibility_date} from {url}: {e}"
+        )
+        raise
     return TimestampedSchema(
         schema=response.json(),
         timestamp=Instant.now().timestamp_nanos(),
@@ -121,9 +133,14 @@ def fetch_compatibility_dates(
     session: Client, *, url: str = COMPATIBILITY_DATES_URL
 ) -> TimestampedCompatibilityDates:
     """Fetch the compatibility dates from the URL."""
-    response = session.get(url)
-    response.raise_for_status()
-    dates = response.json()
+    try:
+        response = session.get(url)
+        response.raise_for_status()
+        dates = response.json()
+        logger.info(f"Fetched compatibility dates from {url}")
+    except Exception as e:
+        logger.error(f"Failed to fetch compatibility dates from {url}: {e}")
+        raise
     # Sort the dates in ascending order, so order is guaranteed.
     dates["compatibility_dates"].sort()
     timestamp = Instant.now().timestamp_nanos()

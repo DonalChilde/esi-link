@@ -1,5 +1,6 @@
 """Tools for fetching and processing ESI OpenAPI schemas, including caching compatibility dates and resolving internal references."""
 
+import logging
 import sqlite3
 from dataclasses import dataclass
 
@@ -14,6 +15,8 @@ from esi_link.schema.helpers import (
     fetch_compatibility_dates,
 )
 from esi_link.settings import COMPATIBILITY_DATES_URL
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -54,10 +57,11 @@ class CompatibilityDatesCacheSQLite:
 
     def _init_cached_dates(self) -> None:
         """Initialize the cached compatibility dates from the database, refreshing from the URL if necessary."""
+        cached_dates = self._load_compatibility_dates_from_db()
+        self._cached_dates = cached_dates
+
         if self._cached_dates is None:
-            cached_dates = self._load_compatibility_dates_from_db()
-            if cached_dates is None:
-                self._refresh_cached_dates()
+            self._refresh_cached_dates()
         if self._is_cache_expired():
             self._refresh_cached_dates()
 
@@ -110,7 +114,20 @@ class CompatibilityDatesCacheSQLite:
         previous_dt = previous_downtime()
         cached_instant = self._cached_dates.timestamp_instant
         # If the cached compatibility dates were fetched before or at the previous downtime, they are expired.
-        return cached_instant <= previous_dt
+        if cached_instant <= previous_dt:
+            logger.info(
+                "Cached compatibility dates are expired. Cached at %s, previous downtime was at %s.",
+                cached_instant,
+                previous_dt,
+            )
+            return True
+        else:
+            logger.info(
+                "Cached compatibility dates are still valid. Cached at %s, previous downtime was at %s.",
+                cached_instant,
+                previous_dt,
+            )
+            return False
 
     @property
     def compatibility_dates(self) -> CachedCompatibilityDates:

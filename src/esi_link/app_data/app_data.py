@@ -5,6 +5,8 @@ from importlib.resources import files as resource_files
 from types import TracebackType
 from typing import Self
 
+from httpx2 import AsyncClient, Client
+
 from esi_link.app_data.helpers import transaction
 from esi_link.auth.credential_manager_sqlite import CredentialManagerSqlite
 from esi_link.auth.models import EsiAppCredentials
@@ -14,25 +16,46 @@ from esi_link.auth.oauth_metadata_sqlite import (
 )
 from esi_link.auth.token_manager_sqlite import CharacterTokenManagerSqlite
 from esi_link.auth.token_tool import TokenTool
+from esi_link.schema.schema_cache_sqlite import SchemaCacheSqlite
 
 
 class AppDataSqlite:
-    def __init__(self, db_uri: str):
+    def __init__(self, db_uri: str, session: Client, async_session: AsyncClient):
         self._db_uri = db_uri
         self._connection: sqlite3.Connection | None = None
+        self._async_session = async_session
+        self._session = session
         self._oauth_cache: OAuthMetadataSqliteCache | None = None
         self._credential_manager: CredentialManagerSqlite | None = None
         self._token_manager: CharacterTokenManagerSqlite | None = None
+        self._schema_cache: SchemaCacheSqlite | None = None
 
     async def __aenter__(self) -> Self:
         """Initialize the database connection and set up related resources."""
         self._connection = self._make_connection()
         self._init_db()
-        self._oauth_cache = OAuthMetadataSqliteCache(self._connection)
+        self._oauth_cache = OAuthMetadataSqliteCache(self._connection, self._session)
         self._credential_manager = CredentialManagerSqlite(self._connection)
         self._token_manager = self._init_token_manager()
+        self._schema_cache = SchemaCacheSqlite(self._connection, self._session)
 
         return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> bool | None:
+        """Clean up resources by closing the database connection."""
+        if self._connection:
+            self._connection.close()
+            self._connection = None
+        self._oauth_cache = None
+        self._credential_manager = None
+        self._schema_cache = None
+        self._token_manager = None
+        return None
 
     def _init_token_manager(self) -> CharacterTokenManagerSqlite | None:
         """Initialize the token manager if credentials are available."""
@@ -47,20 +70,6 @@ class AppDataSqlite:
             client_id=credentials.clientId,
             token_tool=token_tool,
         )
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> bool | None:
-        """Clean up resources by closing the database connection."""
-        if self._connection:
-            self._connection.close()
-            self._connection = None
-        self._oauth_cache = None
-        self._credential_manager = None
-        return None
 
     def _make_connection(self) -> sqlite3.Connection:
         """Create a new connection to the app-data database."""
@@ -110,8 +119,10 @@ class AppDataSqlite:
         return self._oauth_cache.get()
 
     @property
-    def schema_store(self):
-        pass
+    def schema_cache(self) -> SchemaCacheSqlite:
+        if self._schema_cache is None:
+            raise RuntimeError("Schema cache is not initialized.")
+        return self._schema_cache
 
     @property
     def web_cache(self):
