@@ -11,10 +11,11 @@ CREATE TABLE IF NOT EXISTS OauthMetadataCache (
 );
 
 -- The SchemaCache table stores cached ESI schema data.
+-- This table is designed to support multiple schemas, but only one per compatibility date.
 CREATE TABLE IF NOT EXISTS SchemaCache (
     ID INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamped INTEGER NOT NULL,
-    compatibility_date TEXT NOT NULL,
+    compatibility_date TEXT NOT NULL UNIQUE,
     schema_json BLOB NOT NULL
 );
 

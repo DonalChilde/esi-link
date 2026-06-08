@@ -2,32 +2,25 @@
 
 import sqlite3
 from dataclasses import dataclass
-from typing import TypedDict
 
 from httpx2 import Client
-from pydantic import RootModel
 from pydantic_core import from_json, to_json
 from whenever import Instant
 
 from esi_link.app_data.helpers import transaction
 from esi_link.helpers.eve_dates import previous_downtime
+from esi_link.schema.helpers import (
+    TimestampedCompatibilityDates,
+    fetch_compatibility_dates,
+)
 from esi_link.settings import COMPATIBILITY_DATES_URL
-
-
-class CompatibilityDates(TypedDict):
-    """Represents the structure of the compatibility dates response from the ESI endpoint."""
-
-    compatibility_dates: list[str]
-
-
-CompatibilityDatesRoot = RootModel[CompatibilityDates]
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class CachedCompatibilityDates:
     """Represents cached compatibility dates, including the list of dates and the timestamp of when they were fetched."""
 
-    compatibility_dates: CompatibilityDates
+    compatibility_dates: list[str]
     timestamp: int
     """Nanoseconds since the Unix epoch when the compatibility dates were fetched."""
 
@@ -70,9 +63,13 @@ class CompatibilityDatesCacheSQLite:
 
     def _refresh_cached_dates(self) -> None:
         """Refresh the cached compatibility dates by fetching from the URL and saving to the database."""
-        fetched_dates = self._fetch_compatibility_dates_from_url(session=self._session)
-        self._save_compatibility_dates_to_db(fetched_dates)
-        self._cached_dates = fetched_dates
+        fetched_dates = self._fetch_compatibility_dates(session=self._session)
+        cached_dates = CachedCompatibilityDates(
+            compatibility_dates=fetched_dates.compatibility_dates,
+            timestamp=fetched_dates.timestamp,
+        )
+        self._save_compatibility_dates_to_db(cached_dates)
+        self._cached_dates = cached_dates
 
     def _load_compatibility_dates_from_db(self) -> CachedCompatibilityDates | None:
         sql = "SELECT timestamped, compatibility_dates_json FROM CompatibilityDatesCache WHERE id = 0"
@@ -97,20 +94,14 @@ class CompatibilityDatesCacheSQLite:
         with transaction(self._connection) as conn:
             conn.execute(sql, (cached_dates.timestamp, compatibility_dates_json))
 
-    def _fetch_compatibility_dates_from_url(
+    def _fetch_compatibility_dates(
         self, *, session: Client
-    ) -> CachedCompatibilityDates:
+    ) -> TimestampedCompatibilityDates:
         """Fetch the compatibility dates from the URL."""
-        response = session.get(self._compatibility_dates_url)
-        response.raise_for_status()
-        dates = response.json()
-        # Sort the dates in ascending order, so order is guaranteed.
-        dates["compatibility_dates"].sort()
-        timestamp = Instant.now().timestamp_nanos()
-        compatibility_dates = CompatibilityDatesRoot.model_validate(dates).root
-        return CachedCompatibilityDates(
-            compatibility_dates=compatibility_dates, timestamp=timestamp
+        fetched_dates = fetch_compatibility_dates(
+            session=session, url=self._compatibility_dates_url
         )
+        return fetched_dates
 
     def _is_cache_expired(self) -> bool:
         """Check if the cached compatibility dates have expired based on the previous downtime."""
