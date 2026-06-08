@@ -3,9 +3,11 @@ from types import TracebackType
 
 from httpx2 import AsyncClient, Client
 
+from esi_link.app_data.app_data import AppDataSqlite
 from esi_link.auth.token_store import TokenStore
 from esi_link.helpers.http_client import config_async_http_client, config_http_client
 from esi_link.helpers.settings_factories import (
+    app_data_db_uri_factory,
     schema_cache_factory,
     token_store_factory,
     web_cache_factory,
@@ -29,15 +31,21 @@ class EsiLink:
         self._cache = web_cache_factory(settings)
         self._token_store: TokenStore | None = None
         self._schema_cache = schema_cache_factory(settings)
+        self._app_data: AppDataSqlite | None = None
 
     async def __aenter__(self):
+        """Initialize resources for the EsiLink instance, including HTTP sessions and app data context."""
         # Initialize resources here if needed
         self._session = self._stack.enter_context(config_http_client())
-        self._token_store = self._stack.enter_context(
-            token_store_factory(self._settings)
-        )
         self._async_session = await self._stack.enter_async_context(
             await config_async_http_client()
+        )
+        self._app_data = await self._stack.enter_async_context(
+            AppDataSqlite(
+                db_uri=app_data_db_uri_factory(self._settings),
+                session=self._session,
+                async_session=self._async_session,
+            )
         )
         return self
 
@@ -47,6 +55,10 @@ class EsiLink:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> bool | None:
+        """Clean up resources by closing sessions and the app data context."""
+        self._session = None
+        self._async_session = None
+        self._app_data = None
         # This automatically calls __exit__ on all contained context managers
         # and forwards any exceptions correctly
         return await self._stack.__aexit__(exc_type, exc_value, traceback)
@@ -84,3 +96,10 @@ class EsiLink:
             async_session=self._async_session,
             token_store=self._token_store,
         )
+
+    @property
+    def app_data(self) -> AppDataSqlite:
+        """Get the app data context manager, which provides access to cached OAuth metadata, credentials, and schema cache."""
+        if self._app_data is None:
+            raise RuntimeError("App data context is not initialized.")
+        return self._app_data

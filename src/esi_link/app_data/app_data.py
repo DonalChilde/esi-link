@@ -1,4 +1,4 @@
-# AppData is an async context manager class that manages the database connection for the app-data db.
+"""Module for managing application data backed by an SQLite database, including credentials, OAuth metadata, and schema caching."""
 
 import sqlite3
 from importlib.resources import files as resource_files
@@ -94,6 +94,11 @@ class AppDataSqlite:
         """Get the token manager, which may be None if credentials are not set."""
         return self._token_manager
 
+    # NOTE: The get_credentials and save_credentials functions are used over a property
+    # linked to a manager class because we need to trigger reinitialization of the
+    # token manager when credentials are updated. If we every support multiple credentials,
+    # this will have to change, along with the token manager initialization and interface.
+
     def get_credentials(self) -> EsiAppCredentials | None:
         """Get the ESI app credentials from the database."""
         if self._credential_manager is None:
@@ -120,6 +125,7 @@ class AppDataSqlite:
 
     @property
     def schema_cache(self) -> SchemaCacheSqlite:
+        """Get the schema cache, which manages cached ESI schemas and compatibility dates."""
         if self._schema_cache is None:
             raise RuntimeError("Schema cache is not initialized.")
         return self._schema_cache
