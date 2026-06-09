@@ -23,8 +23,8 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+      - name: astral-sh/setup-uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 #v8.2.0
       - name: Sync dependencies with uv
         run: |
           # Use the lockfile and install dev group for pytest and tooling
