@@ -6,8 +6,8 @@ from uuid import UUID
 from whenever import Instant
 
 from esi_link.app_data.helpers import transaction
-from esi_link.cache.models import CachedResponse2
-from esi_link.execution.models import HttpResponse2
+from esi_link.cache.models import CachedResponse
+from esi_link.execution.models import HttpResponse
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ class CacheManagerSqlite:
     def __init__(self, connection: sqlite3.Connection):
         self._connection = connection
 
-    async def _save_cached_response(self, cached_response: CachedResponse2) -> None:
+    async def _save_cached_response(self, cached_response: CachedResponse) -> None:
         with transaction(self._connection) as conn:
             conn.execute(
                 """
@@ -33,7 +33,7 @@ class CacheManagerSqlite:
                 ),
             )
 
-    async def _load_cached_response(self, key: UUID) -> CachedResponse2 | None:
+    async def _load_cached_response(self, key: UUID) -> CachedResponse | None:
         with transaction(self._connection) as conn:
             row = conn.execute(
                 "SELECT cache_key, response_text, response_metadata_json, etag, expires_at, timestamped FROM WebCache WHERE cache_key = ?",
@@ -41,7 +41,7 @@ class CacheManagerSqlite:
             ).fetchone()
             if row is None:
                 return None
-            response = CachedResponse2(
+            response = CachedResponse(
                 cache_key=UUID(row["cache_key"]),
                 response_text=row["response_text"],
                 response_metadata_json=row["response_metadata_json"],
@@ -68,7 +68,7 @@ class CacheManagerSqlite:
             else:
                 conn.execute("DELETE FROM WebCache")
 
-    async def get(self, key: UUID) -> CachedResponse2 | None:
+    async def get(self, key: UUID) -> CachedResponse | None:
         """Get a cached response by cache key."""
         response = await self._load_cached_response(key)
         if response is None:
@@ -84,9 +84,9 @@ class CacheManagerSqlite:
             )
             return response
 
-    async def set(self, key: UUID, http_response: HttpResponse2) -> CachedResponse2:
+    async def set(self, key: UUID, http_response: HttpResponse) -> CachedResponse:
         """Set a cached response in the cache."""
-        cached_response = CachedResponse2(
+        cached_response = CachedResponse(
             cache_key=key,
             response_text=http_response.text,
             response_metadata_json=http_response.metadata.as_bytes,
@@ -106,15 +106,15 @@ class CacheManagerSqlite:
         return cached_response
 
     async def refresh(
-        self, key: UUID, new_http_response: HttpResponse2
-    ) -> CachedResponse2:
+        self, key: UUID, new_http_response: HttpResponse
+    ) -> CachedResponse:
         """Refresh an existing cached response with new response data."""
         cached_response = await self._load_cached_response(key)
         if cached_response is None:
             logger.info("No cached response found for key %s to refresh.", key)
             raise KeyError(f"No cached response found for key {key} to refresh.")
         logger.info("Refreshing cache for key %s.", key)
-        updated_http_response = HttpResponse2(
+        updated_http_response = HttpResponse(
             metadata=new_http_response.metadata,
             text=cached_response.response_text,
         )

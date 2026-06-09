@@ -1,6 +1,6 @@
 """Models for caching responses in esi-link."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from uuid import UUID
 
@@ -8,7 +8,6 @@ from whenever import Instant
 
 from esi_link.execution.models import (
     HttpResponse,
-    HttpResponse2,
     ResponseMetadata,
     ResponseMetadataRoot,
 )
@@ -16,35 +15,6 @@ from esi_link.execution.models import (
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class CachedResponse:
-    """Represents a cached response for a Request."""
-
-    cache_key: UUID
-    cached_at: Instant = field(default_factory=Instant.now)
-    """The instant when the response was cached."""
-    http_response: HttpResponse
-    expires_at: Instant | None = None
-    """The instant when the cached response expires and should be considered stale."""
-
-    @property
-    def is_expired(self) -> bool:
-        """Determine if the cached response is expired based on the current time and the expires_at instant."""
-        if self.expires_at is None:
-            return False
-        return Instant.now() >= self.expires_at
-
-    @property
-    def cache_age(self) -> float:
-        """Calculate the age of the cached response in seconds."""
-        return (Instant.now() - self.cached_at).total("seconds")
-
-
-def _timestamp_nanos() -> int:
-    """Get the current time as a timestamp in nanoseconds."""
-    return Instant.now().timestamp_nanos()
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class CachedResponse2:
     """Represents a cached response for a Request."""
 
     cache_key: UUID
@@ -80,9 +50,9 @@ class CachedResponse2:
         ).root
 
     @property
-    def http_response(self) -> HttpResponse2:
+    def http_response(self) -> HttpResponse:
         """Get the HTTP response as an HttpResponse object."""
-        return HttpResponse2(
+        return HttpResponse(
             metadata=self.metadata,
             text=self.response_text,
         )

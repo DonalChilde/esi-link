@@ -8,7 +8,7 @@ from pydantic import RootModel
 from whenever import Instant
 
 from esi_link.cache.models import CacheAction, CachedResponseStatus
-from esi_link.execution.models import HttpResponse2
+from esi_link.execution.models import HttpResponse
 from esi_link.request.models import RequestGroup
 from esi_link.validation.models import (
     InvalidRequest,
@@ -211,7 +211,7 @@ class InvalidRuntimeRequest:
 @dataclass(slots=True, kw_only=True, frozen=True)
 class RuntimeResponse:
     request_id: UUID
-    http_response: HttpResponse2
+    http_response: HttpResponse
     metrics: RuntimeRequestMetrics = field(default_factory=RuntimeRequestMetrics)
     # runtime_request: RuntimeRequest
 
@@ -219,7 +219,7 @@ class RuntimeResponse:
 @dataclass(slots=True, kw_only=True, frozen=True)
 class FailedRuntimeResponse:
     runtime_request: RuntimeRequest
-    http_response: HttpResponse2 | None
+    http_response: HttpResponse | None
     metrics: RuntimeRequestMetrics = field(default_factory=RuntimeRequestMetrics)
     failure_msg: str = ""
 

@@ -16,6 +16,7 @@ from esi_link.auth.oauth_metadata_sqlite import (
 )
 from esi_link.auth.token_manager_sqlite import CharacterTokenManagerSqlite
 from esi_link.auth.token_tool import TokenTool
+from esi_link.cache.sqlite_cache import CacheManagerSqlite
 from esi_link.schema.compatibility_dates_cache_sqlite import (
     CompatibilityDatesCacheSQLite,
 )
@@ -33,6 +34,7 @@ class AppDataSqlite:
         self._token_manager: CharacterTokenManagerSqlite | None = None
         self._schema_cache: SchemaCacheSqlite | None = None
         self._dates_cache: CompatibilityDatesCacheSQLite | None = None
+        self._web_cache: CacheManagerSqlite | None = None
 
     async def __aenter__(self) -> Self:
         """Initialize the database connection and set up related resources."""
@@ -47,6 +49,7 @@ class AppDataSqlite:
         self._schema_cache = SchemaCacheSqlite(
             self._connection, self._session, self._dates_cache
         )
+        self._web_cache = CacheManagerSqlite(self._connection)
 
         return self
 
@@ -149,4 +152,7 @@ class AppDataSqlite:
 
     @property
     def web_cache(self):
-        pass
+        """Get the web cache, which manages cached ESI HTTP responses."""
+        if self._web_cache is None:
+            raise RuntimeError("Web cache is not initialized.")
+        return self._web_cache

@@ -6,10 +6,7 @@ from httpx2 import AsyncClient, Client
 from esi_link.app_data.app_data import AppDataSqlite
 from esi_link.auth.token_tool import TokenTool
 from esi_link.helpers.http_client import config_async_http_client, config_http_client
-from esi_link.helpers.settings_factories import (
-    app_data_db_uri_factory,
-    web_cache_factory,
-)
+from esi_link.helpers.settings_factories import app_data_db_uri_factory
 from esi_link.request.models import Request, RequestGroup
 from esi_link.request_dispatch_esi_link import (
     dispatch_request,
@@ -26,8 +23,6 @@ class EsiLink:
         self._async_session: AsyncClient | None = None
         self._stack = AsyncExitStack()
         # instance resources
-        self._cache = web_cache_factory(settings)
-
         self._app_data: AppDataSqlite | None = None
 
     async def __aenter__(self):
@@ -73,7 +68,7 @@ class EsiLink:
         return await dispatch_request(
             request=request,
             schema_cache=self._app_data.schema_cache,
-            web_cache=self._cache,
+            web_cache=self._app_data.web_cache,
             date_cache=self._app_data.compatibility_dates_cache,
             async_session=self._async_session,
             token_store=self._app_data.token_manager,
@@ -92,7 +87,7 @@ class EsiLink:
         return await dispatch_request_group(
             request_group=request_group,
             schema_cache=self._app_data.schema_cache,
-            web_cache=self._cache,
+            web_cache=self._app_data.web_cache,
             date_cache=self._app_data.compatibility_dates_cache,
             async_session=self._async_session,
             token_store=self._app_data.token_manager,

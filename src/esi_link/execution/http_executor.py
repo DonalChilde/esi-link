@@ -15,11 +15,11 @@ from whenever import Instant
 
 from esi_link.cache.models import (
     CacheAction,
-    CachedResponse2,
+    CachedResponse,
     CachedResponseStatus,
 )
 from esi_link.cache.sqlite_cache import CacheManagerSqlite
-from esi_link.execution.models import HttpResponse2, ResponseMetadata
+from esi_link.execution.models import HttpResponse, ResponseMetadata
 from esi_link.helpers.timedelta_microseconds import in_microseconds
 from esi_link.runtime.models import (
     CachedResponseMetrics,
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 def _update_stale_cache_headers(
-    request: RuntimeRequest, cached_response: CachedResponse2
+    request: RuntimeRequest, cached_response: CachedResponse
 ) -> RuntimeRequest:
     """Update the headers of the request to include information about the stale cache response."""
     if not cached_response.is_expired:
@@ -90,7 +90,7 @@ async def _make_http_request(
                 headers=headers,
                 received_timestamp=Instant.now().timestamp_nanos(),
             )
-            response_data = HttpResponse2(
+            response_data = HttpResponse(
                 metadata=response_metadata,
                 text=network_response.text,
             )
