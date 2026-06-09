@@ -161,7 +161,7 @@ async def _execute_runtime_requests(
             runtime_response = await execute_http_request(
                 request=request,
                 session=async_session,
-                cache_manager=web_cache,
+                web_cache=web_cache,
                 rate_limiter=rate_limiter,
             )
             assert runtime_response.http_response is not None, (

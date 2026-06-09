@@ -15,12 +15,12 @@ from whenever import Instant
 
 from esi_link.cache.models import (
     CacheAction,
-    CachedResponse,
+    CachedResponse2,
     CachedResponseStatus,
 )
-from esi_link.execution.models import HttpResponse
+from esi_link.cache.sqlite_cache import CacheManagerSqlite
+from esi_link.execution.models import HttpResponse2, ResponseMetadata
 from esi_link.helpers.timedelta_microseconds import in_microseconds
-from esi_link.protocols.cache_manager import CacheManagerProtocol
 from esi_link.runtime.models import (
     CachedResponseMetrics,
     FailedRuntimeResponse,
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 def _update_stale_cache_headers(
-    request: RuntimeRequest, cached_response: CachedResponse
+    request: RuntimeRequest, cached_response: CachedResponse2
 ) -> RuntimeRequest:
     """Update the headers of the request to include information about the stale cache response."""
     if not cached_response.is_expired:
@@ -81,15 +81,18 @@ async def _make_http_request(
             )
             response_text = network_response.text
             headers = tuple(network_response.headers.items())
-            response_data = HttpResponse(
+            response_metadata = ResponseMetadata(
                 status_code=network_response.status_code,
                 reason_phrase=network_response.reason_phrase,
                 url=str(network_response.url),
                 elapsed=in_microseconds(network_response.elapsed),
                 bytes_downloaded=len(network_response.content),
                 headers=headers,
-                text=response_text,
                 received_timestamp=Instant.now().timestamp_nanos(),
+            )
+            response_data = HttpResponse2(
+                metadata=response_metadata,
+                text=network_response.text,
             )
             metrics.http_request_completed = Instant.now().timestamp_nanos()
 
@@ -234,7 +237,7 @@ async def execute_http_request(
     request: RuntimeRequest,
     session: httpx2.AsyncClient,
     rate_limiter: AsyncLimiter,
-    cache_manager: CacheManagerProtocol | None,
+    web_cache: CacheManagerSqlite | None,
 ) -> RuntimeResponse | FailedRuntimeResponse:
     """Execute the HTTP request with rate limiting and optional caching.
 
@@ -242,7 +245,7 @@ async def execute_http_request(
         request: The RuntimeRequest to execute.
         session: The httpx2.AsyncClient to use for making the HTTP request.
         rate_limiter: The AsyncLimiter to use for rate limiting the HTTP request.
-        cache_manager: The CacheManagerProtocol to use for caching the HTTP response.
+        web_cache: The CacheManagerSqlite to use for caching the HTTP response.
             If None, caching will be disabled and the request will be executed directly
             without checking the cache.
 
@@ -252,7 +255,7 @@ async def execute_http_request(
     """
     metrics = RuntimeRequestMetrics()
     metrics.task_started = Instant.now().timestamp_nanos()
-    if cache_manager is None:
+    if web_cache is None:
         response = await _fetch_response(
             request=request, session=session, rate_limiter=rate_limiter, metrics=metrics
         )
@@ -263,7 +266,7 @@ async def execute_http_request(
             session=session,
             rate_limiter=rate_limiter,
             metrics=metrics,
-            cache_manager=cache_manager,
+            web_cache=web_cache,
         )
     else:
         response = await _fetch_response(
@@ -304,7 +307,7 @@ async def _fetch_response_with_cache(
     session: httpx2.AsyncClient,
     rate_limiter: AsyncLimiter,
     metrics: RuntimeRequestMetrics,
-    cache_manager: CacheManagerProtocol,
+    web_cache: CacheManagerSqlite,
 ) -> RuntimeResponse | FailedRuntimeResponse:
     cache_key = request.cache_key
     if cache_key is None:
@@ -316,7 +319,7 @@ async def _fetch_response_with_cache(
 
     # Check the cache for a cached response for this request
     cache_metrics.cache_check_started = Instant.now().timestamp_nanos()
-    cached_response = await cache_manager.get(cache_key)
+    cached_response = await web_cache.get(cache_key)
     cache_metrics.cache_check_completed = Instant.now().timestamp_nanos()
 
     if cached_response is None:
@@ -340,7 +343,7 @@ async def _fetch_response_with_cache(
             return response
         cache_metrics.cache_action_started = Instant.now().timestamp_nanos()
         metrics.cache_action = CacheAction.ADDED_TO_CACHE
-        await cache_manager.set(cache_key, response.http_response)
+        await web_cache.set(cache_key, response.http_response)
         cache_metrics.cache_action_completed = Instant.now().timestamp_nanos()
         logger.info(
             f"Cached response for request {response.http_response.url} with cache key {cache_key}, expires at {response.http_response.expires_at}"
@@ -368,9 +371,7 @@ async def _fetch_response_with_cache(
             # Cached response is still valid, refresh the cache with the new response data and return the cached response
             cache_metrics.cache_action_started = Instant.now().timestamp_nanos()
             metrics.cache_action = CacheAction.CACHE_304_REFRESH_METADATA
-            cached_response = await cache_manager.refresh(
-                cache_key, response.http_response
-            )
+            cached_response = await web_cache.refresh(cache_key, response.http_response)
             cache_metrics.cache_action_completed = Instant.now().timestamp_nanos()
             logger.info(
                 "Refreshed cache for request %s with new response, expires at %s",
@@ -386,7 +387,7 @@ async def _fetch_response_with_cache(
             # We got a new valid response, so we update the cache with the new response and return it
             cache_metrics.cache_action_started = Instant.now().timestamp_nanos()
             metrics.cache_action = CacheAction.ADDED_TO_CACHE
-            cached_response = await cache_manager.set(cache_key, response.http_response)
+            cached_response = await web_cache.set(cache_key, response.http_response)
             cache_metrics.cache_action_completed = Instant.now().timestamp_nanos()
             logger.info(
                 f"Updated cache for request {response.http_response.url} with new response, expires at {cached_response.expires_at}"

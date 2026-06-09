@@ -9,11 +9,9 @@ from httpx2 import AsyncClient
 from whenever import Instant
 
 from esi_link.auth.token_manager_sqlite import CharacterTokenManagerSqlite
+from esi_link.cache.sqlite_cache import CacheManagerSqlite
 from esi_link.execution.http_executor import (
     execute_http_request,
-)
-from esi_link.protocols.cache_manager import (
-    CacheManagerProtocol,
 )
 from esi_link.request.models import (
     Request,
@@ -51,7 +49,7 @@ logger = logging.getLogger(__name__)
 async def dispatch_request(
     request: Request,
     schema_cache: SchemaCacheSqlite,
-    web_cache: CacheManagerProtocol,
+    web_cache: CacheManagerSqlite,
     date_cache: CompatibilityDatesCacheSQLite,
     async_session: AsyncClient,
     token_store: CharacterTokenManagerSqlite | None = None,
@@ -85,7 +83,7 @@ async def dispatch_request(
 async def dispatch_request_group(
     request_group: RequestGroup,
     schema_cache: SchemaCacheSqlite,
-    web_cache: CacheManagerProtocol,
+    web_cache: CacheManagerSqlite,
     date_cache: CompatibilityDatesCacheSQLite,
     async_session: AsyncClient,
     token_store: CharacterTokenManagerSqlite | None = None,
@@ -139,7 +137,7 @@ async def dispatch_request_group(
 
 async def _execute_runtime_requests(
     requests: dict[UUID, RuntimeRequest],
-    web_cache: CacheManagerProtocol,
+    web_cache: CacheManagerSqlite,
     timeout_seconds: int = 10,
     requests_per: float = 100.0,
     time_period: float = 60.0,
@@ -158,7 +156,7 @@ async def _execute_runtime_requests(
         runtime_response = await execute_http_request(
             request=request,
             session=async_session,
-            cache_manager=web_cache,
+            web_cache=web_cache,
             rate_limiter=rate_limiter,
         )
         assert runtime_response.http_response is not None, (

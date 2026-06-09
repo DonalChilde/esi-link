@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import RootModel
 
-from esi_link.execution.models import HttpResponse
+from esi_link.execution.models import HttpResponse2
 from esi_link.request.models import Request, RequestGroup
 from esi_link.runtime.models import (
     FailedRuntimeResponse,
@@ -33,7 +33,7 @@ class ResponseGroupAction:
 @dataclass(slots=True, kw_only=True, frozen=True)
 class Response:
     request_id: UUID
-    http_response: HttpResponse
+    http_response: HttpResponse2
     metrics: RuntimeRequestMetrics = field(default_factory=RuntimeRequestMetrics)
 
     def to_string(self, indent: int) -> str:
@@ -54,7 +54,7 @@ ResponseRoot = RootModel[Response]
 
 @dataclass(slots=True, kw_only=True)
 class FailedResponse:
-    http_response: HttpResponse | None
+    http_response: HttpResponse2 | None
     runtime_request: RuntimeRequest
     metrics: RuntimeRequestMetrics = field(default_factory=RuntimeRequestMetrics)
     failure_msg: str = ""
