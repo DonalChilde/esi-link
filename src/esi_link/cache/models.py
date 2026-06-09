@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from uuid import UUID
 
-from pydantic_core import from_json, to_json
 from whenever import Instant
 
 from esi_link.execution.models import (

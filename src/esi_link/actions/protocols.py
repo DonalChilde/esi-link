@@ -1,6 +1,6 @@
 from typing import Any, Protocol
 
-from esi_link.response.models import Response, ResponseGroup
+from esi_link.response.models import ResponseGroup
 from esi_link.runtime.models import FailedRuntimeResponse, RuntimeResponse
 
 type CONTEXT = dict[str, Any]
