@@ -53,3 +53,19 @@ CREATE TABLE IF NOT EXISTS CharacterTokens (
     expires_at INTEGER NOT NULL,
     timestamped INTEGER NOT NULL
 );
+
+-- The WebCache table stores cached responses from ESI endpoints.
+-- cache_key is a unique identifier for the cached response, a UUID
+-- response_text is the raw text of the response, stored as TEXT for efficient retrieval
+-- response_metadata_json is the metadata of the response (status code, headers, etc.) stored as JSON in a BLOB
+-- etag is the ETag header value from the response, if present, stored as TEXT
+-- expires_at is the expiration time of the cached response, stored as a Unix timestamp in seconds, if present
+CREATE TABLE IF NOT EXISTS WebCache (
+    ID INTEGER PRIMARY KEY AUTOINCREMENT,
+    cache_key TEXT NOT NULL UNIQUE,
+    response_text TEXT NOT NULL,
+    response_metadata_json BLOB NOT NULL,
+    etag TEXT,
+    expires_at INTEGER,
+    timestamped INTEGER NOT NULL
+);

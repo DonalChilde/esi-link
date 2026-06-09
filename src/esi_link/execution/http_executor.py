@@ -367,7 +367,7 @@ async def _fetch_response_with_cache(
         if response.http_response.status_code == 304:
             # Cached response is still valid, refresh the cache with the new response data and return the cached response
             cache_metrics.cache_action_started = Instant.now().timestamp_nanos()
-            metrics.cache_action = CacheAction.CACHE_304_REFRESH
+            metrics.cache_action = CacheAction.CACHE_304_REFRESH_METADATA
             cached_response = await cache_manager.refresh(
                 cache_key, response.http_response
             )
