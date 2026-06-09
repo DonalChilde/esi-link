@@ -12,14 +12,8 @@ from esi_link.auth.helpers.request_authentication_code import (
     generate_request_params,
     start_web_server_and_listen_for_code,
 )
-from esi_link.auth.token_tool import TokenTool
 from esi_link.cli.helpers import get_esi_link_settings_from_context
 from esi_link.esi_link_api import EsiLink
-from esi_link.helpers.http_client import config_http_client
-from esi_link.helpers.settings_factories import (
-    token_store_factory,
-    token_tool_factory,
-)
 
 app = typer.Typer(no_args_is_help=True)
 
