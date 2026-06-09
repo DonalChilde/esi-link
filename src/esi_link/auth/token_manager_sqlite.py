@@ -3,7 +3,6 @@ import sqlite3
 from typing import Annotated
 
 from annotated_types import Ge, Le
-from httpx2 import AsyncClient, Client
 from pydantic_core import from_json, to_json
 from whenever import Instant
 
@@ -81,9 +80,7 @@ class CharacterTokenManagerSqlite:
         ]
         return character_tokens
 
-    def _refresh_character_token(
-        self, character_id: int, *, session: Client
-    ) -> CharacterToken:
+    def _refresh_character_token(self, character_id: int) -> CharacterToken:
         """Refresh the token for a specific character ID and update it in the database."""
         existing_token = self.get_character(character_id)
         oauth_token = self._token_tool.refresh_existing_token(
@@ -100,9 +97,7 @@ class CharacterTokenManagerSqlite:
         self.save_character(updated_character_token)
         return updated_character_token
 
-    async def _async_refresh_character_token(
-        self, character_id: int, *, session: AsyncClient
-    ) -> CharacterToken:
+    async def _async_refresh_character_token(self, character_id: int) -> CharacterToken:
         """Asynchronously refresh the token for a specific character ID and update it in the database."""
         existing_token = self.get_character(character_id)
         oauth_token = await self._token_tool.async_refresh_existing_token(
@@ -122,28 +117,23 @@ class CharacterTokenManagerSqlite:
     def refresh_character_token(
         self,
         character_id: int,
-        *,
-        session: Client,
         min_seconds: Annotated[int, Ge(0), Le(1200)] = 300,
     ) -> CharacterToken:
         """Get the token for a character, refreshing it if it's close to expiring."""
         character_token = self.get_character(character_id)
         if character_token.expires_in < min_seconds:
-            return self._refresh_character_token(character_id, session=session)
+            return self._refresh_character_token(character_id)
         return character_token
 
     async def refresh_all_character_tokens(
         self,
         *,
-        session: AsyncClient,
         min_seconds: Annotated[int, Ge(0), Le(1200)] = 300,
     ) -> list[CharacterToken]:
         """Refresh tokens for all characters that are close to expiring."""
         character_tokens = self.get_all_characters()
         tasks = [
-            self._async_refresh_character_token(
-                character_id=token.character_id, session=session
-            )
+            self._async_refresh_character_token(character_id=token.character_id)
             for token in character_tokens
             if token.expires_in < min_seconds
         ]

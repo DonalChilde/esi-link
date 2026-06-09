@@ -5,10 +5,10 @@ import logging
 from uuid import UUID
 
 from aiolimiter import AsyncLimiter
-from httpx2 import AsyncClient, Client
+from httpx2 import AsyncClient
 from whenever import Instant
 
-from esi_link.auth.token_store import TokenStore
+from esi_link.auth.token_manager_sqlite import CharacterTokenManagerSqlite
 from esi_link.execution.http_executor import (
     execute_http_request,
 )
@@ -35,7 +35,10 @@ from esi_link.runtime.models import (
 from esi_link.runtime.runtime_request_factory import (
     generate_runtime_request_group,
 )
-from esi_link.schema.schema_cache import SchemaCache
+from esi_link.schema.compatibility_dates_cache_sqlite import (
+    CompatibilityDatesCacheSQLite,
+)
+from esi_link.schema.schema_cache_sqlite import SchemaCacheSqlite
 from esi_link.validation.request_validation_factory import (
     validate_requests,
 )
@@ -47,11 +50,12 @@ logger = logging.getLogger(__name__)
 
 async def dispatch_request(
     request: Request,
-    schema_cache: SchemaCache,
+    schema_cache: SchemaCacheSqlite,
     web_cache: CacheManagerProtocol,
-    session: Client,
+    date_cache: CompatibilityDatesCacheSQLite,
     async_session: AsyncClient,
-    token_store: TokenStore | None = None,
+    token_store: CharacterTokenManagerSqlite | None = None,
+    timeout_seconds: int = 10,
     requests_per: float = 100.0,
     time_period: float = 60.0,
 ) -> tuple[ResponseGroup, ResponseDebugGroup | None]:
@@ -70,8 +74,9 @@ async def dispatch_request(
         token_store=token_store,
         requests_per=requests_per,
         time_period=time_period,
-        session=session,
+        timeout_seconds=timeout_seconds,
         async_session=async_session,
+        date_cache=date_cache,
     )
 
     return response_group, debug_group
@@ -79,11 +84,11 @@ async def dispatch_request(
 
 async def dispatch_request_group(
     request_group: RequestGroup,
-    schema_cache: SchemaCache,
+    schema_cache: SchemaCacheSqlite,
     web_cache: CacheManagerProtocol,
-    session: Client,
+    date_cache: CompatibilityDatesCacheSQLite,
     async_session: AsyncClient,
-    token_store: TokenStore | None = None,
+    token_store: CharacterTokenManagerSqlite | None = None,
     timeout_seconds: int = 10,
     requests_per: float = 100.0,
     time_period: float = 60.0,
@@ -95,7 +100,7 @@ async def dispatch_request_group(
     valid_requests, invalid_requests = validate_requests(
         requests=runtime_group.request_group.requests,
         schema_cache=schema_cache,
-        session=session,
+        date_cache=date_cache,
         token_store=token_store,
     )
     runtime_group.valid_requests = valid_requests
@@ -104,7 +109,6 @@ async def dispatch_request_group(
     valid_runtime_requests, invalid_runtime_requests = generate_runtime_request_group(
         validated_requests=runtime_group.valid_requests,
         token_store=token_store,
-        session=session,
         timeout_seconds=timeout_seconds,
     )
     runtime_group.runtime_requests = valid_runtime_requests

@@ -72,14 +72,16 @@ class AvailableCachedSchema:
 
 class SchemaCacheSqlite:
     def __init__(
-        self, connection: sqlite3.Connection, session: Client, ttl: int = 2_592_000
+        self,
+        connection: sqlite3.Connection,
+        session: Client,
+        dates_cache: CompatibilityDatesCacheSQLite,
+        ttl: int = 2_592_000,
     ):
         """A simple schema cache that stores ESI schema data in a SQLite database."""
         self._connection = connection
         self._session = session
-        self._compatibility_dates_cache = CompatibilityDatesCacheSQLite(
-            connection, session
-        )
+        self._compatibility_dates_cache = dates_cache
         self._cached_schemas: dict[str, CachedSchema] = {}
         self._ttl = ttl
 

@@ -5,14 +5,15 @@ from copy import deepcopy
 from dataclasses import replace
 from uuid import UUID
 
-from httpx2 import Client
-
-from esi_link.auth.token_store import TokenStore
+from esi_link.auth.token_manager_sqlite import CharacterTokenManagerSqlite
 from esi_link.request.models import Request
+from esi_link.schema.compatibility_dates_cache_sqlite import (
+    CompatibilityDatesCacheSQLite,
+)
 from esi_link.schema.models import (
     EsiSchema,
 )
-from esi_link.schema.schema_cache import SchemaCache
+from esi_link.schema.schema_cache_sqlite import SchemaCacheSqlite
 from esi_link.validation.models import (
     InvalidRequest,
     ValidatedRequest,
@@ -23,9 +24,9 @@ logger = logging.getLogger(__name__)
 
 def validate_request(
     request: Request,
-    schema_cache: SchemaCache,
-    session: Client,
-    token_store: TokenStore | None = None,
+    schema_cache: SchemaCacheSqlite,
+    date_cache: CompatibilityDatesCacheSQLite,
+    token_store: CharacterTokenManagerSqlite | None = None,
 ) -> ValidatedRequest | InvalidRequest:
     """Validates an individual request.
 
@@ -37,10 +38,10 @@ def validate_request(
         actions=[],  # TODO move to validation step after we have the schema, so we can validate that the actions are valid for the requested operation_id
     )
     in_process = _validate_compatibility_date(
-        request, in_process, schema_cache=schema_cache, session=session
+        request, in_process, date_cache=date_cache
     )
     in_process = _validate_request_schema(
-        request, in_process, schema_cache=schema_cache, session=session
+        request, in_process, schema_cache=schema_cache
     )
     if isinstance(in_process, InvalidRequest):
         # If the schema validation failed, we don't need to do any further validation,
@@ -49,33 +50,49 @@ def validate_request(
         return in_process
 
     # Get the schema for use in the rest of the validation steps.
-    schema = schema_cache.get_schema(
-        compatibility_date=in_process.compatibility_date,
-        session=session,
-    ).esi_schema
-    in_process = _validate_operation_id(request, in_process, schema=schema)
+    cached_schema = schema_cache.get_cached_schema(
+        compatibility_date=in_process.compatibility_date
+    )
+    in_process = _validate_operation_id(
+        request, in_process, schema=cached_schema.esi_schema
+    )
     if isinstance(in_process, InvalidRequest):
         # If the operation_id validation failed, we don't need to do any further validation,
         # because the request is already invalid. We can just return the FailedRequestValidation
         # with the operation_id validation error.
         return in_process
-    in_process = _validate_x_compatibility_date(request, in_process, schema=schema)
-    in_process = _validate_path_parameters(request, in_process, schema=schema)
-    in_process = _validate_query_parameters(request, in_process, schema=schema)
-    in_process = _validate_body_parameters(request, in_process, schema=schema)
+    in_process = _validate_x_compatibility_date(
+        request, in_process, schema=cached_schema.esi_schema
+    )
+    in_process = _validate_path_parameters(
+        request, in_process, schema=cached_schema.esi_schema
+    )
+    in_process = _validate_query_parameters(
+        request, in_process, schema=cached_schema.esi_schema
+    )
+    in_process = _validate_body_parameters(
+        request, in_process, schema=cached_schema.esi_schema
+    )
     if token_store is not None:
-        authorized_characters = set(token_store.available_character_ids)
+        authorized_characters = set(token_store.available_characters)
     else:
         authorized_characters: set[int] = set()
     in_process = _validate_authentication(
-        request, in_process, schema=schema, authorized_characters=authorized_characters
+        request,
+        in_process,
+        schema=cached_schema.esi_schema,
+        authorized_characters=authorized_characters,
     )
-    in_process = _validate_language(request, in_process, schema=schema)
-    in_process = _set_method(request, in_process, schema=schema)
-    in_process = _set_url_template(request, in_process, schema=schema)
-    in_process = _set_is_paged(request, in_process, schema=schema)
-    in_process = _set_is_cached(request, in_process, schema=schema)
-    in_process = _set_is_authentication_required(request, in_process, schema=schema)
+    in_process = _validate_language(
+        request, in_process, schema=cached_schema.esi_schema
+    )
+    in_process = _set_method(request, in_process, schema=cached_schema.esi_schema)
+    in_process = _set_url_template(request, in_process, schema=cached_schema.esi_schema)
+    in_process = _set_is_paged(request, in_process, schema=cached_schema.esi_schema)
+    in_process = _set_is_cached(request, in_process, schema=cached_schema.esi_schema)
+    in_process = _set_is_authentication_required(
+        request, in_process, schema=cached_schema.esi_schema
+    )
 
     # Last check before returning the validation result.
     return in_process
@@ -83,9 +100,9 @@ def validate_request(
 
 def validate_requests(
     requests: dict[UUID, Request],
-    schema_cache: SchemaCache,
-    session: Client,
-    token_store: TokenStore | None = None,
+    schema_cache: SchemaCacheSqlite,
+    date_cache: CompatibilityDatesCacheSQLite,
+    token_store: CharacterTokenManagerSqlite | None = None,
 ) -> tuple[dict[UUID, ValidatedRequest], dict[UUID, InvalidRequest]]:
     """Validates a group of requests.
 
@@ -99,7 +116,7 @@ def validate_requests(
             request=request,
             schema_cache=schema_cache,
             token_store=token_store,
-            session=session,
+            date_cache=date_cache,
         )
         if isinstance(validation_result, ValidatedRequest):
             validated_requests[request_id] = validation_result
@@ -112,22 +129,21 @@ def _validate_compatibility_date(
     request: Request,
     in_process: ValidatedRequest | InvalidRequest,
     *,
-    schema_cache: SchemaCache,
-    session: Client,
+    date_cache: CompatibilityDatesCacheSQLite,
 ) -> ValidatedRequest | InvalidRequest:
     """Validates that the compatibility date provided in the request is valid.
 
     If no compatibility date is provided in the request, the latest schema compatibility
     date will be used.
     """
-    valid_compatibility_dates = schema_cache.valid_compatibility_dates(session=session)
+    valid_compatibility_dates = date_cache.compatibility_dates.compatibility_dates
     compatibility_date = request.compatibility_date
     if compatibility_date is None:
-        compatibility_date = schema_cache.latest_compatibility_date(session=session)
-    if compatibility_date not in valid_compatibility_dates["compatibility_dates"]:
+        compatibility_date = max(valid_compatibility_dates)
+    if compatibility_date not in valid_compatibility_dates:
         fail_msg = (
             f"Requested compatibility date {compatibility_date} is not valid. "
-            f"Valid compatibility dates are: {', '.join(valid_compatibility_dates['compatibility_dates'])}."
+            f"Valid compatibility dates are: {', '.join(valid_compatibility_dates)}."
         )
         if isinstance(in_process, InvalidRequest):
             fail_msgs = list(in_process.errors) + [fail_msg]
@@ -151,8 +167,7 @@ def _validate_request_schema(
     request: Request,
     inprocess_request: ValidatedRequest | InvalidRequest,
     *,
-    session: Client,
-    schema_cache: SchemaCache,
+    schema_cache: SchemaCacheSqlite,
 ) -> ValidatedRequest | InvalidRequest:
     """Validates that the requested schema is available in the schema manager.
 
@@ -167,8 +182,7 @@ def _validate_request_schema(
         # the FailedRequestValidation with the compatibility date validation error.
         return deepcopy(inprocess_request)
     try:
-        _requested_schema = schema_cache.get_schema(
-            session=session,
+        _requested_schema = schema_cache.get_cached_schema(
             compatibility_date=inprocess_request.compatibility_date,
         )
     except Exception as e:

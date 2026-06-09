@@ -16,6 +16,9 @@ from esi_link.auth.oauth_metadata_sqlite import (
 )
 from esi_link.auth.token_manager_sqlite import CharacterTokenManagerSqlite
 from esi_link.auth.token_tool import TokenTool
+from esi_link.schema.compatibility_dates_cache_sqlite import (
+    CompatibilityDatesCacheSQLite,
+)
 from esi_link.schema.schema_cache_sqlite import SchemaCacheSqlite
 
 
@@ -29,6 +32,7 @@ class AppDataSqlite:
         self._credential_manager: CredentialManagerSqlite | None = None
         self._token_manager: CharacterTokenManagerSqlite | None = None
         self._schema_cache: SchemaCacheSqlite | None = None
+        self._dates_cache: CompatibilityDatesCacheSQLite | None = None
 
     async def __aenter__(self) -> Self:
         """Initialize the database connection and set up related resources."""
@@ -37,7 +41,12 @@ class AppDataSqlite:
         self._oauth_cache = OAuthMetadataSqliteCache(self._connection, self._session)
         self._credential_manager = CredentialManagerSqlite(self._connection)
         self._token_manager = self._init_token_manager()
-        self._schema_cache = SchemaCacheSqlite(self._connection, self._session)
+        self._dates_cache = CompatibilityDatesCacheSQLite(
+            self._connection, self._session
+        )
+        self._schema_cache = SchemaCacheSqlite(
+            self._connection, self._session, self._dates_cache
+        )
 
         return self
 
@@ -53,6 +62,7 @@ class AppDataSqlite:
             self._connection = None
         self._oauth_cache = None
         self._credential_manager = None
+        self._dates_cache = None
         self._schema_cache = None
         self._token_manager = None
         return None
@@ -129,6 +139,13 @@ class AppDataSqlite:
         if self._schema_cache is None:
             raise RuntimeError("Schema cache is not initialized.")
         return self._schema_cache
+
+    @property
+    def compatibility_dates_cache(self) -> CompatibilityDatesCacheSQLite:
+        """Get the compatibility dates cache, which manages cached ESI compatibility dates."""
+        if self._dates_cache is None:
+            raise RuntimeError("Compatibility dates cache is not initialized.")
+        return self._dates_cache
 
     @property
     def web_cache(self):

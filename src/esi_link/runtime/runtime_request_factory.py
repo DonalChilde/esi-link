@@ -5,10 +5,8 @@ from copy import deepcopy
 from dataclasses import replace
 from uuid import UUID, uuid5
 
-from httpx2 import Client
-
 from esi_link import ESI_LINK_NAMESPACE
-from esi_link.auth.token_store import TokenStore
+from esi_link.auth.token_manager_sqlite import CharacterTokenManagerSqlite
 from esi_link.helpers.canonicalize_url import combine_and_canonicalize_url
 from esi_link.runtime.models import (
     InvalidRuntimeRequest,
@@ -23,8 +21,7 @@ logger = logging.getLogger(__name__)
 
 def generate_runtime_request(
     validated_request: ValidatedRequest,
-    token_store: TokenStore | None,
-    session: Client,
+    token_store: CharacterTokenManagerSqlite | None,
     timeout_seconds: int = 10,
 ) -> RuntimeRequest | InvalidRuntimeRequest:
     """Generate a RuntimeRequest from a ValidatedRequest and the corresponding EsiSchema."""
@@ -39,7 +36,9 @@ def generate_runtime_request(
     in_process = _set_cache_url(validated_request, in_process)
     in_process = _set_cache_key(validated_request, in_process)
     in_process = _set_headers(
-        validated_request, in_process, token_store=token_store, session=session
+        validated_request,
+        in_process,
+        token_store=token_store,
     )
     in_process = _set_additional_query_parameters(validated_request, in_process)
     return in_process
@@ -47,8 +46,7 @@ def generate_runtime_request(
 
 def generate_runtime_request_group(
     validated_requests: dict[UUID, ValidatedRequest],
-    token_store: TokenStore | None,
-    session: Client,
+    token_store: CharacterTokenManagerSqlite | None,
     timeout_seconds: int = 10,
 ) -> tuple[dict[UUID, RuntimeRequest], dict[UUID, InvalidRuntimeRequest]]:
     """Generate a RuntimeRequestGroup from a ValidatedRequestGroup."""
@@ -58,7 +56,6 @@ def generate_runtime_request_group(
         runtime_request = generate_runtime_request(
             validated_request=validated_request,
             token_store=token_store,
-            session=session,
             timeout_seconds=timeout_seconds,
         )
         if isinstance(runtime_request, InvalidRuntimeRequest):
@@ -190,8 +187,7 @@ def _set_headers(
     validated_request: ValidatedRequest,
     inprocess_request: RuntimeRequest,
     *,
-    token_store: TokenStore | None,
-    session: Client,
+    token_store: CharacterTokenManagerSqlite | None,
 ) -> RuntimeRequest:
     """Sets the headers field of the RuntimeRequest based on the authentication requirements of the request and the provided authorization headers."""
     headers: dict[str, str] = {}
@@ -206,7 +202,7 @@ def _set_headers(
             )
         try:
             authorization_header = token_store.refresh_character_token(
-                validated_request.authorization_id, session=session
+                validated_request.authorization_id
             ).auth_headers
         except Exception as e:
             raise ValueError(
