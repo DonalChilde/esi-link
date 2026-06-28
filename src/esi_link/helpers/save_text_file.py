@@ -1,9 +1,6 @@
 """Helper function to save text to a file, with optional overwrite behavior."""
 
-import logging
 from pathlib import Path
-
-logger = logging.getLogger(__name__)
 
 
 def save_text_file(
